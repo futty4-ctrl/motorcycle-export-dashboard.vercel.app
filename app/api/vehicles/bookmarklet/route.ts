@@ -6,15 +6,19 @@ const API_KEY_HEADER = "x-gami-api-key"
 /** 検証するAPIキー（環境変数 GAMI_BOOKMARKLET_API_KEY で上書き可能） */
 const DEFAULT_API_KEY = "gami-bk-7f3a9c2e1b8d4f6a0e5c9b3d7f1a8e2c"
 
-/** ブックマークレットから受け取るデータ（任意のキーも許容） */
+/**
+ * ブックマークレットから受け取るデータ
+ * 必須: vehicleName / lotNumber / url のいずれか1つ以上
+ * price は vehicles にはなく scenarios に保存
+ */
 type BookmarkletBody = {
   vehicleName?: string | null
   lotNumber?: string | null
-  grade?: string | null
   overallGrade?: string | null
+  imageUrl?: string | null
   price?: number | null
   url?: string | null
-  imageUrl?: string | null
+  grade?: string | null
   image_url?: string | null
   車名?: string | null
   車種名?: string | null
@@ -100,24 +104,31 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 届いたデータをそのまま表示
-  console.log("[bookmarklet] received data:", JSON.stringify(body, null, 2))
-
+  // 受け取る5項目: vehicleName, lotNumber, overallGrade, imageUrl, price（＋urlは重複検索用）
   const vehicleName = str(
     body?.vehicleName ?? body?.車名 ?? body?.車種名
   )
   const lotNumber = str(body?.lotNumber ?? body?.出品番号)
-  const grade = str(
-    body?.grade ?? body?.評価点 ?? body?.overallGrade ?? body?.総合評価点
+  const overallGrade = str(
+    body?.overallGrade ?? body?.grade ?? body?.総合評価点 ?? body?.評価点
   )
-  const price = num(body?.price ?? body?.価格)
-  const url = str(body?.url ?? body?.URL)
   const imageUrl = str(
     body?.imageUrl ??
       body?.image_url ??
       body?.画像URL ??
       body?.メイン写真URL
   )
+  const price = num(body?.price ?? body?.価格)
+  const url = str(body?.url ?? body?.URL)
+
+  console.log("[bookmarklet] received:", {
+    vehicleName,
+    lotNumber,
+    overallGrade,
+    imageUrl: imageUrl ? "(set)" : null,
+    price,
+    url: url ? "(set)" : null,
+  })
 
   if (!vehicleName && !lotNumber && !url) {
     return NextResponse.json(
@@ -128,9 +139,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = createServerSupabaseClient()
-    const chassisNumber = vehicleName || lotNumber || null
-    const bdsRating = grade ?? null
     const status = "仕入中"
+    // vehicles に保存: 車種名(chassis_number), 出品番号, 総合評価(bds_rating), 画像URL, 元URL
+    const chassisNumber = vehicleName || lotNumber || null
 
     let existingId: string | null = null
     if (url || lotNumber) {
@@ -158,7 +169,7 @@ export async function POST(request: NextRequest) {
         .update({
           status,
           ...(chassisNumber != null && { chassis_number: chassisNumber }),
-          ...(bdsRating != null && { bds_rating: bdsRating }),
+          ...(overallGrade != null && { bds_rating: overallGrade }),
           ...(lotNumber != null && { lot_number: lotNumber }),
           ...(url != null && { source_url: url }),
           ...(imageUrl != null && { image_url: imageUrl }),
@@ -195,10 +206,10 @@ export async function POST(request: NextRequest) {
       .insert({
         status,
         chassis_number: chassisNumber,
-        bds_rating: bdsRating,
-        lot_number: lotNumber,
-        source_url: url,
-        ...(imageUrl != null && { image_url: imageUrl }),
+        bds_rating: overallGrade ?? null,
+        lot_number: lotNumber ?? null,
+        source_url: url ?? null,
+        image_url: imageUrl ?? null,
       })
       .select("id")
       .single()

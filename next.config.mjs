@@ -6,12 +6,13 @@ const nextConfig = {
   images: {
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-    // BDS（オークション・査定）の画像を next/image で表示するための許可
+    // 外部画像（Supabase Storage / BDS）を next/image で表示するための許可
     remotePatterns: [
+      { protocol: "https", hostname: "**.supabase.co", pathname: "/**" },
+      { protocol: "https", hostname: "**.bds.co.jp", pathname: "/**" },
+      { protocol: "https", hostname: "**.bds-service.jp", pathname: "/**" },
       { protocol: "https", hostname: "**.bds-net.co.jp", pathname: "/**" },
       { protocol: "https", hostname: "bds-net.co.jp", pathname: "/**" },
-      { protocol: "http", hostname: "**.bds-net.co.jp", pathname: "/**" },
-      { protocol: "http", hostname: "bds-net.co.jp", pathname: "/**" },
     ],
   },
 }
