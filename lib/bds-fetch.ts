@@ -10,15 +10,26 @@ const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp)(\?|$)/i
  * 指定URLのHTMLを取得し、img の src を抽出する（data-src 等にも対応）
  */
 export async function extractImageUrlsFromPage(pageUrl: string): Promise<string[]> {
-  const res = await fetch(pageUrl, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      Accept: "text/html,application/xhtml+xml",
-    },
-    next: { revalidate: 0 },
-  })
-  if (!res.ok) throw new Error(`ページの取得に失敗しました: ${res.status}`)
+  let res: Response
+  try {
+    res = await fetch(pageUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml",
+      },
+      next: { revalidate: 0 },
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "接続できませんでした"
+    throw new Error(`ページに接続できませんでした（${msg}）。ログイン必須や bot 対策の場合は、下の「ファイルを選択」で写真をアップロードしてください。`)
+  }
+  if (!res.ok) {
+    if (res.status === 403 || res.status === 401) {
+      throw new Error("BDS がアクセスを拒否しています（要ログインまたは外部アクセス制限）。写真は「ファイルを選択」またはドラッグ＆ドロップでアップロードしてください。")
+    }
+    throw new Error(`ページの取得に失敗しました（${res.status}）。「ファイルを選択」で写真をアップロードできます。`)
+  }
   const html = await res.text()
   const baseUrl = new URL(pageUrl)
   const urls: string[] = []

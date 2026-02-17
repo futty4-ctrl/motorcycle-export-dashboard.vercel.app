@@ -328,7 +328,12 @@ export function VehicleDetailContent({
       toast.success(`${res.count}枚の写真を Drive に保存しました`)
       setBdsUrl("")
       window.location.reload()
-    } else toast.error(res.error)
+    } else {
+      toast.error(res.error ?? "取り込みに失敗しました", {
+        description: "下の「ファイルを選択」またはドラッグ＆ドロップで写真をアップロードできます。",
+        duration: 8000,
+      })
+    }
   }
 
   const readFilesAsBase64 = (files: FileList | null): Promise<{ base64: string; mimeType: string }[]> => {
@@ -975,6 +980,9 @@ export function VehicleDetailContent({
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             BDS車両ページURLから写真を取り込むか、PCから写真をドラッグ＆ドロップ／ファイル選択でアップロードできます。Drive に保存した写真を Gemini で解析し、外装・フレーム・エンジン評価（A〜E）・リスク箇所・eBay高値パーツをリスト化します。
+          </p>
+          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            URL 取り込みができない場合（BDS のログイン必須・外部制限など）は、下のドラッグ＆ドロップまたは「ファイルを選択」で写真をアップロードしてください。
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <input

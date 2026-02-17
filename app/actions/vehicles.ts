@@ -687,7 +687,10 @@ export async function importPhotosFromBdsUrl(
 
     const imageUrls = await extractImageUrlsFromPage(bdsPageUrl)
     if (imageUrls.length === 0) {
-      return { success: false, error: "ページから画像を取得できませんでした。" }
+      return {
+        success: false,
+        error: "ページから画像を取得できませんでした。BDS が外部アクセスを制限している、または写真が JavaScript で読み込まれている可能性があります。下の「ファイルを選択」またはドラッグ＆ドロップで写真をアップロードしてください。",
+      }
     }
 
     const imageIds: string[] = []
@@ -706,7 +709,10 @@ export async function importPhotosFromBdsUrl(
     }
 
     if (imageIds.length === 0) {
-      return { success: false, error: "アップロード可能な画像がありませんでした。" }
+      return {
+        success: false,
+        error: "アップロード可能な画像がありませんでした（BDS の画像が取得できない場合があります）。「ファイルを選択」またはドラッグ＆ドロップで写真をアップロードしてください。",
+      }
     }
 
     return {
