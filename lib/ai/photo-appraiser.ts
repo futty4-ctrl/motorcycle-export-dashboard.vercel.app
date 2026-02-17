@@ -12,7 +12,10 @@ export type PhotoAppraisalResult = {
   confidence: "high" | "medium" | "low"
   customParts: { part: string; brand?: string }[]
   exteriorCondition: number
+  /** 日本国内オークションでの落札相場（仕入目安・円） */
   estimatedDomesticJpy: number
+  /** ヤフオク等で車体として売った場合の想定売却額（円）。未設定時は estimatedDomesticJpy をフォールバック */
+  estimatedDomesticSaleJpy?: number
   estimatedExportUsd: number
   note?: string
 }
@@ -23,9 +26,10 @@ const APPRAISER_PROMPT = `あなたはバイク輸出入のプロ鑑定士です
 1. **車種名と型式**: 可能な範囲で特定し、確信度（high / medium / low）も付けてください。
 2. **カスタムパーツの有無とブランド**: 純正以外のパーツがあればパーツ名とブランド（分かる場合）を列挙してください。
 3. **外装コンディション**: 5段階評価（1=不良・5=良）で付けてください。
-4. **推定落札相場**:
-   - 日本国内のオークション落札相場の目安（円）
-   - 海外輸出時の想定売却相場（USD）
+4. **価格の目安**（すべて数値で）:
+   - **estimatedDomesticJpy**: 日本国内のオークションでこのバイクを落札するときの相場（仕入価格の目安・円）
+   - **estimatedDomesticSaleJpy**: 同じバイクをヤフオク等で車体として売った場合の想定売却額（円）。落札相場より高くなることが多い。
+   - **estimatedExportUsd**: 海外輸出時の想定売却相場（USD）
 
 出力は必ず次の JSON 形式のみにしてください。説明文は不要です。
 {
@@ -34,8 +38,9 @@ const APPRAISER_PROMPT = `あなたはバイク輸出入のプロ鑑定士です
   "confidence": "high" | "medium" | "low",
   "customParts": [{"part": "パーツ名", "brand": "ブランド名（不明なら省略可）"}],
   "exteriorCondition": 1〜5の整数,
-  "estimatedDomesticJpy": 日本国内推定落札相場（円の数値）,
-  "estimatedExportUsd": 海外輸出推定相場（USDの数値）,
+  "estimatedDomesticJpy": 日本国内オークション落札相場＝仕入目安（円）,
+  "estimatedDomesticSaleJpy": ヤフオク等で車体販売したときの想定売却額（円）,
+  "estimatedExportUsd": 海外輸出想定売却額（USDの数値）,
   "note": "任意のメモ（省略可）"
 }`
 
@@ -73,6 +78,12 @@ function parseAppraisalJson(text: string): PhotoAppraisalResult {
       : typeof parsed.estimatedExportUsd === "string"
         ? Math.max(0, parseFloat(parsed.estimatedExportUsd.replace(/[^0-9.]/g, "")) || 0)
         : 0
+  const estimatedDomesticSaleJpy =
+    typeof parsed.estimatedDomesticSaleJpy === "number"
+      ? Math.max(0, Math.round(parsed.estimatedDomesticSaleJpy))
+      : typeof parsed.estimatedDomesticSaleJpy === "string"
+        ? Math.max(0, parseInt(parsed.estimatedDomesticSaleJpy.replace(/\D/g, ""), 10) || 0)
+        : undefined
   const note = typeof parsed.note === "string" ? parsed.note : undefined
   return {
     modelName,
@@ -81,6 +92,7 @@ function parseAppraisalJson(text: string): PhotoAppraisalResult {
     customParts,
     exteriorCondition,
     estimatedDomesticJpy,
+    ...(estimatedDomesticSaleJpy != null && estimatedDomesticSaleJpy > 0 && { estimatedDomesticSaleJpy }),
     estimatedExportUsd,
     note,
   }

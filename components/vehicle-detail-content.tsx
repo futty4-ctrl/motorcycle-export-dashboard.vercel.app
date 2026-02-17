@@ -681,7 +681,8 @@ export function VehicleDetailContent({
                   if (!res.ok) throw new Error(data?.error ?? "AI査定に失敗しました")
                   const purchaseLimit = data.purchaseLimitJpy ?? (data.estimatedDomesticJpy ? Math.round(data.estimatedDomesticJpy * 0.7) : maxBid)
                   setMaxBid(purchaseLimit)
-                  if (data.estimatedDomesticJpy != null) setYahooExpectedSale(data.estimatedDomesticJpy)
+                  const salePrice = data.estimatedDomesticSaleJpy ?? data.estimatedDomesticJpy
+                  if (salePrice != null && salePrice > 0) setYahooExpectedSale(salePrice)
                   if (data.estimatedExportUsd != null) setEbayExpectedSaleUsd(data.estimatedExportUsd)
                   const descParts: string[] = []
                   if (data.modelName) descParts.push(`${data.modelName}${data.modelType ? ` (${data.modelType})` : ""}`)
