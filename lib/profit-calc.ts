@@ -65,6 +65,94 @@ export type EbayPartsScenario = {
   profitJpy: number
 }
 
+/** GAMI専用: 送料プリセット（円） */
+export const GAMI_SHIPPING_NORMAL_JPY = 15000
+export const GAMI_SHIPPING_OSAKA_JPY = 5000
+
+/** GAMI専用: 車体出品時のヤフオク手数料（円） */
+export const GAMI_YAHOO_FEE_BODY_JPY = 1980
+
+/** GAMI専用: 利益4万確保の閾値（円） */
+export const GAMI_TARGET_PROFIT_JPY = 40000
+
+export type GamiListingType = "body" | "parts"
+export type GamiShippingType = "normal" | "osaka"
+
+export type GamiProfitResult = {
+  /** 成約料（Base） */
+  baseFeeJpy: number
+  /** 消費税 = 成約料 * 0.1 */
+  consumptionTaxJpy: number
+  /** 送料（円） */
+  shippingJpy: number
+  /** ヤフオク手数料（円）車体=1980、パーツ=販売予想*0.1 */
+  yahooFeeJpy: number
+  /** 整備費（円）= 修理費 */
+  repairCostJpy: number
+  /** 支出合計 */
+  totalCostJpy: number
+  /** 最終利益 */
+  finalProfitJpy: number
+  /** 仕入れ可（最終利益>=4万） */
+  isPurchasable: boolean
+  /** 利益4万確保できる最大落札額（円）。これ以下で落札すれば利益4万以上 */
+  maxBidForTargetProfitJpy: number
+}
+
+/**
+ * GAMI専用ルールで最終利益と逆算を計算
+ * 消費税 = 成約料*0.1
+ * ヤフオク手数料 = 車体なら1980円、パーツなら販売予想*0.1
+ * 支出合計 = 落札 + 成約料 + 消費税 + 送料 + ヤフオク手数料 + 整備費
+ * 最終利益 = 販売予想 - 支出合計
+ */
+export function calcGamiProfit(params: {
+  expectedSalePriceJpy: number
+  winningBidJpy: number
+  baseFeeJpy: number
+  shippingType: GamiShippingType
+  listingType: GamiListingType
+  repairCostJpy: number
+}): GamiProfitResult {
+  const consumptionTaxJpy = Math.round(params.baseFeeJpy * 0.1)
+  const shippingJpy =
+    params.shippingType === "osaka" ? GAMI_SHIPPING_OSAKA_JPY : GAMI_SHIPPING_NORMAL_JPY
+  const yahooFeeJpy =
+    params.listingType === "body"
+      ? GAMI_YAHOO_FEE_BODY_JPY
+      : Math.round(params.expectedSalePriceJpy * 0.1)
+  const totalCostJpy =
+    params.winningBidJpy +
+    params.baseFeeJpy +
+    consumptionTaxJpy +
+    shippingJpy +
+    yahooFeeJpy +
+    params.repairCostJpy
+  const finalProfitJpy = params.expectedSalePriceJpy - totalCostJpy
+  const isPurchasable = finalProfitJpy >= GAMI_TARGET_PROFIT_JPY
+  const maxBidForTargetProfitJpy = Math.max(
+    0,
+    params.expectedSalePriceJpy -
+      GAMI_TARGET_PROFIT_JPY -
+      params.baseFeeJpy -
+      consumptionTaxJpy -
+      shippingJpy -
+      yahooFeeJpy -
+      params.repairCostJpy
+  )
+  return {
+    baseFeeJpy: params.baseFeeJpy,
+    consumptionTaxJpy,
+    shippingJpy,
+    yahooFeeJpy,
+    repairCostJpy: params.repairCostJpy,
+    totalCostJpy,
+    finalProfitJpy,
+    isPurchasable,
+    maxBidForTargetProfitJpy,
+  }
+}
+
 /**
  * 利益 = 販売予想価格 - (落札額 + 陸送費 + 修理費 + 各手数料 + 送料)
  */

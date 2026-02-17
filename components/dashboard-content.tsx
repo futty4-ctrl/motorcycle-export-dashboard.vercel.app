@@ -272,7 +272,10 @@ export function DashboardContent() {
       <div className="mt-4">
         <SummaryCards summary={summary} />
       </div>
-      <div className="mt-6">
+      <p className="mt-6 text-sm text-muted-foreground">
+        「あと○円以内の落札なら利益4万確保」は各車両をクリックし、詳細の利益シミュレーター（GAMI専用ルール）で確認できます。
+      </p>
+      <div className="mt-2">
         <VehicleList
           vehicles={vehicles}
           externalSearch={headerSearch}

@@ -49,7 +49,14 @@ import {
 import { getSettings } from "@/app/actions/settings"
 import { saveBadCase } from "@/app/actions/bad-cases"
 import { toast } from "sonner"
-import { calcYahooBodyScenario, calcEbayPartsScenario } from "@/lib/profit-calc"
+import {
+  calcYahooBodyScenario,
+  calcEbayPartsScenario,
+  calcGamiProfit,
+  GAMI_TARGET_PROFIT_JPY,
+  type GamiShippingType,
+  type GamiListingType,
+} from "@/lib/profit-calc"
 import {
   calcPremiumPartsBonusJpy,
   isPremiumPartCategory,
@@ -195,7 +202,7 @@ export function VehicleDetailContent({
   const [badCaseFocusPointsInput, setBadCaseFocusPointsInput] = useState("")
   const [savingBadCase, setSavingBadCase] = useState(false)
 
-  // 利益シミュレーター
+  // 利益シミュレーター（GAMI専用ルール）
   const [maxBid, setMaxBid] = useState(100000)
   const [domesticShipping, setDomesticShipping] = useState(30000)
   const [yahooExpectedSale, setYahooExpectedSale] = useState(200000)
@@ -204,6 +211,9 @@ export function VehicleDetailContent({
   const [yahooShipping, setYahooShipping] = useState(5000)
   const [ebayFeesUsd, setEbayFeesUsd] = useState(50)
   const [ebayShippingUsd, setEbayShippingUsd] = useState(40)
+  const [baseFeeJpy, setBaseFeeJpy] = useState(0)
+  const [gamiShippingType, setGamiShippingType] = useState<GamiShippingType>("normal")
+  const [gamiListingType, setGamiListingType] = useState<GamiListingType>("body")
 
   const [appraiseLoading, setAppraiseLoading] = useState(false)
   const appraiseInputRef = useRef<HTMLInputElement>(null)
@@ -542,6 +552,15 @@ export function VehicleDetailContent({
   const recommendedScenario =
     yahooSim.profitJpy >= ebaySim.profitJpy ? "yahoo_body" : "ebay_parts"
 
+  const gamiResult = calcGamiProfit({
+    expectedSalePriceJpy: yahooExpectedSale,
+    winningBidJpy: maxBid,
+    baseFeeJpy,
+    shippingType: gamiShippingType,
+    listingType: gamiListingType,
+    repairCostJpy: totalRepairCost,
+  })
+
   return (
     <div className="space-y-8">
       {/* 基本情報 */}
@@ -645,8 +664,12 @@ export function VehicleDetailContent({
         </div>
       )}
 
-      {/* BDS仕入れ 利益シミュレーター */}
-      <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+      {/* BDS仕入れ 利益シミュレーター（GAMI専用ルール） */}
+      <div
+        className={`rounded-xl border-2 bg-card p-4 sm:p-5 ${
+          gamiResult.isPurchasable ? "border-green-500 shadow-[0_0_12px_rgba(34,197,94,0.4)]" : "border-border"
+        }`}
+      >
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -654,7 +677,7 @@ export function VehicleDetailContent({
               利益シミュレーター
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              入札上限・経費を入力すると、ヤフオク販売時とeBayパーツ販売時の予想利益をリアルタイム表示します。
+              GAMI専用ルール：成約料・送料・出品タイプを設定し、最終利益と「あと○円以内の落札なら利益4万確保」を表示します。
             </p>
           </div>
           <div>
@@ -745,16 +768,39 @@ export function VehicleDetailContent({
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
-              <label className="text-xs text-muted-foreground">陸送費（円）</label>
+              <label className="text-xs text-muted-foreground">成約料・Base（円）</label>
               <input
                 type="number"
-                value={domesticShipping}
-                onChange={(e) => setDomesticShipping(Number(e.target.value) || 0)}
+                min={0}
+                value={baseFeeJpy}
+                onChange={(e) => setBaseFeeJpy(Number(e.target.value) || 0)}
                 className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-sm"
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">修理費（円）</label>
+              <label className="text-xs text-muted-foreground">送料</label>
+              <select
+                value={gamiShippingType}
+                onChange={(e) => setGamiShippingType(e.target.value as GamiShippingType)}
+                className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-sm"
+              >
+                <option value="normal">通常（15,000円）</option>
+                <option value="osaka">大阪（5,000円）</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">出品タイプ</label>
+              <select
+                value={gamiListingType}
+                onChange={(e) => setGamiListingType(e.target.value as GamiListingType)}
+                className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-sm"
+              >
+                <option value="body">車体</option>
+                <option value="parts">パーツ</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">整備費（円）</label>
               <input
                 type="number"
                 value={totalRepairCost}
@@ -762,22 +808,26 @@ export function VehicleDetailContent({
                 className="mt-0.5 w-full rounded-lg border border-input bg-muted/50 px-2 py-1.5 text-sm"
               />
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {totalRepairCost === 0
-                  ? "査定未実行"
-                  : `AI査定${baseRepairCost > 0 ? ` ¥${baseRepairCost.toLocaleString()}` : ""}${strictRepairCost > 0 ? ` + 高精度 ¥${strictRepairCost.toLocaleString()}` : ""}${consumablesCost > 0 ? ` + 消耗品 ¥${consumablesCost.toLocaleString()}` : ""}`}
+                {totalRepairCost === 0 ? "査定未実行" : "AI査定・高精度・消耗品"}
               </p>
-              {consumablesItems.length > 0 && (
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {consumablesItems.map((i) => `${i.label} ¥${i.costJpy.toLocaleString()}`).join(" / ")}
-                </p>
-              )}
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
-              <label className="text-xs text-muted-foreground">ヤフオク予想売却（円）</label>
+              <label className="text-xs text-muted-foreground">販売予想価格（円）</label>
               <input
                 type="number"
                 value={yahooExpectedSale}
                 onChange={(e) => setYahooExpectedSale(Number(e.target.value) || 0)}
+                className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">陸送費（円・従来式用）</label>
+              <input
+                type="number"
+                value={domesticShipping}
+                onChange={(e) => setDomesticShipping(Number(e.target.value) || 0)}
                 className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-sm"
               />
             </div>
@@ -792,42 +842,52 @@ export function VehicleDetailContent({
             </div>
           </div>
 
+          <div className="rounded-lg bg-muted/30 p-4">
+            <p className="text-xs text-muted-foreground">支出内訳（GAMI）</p>
+            <p className="mt-1 text-sm">
+              落札 {formatJPY(maxBid)} ＋ 成約料 {formatJPY(gamiResult.baseFeeJpy)} ＋ 消費税 {formatJPY(gamiResult.consumptionTaxJpy)} ＋ 送料 {formatJPY(gamiResult.shippingJpy)} ＋ ヤフオク手数料 {formatJPY(gamiResult.yahooFeeJpy)} ＋ 整備費 {formatJPY(gamiResult.repairCostJpy)} ＝ 支出合計 {formatJPY(gamiResult.totalCostJpy)}
+            </p>
+            <p className="mt-2 text-sm font-semibold">
+              最終利益 ＝ 販売予想 {formatJPY(yahooExpectedSale)} − 支出合計 {formatJPY(gamiResult.totalCostJpy)} ＝ {formatJPY(gamiResult.finalProfitJpy)}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-lg bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-lg font-bold ${
+                  gamiResult.isPurchasable ? "bg-green-600 text-white" : "bg-amber-600 text-white"
+                }`}
+              >
+                {gamiResult.isPurchasable ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
+                {gamiResult.isPurchasable ? "仕入れ可" : "検討中"}
+              </span>
+              <span className={`text-lg font-bold ${gamiResult.finalProfitJpy >= 0 ? "text-foreground" : "text-destructive"}`}>
+                最終利益 {formatJPY(gamiResult.finalProfitJpy)}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              あと <strong className="text-foreground">{formatJPY(gamiResult.maxBidForTargetProfitJpy)}</strong> 以内の落札なら利益4万確保
+            </p>
+          </div>
+
           {ebayBonusJpy > 0 && (
             <p className="text-xs text-muted-foreground">
               4mini鑑定で検出したブランドパーツ・社外品の中古相場 +{formatJPY(ebayBonusJpy)} をeBay利益に加算
             </p>
           )}
-          <div className="flex flex-col gap-3 rounded-lg bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap gap-6">
-              <div>
-                <p className="text-xs text-muted-foreground">ヤフオク販売 予想利益</p>
-                <p className={`text-lg font-bold ${yahooSim.profitJpy >= 0 ? "text-foreground" : "text-destructive"}`}>
-                  {formatJPY(yahooSim.profitJpy)}
-                  {recommendedScenario === "yahoo_body" && (
-                    <span className="ml-2 text-sm font-normal text-primary">推奨</span>
-                  )}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">eBayパーツ 予想利益</p>
-                <p className={`text-lg font-bold ${ebaySim.profitJpy >= 0 ? "text-foreground" : "text-destructive"}`}>
-                  {formatJPY(ebaySim.profitJpy)}
-                  {recommendedScenario === "ebay_parts" && (
-                    <span className="ml-2 text-sm font-normal text-primary">推奨</span>
-                  )}
-                </p>
-              </div>
+          <div className="flex flex-wrap gap-6 rounded-lg bg-muted/20 p-3">
+            <div>
+              <p className="text-xs text-muted-foreground">ヤフオク販売 予想利益（従来式）</p>
+              <p className={`text-sm font-bold ${yahooSim.profitJpy >= 0 ? "text-foreground" : "text-destructive"}`}>
+                {formatJPY(yahooSim.profitJpy)}
+              </p>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">目標 {formatJPY(TARGET_PROFIT_JPY)}</span>
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-lg font-bold ${
-                  isGo ? "bg-green-600 text-white" : "bg-red-600 text-white"
-                }`}
-              >
-                {isGo ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
-                {isGo ? "GO" : "STOP"}
-              </span>
+            <div>
+              <p className="text-xs text-muted-foreground">eBayパーツ 予想利益</p>
+              <p className={`text-sm font-bold ${ebaySim.profitJpy >= 0 ? "text-foreground" : "text-destructive"}`}>
+                {formatJPY(ebaySim.profitJpy)}
+              </p>
             </div>
           </div>
         </div>
