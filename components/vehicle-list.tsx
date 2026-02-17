@@ -6,7 +6,7 @@ import { vehicles as fallbackVehicles, type VehicleStatus } from "@/lib/data"
 import type { VehicleDisplay } from "@/lib/vehicle-display"
 import { VehicleCard } from "./vehicle-card"
 
-const filters: (VehicleStatus | "すべて")[] = ["すべて", "仕入中", "落札", "在庫あり", "出品中", "発送中", "売却済"]
+const filters: (VehicleStatus | "すべて")[] = ["すべて", "仕入中", "査定中", "落札", "在庫あり", "出品中", "発送中", "売却済"]
 
 type VehicleListProps = {
   /** Supabase / スプレッドシートから取得した車両一覧。未指定時はフォールバックデータを使用 */

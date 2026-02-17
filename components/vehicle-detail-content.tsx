@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   ExternalLink,
   Loader2,
@@ -17,6 +17,7 @@ import {
   XCircle,
   ShieldCheck,
   AlertCircle,
+  Upload,
 } from "lucide-react"
 import {
   Dialog,
@@ -37,6 +38,7 @@ import {
   runStrictInspection,
   runFourMiniAnalysis,
   importPhotosFromBdsUrl,
+  uploadVehiclePhotosDirect,
   updateEvaluationActuals,
 } from "@/app/actions/vehicles"
 import {
@@ -54,7 +56,7 @@ import {
 } from "@/lib/premium-parts-bonus"
 
 const FALLBACK_IMAGE = "/bikes/placeholder.svg"
-const STATUSES: VehicleStatus[] = ["仕入中", "落札", "在庫あり", "出品中", "発送中", "売却済"]
+const STATUSES: VehicleStatus[] = ["仕入中", "査定中", "落札", "在庫あり", "出品中", "発送中", "売却済"]
 
 const TARGET_PROFIT_JPY = 50000
 
@@ -178,6 +180,9 @@ export function VehicleDetailContent({
   )
   const [bdsUrl, setBdsUrl] = useState("")
   const [bdsImporting, setBdsImporting] = useState(false)
+  const [directUploading, setDirectUploading] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const directUploadInputRef = useRef<HTMLInputElement>(null)
   const [usdJpyRate, setUsdJpyRate] = useState(150)
   const [strictInspectionRunning, setStrictInspectionRunning] = useState(false)
   const [fourMiniRunning, setFourMiniRunning] = useState(false)
@@ -319,6 +324,43 @@ export function VehicleDetailContent({
     if (res.success) {
       toast.success(`${res.count}枚の写真を Drive に保存しました`)
       setBdsUrl("")
+      window.location.reload()
+    } else toast.error(res.error)
+  }
+
+  const readFilesAsBase64 = (files: FileList | null): Promise<{ base64: string; mimeType: string }[]> => {
+    if (!files || files.length === 0) return Promise.resolve([])
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    const list = Array.from(files).filter((f) => allowed.includes(f.type))
+    return Promise.all(
+      list.map(
+        (f) =>
+          new Promise<{ base64: string; mimeType: string }>((resolve, reject) => {
+            const r = new FileReader()
+            r.onload = () => {
+              const data = (r.result as string)?.split(",")[1]
+              if (data) resolve({ base64: data, mimeType: f.type })
+              else reject(new Error("読み込み失敗"))
+            }
+            r.onerror = () => reject(r.error)
+            r.readAsDataURL(f)
+          })
+      )
+    )
+  }
+
+  const handleDirectUpload = async (files: FileList | null) => {
+    if (source !== "supabase" || !files?.length) return
+    const images = await readFilesAsBase64(files)
+    if (images.length === 0) {
+      toast.error("画像ファイル（JPEG/PNG/WebP/GIF）を選択してください")
+      return
+    }
+    setDirectUploading(true)
+    const res = await uploadVehiclePhotosDirect(vehicle.id, images)
+    setDirectUploading(false)
+    if (res.success) {
+      toast.success(`${res.count}枚を Drive にアップロードしました。続けて「写真を一括解析して保存」を実行できます。`)
       window.location.reload()
     } else toast.error(res.error)
   }
@@ -574,6 +616,26 @@ export function VehicleDetailContent({
           </div>
         </div>
       </div>
+
+      {/* ブックマークレット登録で Drive に写真がない場合の案内 */}
+      {source === "supabase" && !vehicle.driveLink && (
+        <div className="rounded-xl border border-primary/40 bg-primary/5 p-4 sm:p-5">
+          <h2 className="text-base font-semibold text-foreground">評価の進め方（ブックマークレットで登録した車両）</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            この車両はブックマークレットで登録されたため、まだ Drive に写真がありません。
+          </p>
+          <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-muted-foreground">
+            <li>
+              <strong className="text-foreground">査定・利益比較だけすぐ行う</strong>
+              ：下の「BDSテキスト」に査定表の内容をコピペして「査定実行して保存」を押してください。
+            </li>
+            <li>
+              <strong className="text-foreground">写真解析・高精度鑑定も行う</strong>
+              ：BDS の URL が使える場合は「BDS車両ページURL」で写真を取り込み、難しい場合は<strong className="text-foreground">スクショをこのページの「ファイルを選択」またはドラッグ＆ドロップでアップロード</strong>してから「写真を一括解析して保存」を実行してください。
+            </li>
+          </ul>
+        </div>
+      )}
 
       {/* BDS仕入れ 利益シミュレーター */}
       <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
@@ -844,7 +906,7 @@ export function VehicleDetailContent({
             オークション写真一括解析
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            BDS車両ページURLから写真を取り込むか、Drive に保存した写真を Gemini で解析し、外装・フレーム・エンジン評価（A〜E）・リスク箇所・eBay高値パーツをリスト化します。
+            BDS車両ページURLから写真を取り込むか、PCから写真をドラッグ＆ドロップ／ファイル選択でアップロードできます。Drive に保存した写真を Gemini で解析し、外装・フレーム・エンジン評価（A〜E）・リスク箇所・eBay高値パーツをリスト化します。
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <input
@@ -864,6 +926,57 @@ export function VehicleDetailContent({
               {bdsImporting ? "取り込み中…" : "写真を取り込む"}
             </button>
           </div>
+
+          <input
+            ref={directUploadInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              handleDirectUpload(e.target.files)
+              e.target.value = ""
+            }}
+          />
+          <div
+            className={`mt-3 rounded-lg border-2 border-dashed p-4 text-center transition-colors ${
+              isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/30 bg-muted/30"
+            } ${directUploading ? "pointer-events-none opacity-70" : ""}`}
+            onDragOver={(e) => {
+              e.preventDefault()
+              if (!directUploading) setIsDragging(true)
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setIsDragging(false)
+              if (!directUploading && e.dataTransfer.files.length) handleDirectUpload(e.dataTransfer.files)
+            }}
+          >
+            {directUploading ? (
+              <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                アップロード中…
+              </span>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  写真をここにドラッグ＆ドロップするか、
+                  <button
+                    type="button"
+                    onClick={() => directUploadInputRef.current?.click()}
+                    className="mx-1 inline-flex items-center gap-1 font-medium text-primary underline hover:no-underline"
+                  >
+                    <Upload className="h-4 w-4" />
+                    ファイルを選択
+                  </button>
+                  してアップロード
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">JPEG / PNG / WebP / GIF（複数可）</p>
+              </>
+            )}
+          </div>
+
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"

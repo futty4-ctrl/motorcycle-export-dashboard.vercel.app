@@ -21,7 +21,7 @@ import {
 import { Loader2, Package, Car, Search, ExternalLink } from "lucide-react"
 import { toast } from "sonner"
 
-const STATUSES: VehicleStatus[] = ["仕入中", "落札", "在庫あり", "出品中", "発送中", "売却済"]
+const STATUSES: VehicleStatus[] = ["仕入中", "査定中", "落札", "在庫あり", "出品中", "発送中", "売却済"]
 
 export function InventoryContent() {
   const [vehicles, setVehicles] = useState<VehicleDisplay[] | null>(null)

@@ -1,4 +1,4 @@
-export type VehicleStatus = "仕入中" | "落札" | "在庫あり" | "出品中" | "売却済" | "発送中"
+export type VehicleStatus = "仕入中" | "査定中" | "落札" | "在庫あり" | "出品中" | "売却済" | "発送中"
 
 export interface Vehicle {
   id: string

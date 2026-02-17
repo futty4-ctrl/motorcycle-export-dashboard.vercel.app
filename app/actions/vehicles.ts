@@ -28,7 +28,7 @@ import type { Vehicle, VehicleStatus } from "@/lib/data"
 import type { VehicleDisplay } from "@/lib/vehicle-display"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
-const VALID_STATUSES: VehicleStatus[] = ["仕入中", "落札", "在庫あり", "出品中", "売却済", "発送中"]
+const VALID_STATUSES: VehicleStatus[] = ["仕入中", "査定中", "落札", "在庫あり", "出品中", "売却済", "発送中"]
 
 function parseVehicleStatus(value: string): VehicleStatus {
   const trimmed = String(value).trim()
@@ -717,6 +717,72 @@ export async function importPhotosFromBdsUrl(
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "BDS写真の取り込みに失敗しました"
+    return { success: false, error: message }
+  }
+}
+
+/**
+ * 車両の Drive フォルダに複数画像を直接アップロードする（フォルダがなければ作成）。
+ * ブックマークレット登録車でも「ファイルを選択」で写真を上げたあと解析できる。
+ */
+export async function uploadVehiclePhotosDirect(
+  vehicleId: string,
+  images: { base64: string; mimeType: string }[]
+): Promise<{
+  success: boolean
+  error?: string
+  count?: number
+  folderUrl?: string
+}> {
+  if (images.length === 0) {
+    return { success: false, error: "画像がありません。" }
+  }
+  try {
+    const supabase = createServerSupabaseClient()
+    let folderId: string
+    let folderUrl: string
+
+    const { data: vehicle } = await supabase
+      .from("vehicles")
+      .select("drive_link")
+      .eq("id", vehicleId)
+      .single()
+
+    const existingFolderId = extractDriveFolderId(vehicle?.drive_link ?? null)
+    if (existingFolderId) {
+      folderId = existingFolderId
+      folderUrl = vehicle!.drive_link!
+    } else {
+      const parentId = process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID ?? undefined
+      const created = await createVehicleDriveFolder(vehicleId, parentId)
+      folderId = created.id
+      folderUrl = created.webViewLink
+      await supabase
+        .from("vehicles")
+        .update({ drive_link: folderUrl })
+        .eq("id", vehicleId)
+    }
+
+    const ext = (mime: string) => (mime.includes("png") ? "png" : "jpg")
+    for (let i = 0; i < Math.min(images.length, 50); i++) {
+      const img = images[i]
+      const name = `upload_${i + 1}.${ext(img.mimeType)}`
+      await uploadToDriveFolder(
+        folderId,
+        name,
+        img.mimeType,
+        img.base64
+      )
+    }
+
+    const count = Math.min(images.length, 50)
+    return {
+      success: true,
+      count,
+      folderUrl,
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "アップロードに失敗しました"
     return { success: false, error: message }
   }
 }

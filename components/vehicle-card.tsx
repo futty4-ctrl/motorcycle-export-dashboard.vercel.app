@@ -17,6 +17,8 @@ function getStatusStyle(status: VehicleStatus) {
   switch (status) {
     case "仕入中":
       return "bg-chart-3/15 text-chart-3 border-chart-3/30"
+    case "査定中":
+      return "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30"
     case "落札":
       return "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
     case "在庫あり":
