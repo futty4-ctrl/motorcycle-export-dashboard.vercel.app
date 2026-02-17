@@ -24,18 +24,23 @@ function isAllowedUrl(url: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
-  const url = request.nextUrl.searchParams.get("url")
+  const raw = request.nextUrl.searchParams.get("url")
+  const url = raw ? decodeURIComponent(raw).trim() : ""
   if (!url || !isAllowedUrl(url)) {
     return new NextResponse("Invalid or disallowed URL", { status: 400 })
   }
 
   try {
+    const origin = new URL(url).origin
     const res = await fetch(url, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         Accept: "image/*",
+        Referer: origin + "/",
+        Origin: origin,
       },
+      redirect: "follow",
       next: { revalidate: 3600 },
     })
     if (!res.ok) {
