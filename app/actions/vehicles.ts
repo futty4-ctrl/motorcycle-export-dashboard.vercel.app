@@ -788,6 +788,65 @@ export async function uploadVehiclePhotosDirect(
 }
 
 /**
+ * BDS車両URLを1本貼るだけで車両を登録し、写真を取り込む。
+ * 既に同じ source_url の車両があればその車両に写真のみ取り込む。
+ */
+export async function createVehicleAndImportFromBdsUrl(bdsPageUrl: string): Promise<{
+  success: boolean
+  error?: string
+  vehicleId?: string
+  count?: number
+}> {
+  const url = bdsPageUrl.trim()
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    return { success: false, error: "有効なURLを入力してください。" }
+  }
+  try {
+    const supabase = createServerSupabaseClient()
+
+    const { data: existing } = await supabase
+      .from("vehicles")
+      .select("id")
+      .eq("source_url", url)
+      .maybeSingle()
+
+    let vehicleId: string
+    if (existing?.id) {
+      vehicleId = existing.id
+    } else {
+      const { data: inserted, error: insertError } = await supabase
+        .from("vehicles")
+        .insert({
+          status: "仕入中",
+          source_url: url,
+        })
+        .select("id")
+        .single()
+      if (insertError) throw insertError
+      if (!inserted?.id) throw new Error("車両の作成に失敗しました")
+      vehicleId = inserted.id
+    }
+
+    const importRes = await importPhotosFromBdsUrl(vehicleId, url)
+    if (!importRes.success) {
+      return {
+        success: false,
+        error: importRes.error,
+        vehicleId,
+      }
+    }
+    return {
+      success: true,
+      vehicleId,
+      count: importRes.count,
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "登録・取り込みに失敗しました"
+    return { success: false, error: message }
+  }
+}
+
+/**
  * 車両に紐づく利益シナリオを取得（Supabase）
  */
 export async function getScenariosByVehicleId(vehicleId: string) {

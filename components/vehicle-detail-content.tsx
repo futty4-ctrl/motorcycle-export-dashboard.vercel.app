@@ -622,7 +622,7 @@ export function VehicleDetailContent({
         <div className="rounded-xl border border-primary/40 bg-primary/5 p-4 sm:p-5">
           <h2 className="text-base font-semibold text-foreground">評価の進め方（ブックマークレットで登録した車両）</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            この車両はブックマークレットで登録されたため、まだ Drive に写真がありません。
+            ブックマークレットの役割は<strong className="text-foreground">「車両を1件登録してこのページを開く」</strong>まで。写真の追加・解析はすべてこのページで行います。
           </p>
           <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-muted-foreground">
             <li>
@@ -631,7 +631,7 @@ export function VehicleDetailContent({
             </li>
             <li>
               <strong className="text-foreground">写真解析・高精度鑑定も行う</strong>
-              ：BDS の URL が使える場合は「BDS車両ページURL」で写真を取り込み、難しい場合は<strong className="text-foreground">スクショをこのページの「ファイルを選択」またはドラッグ＆ドロップでアップロード</strong>してから「写真を一括解析して保存」を実行してください。
+              ：「オークション写真一括解析」で、BDS URL を貼って「写真を取り込む」か、<strong className="text-foreground">スクショをドラッグ＆ドロップ・ファイル選択・Ctrl+V（貼り付け）</strong>でアップロードしてから「写真を一括解析して保存」を実行してください。
             </li>
           </ul>
         </div>
@@ -939,7 +939,10 @@ export function VehicleDetailContent({
             }}
           />
           <div
-            className={`mt-3 rounded-lg border-2 border-dashed p-4 text-center transition-colors ${
+            tabIndex={0}
+            role="button"
+            aria-label="写真をドロップまたは貼り付け"
+            className={`mt-3 rounded-lg border-2 border-dashed p-4 text-center transition-colors outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 ${
               isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/30 bg-muted/30"
             } ${directUploading ? "pointer-events-none opacity-70" : ""}`}
             onDragOver={(e) => {
@@ -951,6 +954,26 @@ export function VehicleDetailContent({
               e.preventDefault()
               setIsDragging(false)
               if (!directUploading && e.dataTransfer.files.length) handleDirectUpload(e.dataTransfer.files)
+            }}
+            onPaste={(e) => {
+              if (directUploading || source !== "supabase") return
+              if (e.target instanceof HTMLElement && e.target.closest("input, textarea, [contenteditable=\"true\"]"))
+                return
+              const items = e.clipboardData?.items
+              if (!items) return
+              const files: File[] = []
+              for (let i = 0; i < items.length; i++) {
+                if (items[i].type.startsWith("image/")) {
+                  const f = items[i].getAsFile()
+                  if (f) files.push(f)
+                }
+              }
+              if (files.length > 0) {
+                e.preventDefault()
+                const dt = new DataTransfer()
+                files.forEach((f) => dt.items.add(f))
+                handleDirectUpload(dt.files)
+              }
             }}
           >
             {directUploading ? (
@@ -970,7 +993,9 @@ export function VehicleDetailContent({
                     <Upload className="h-4 w-4" />
                     ファイルを選択
                   </button>
-                  してアップロード
+                  してアップロード。スクショは
+                  <span className="font-medium text-foreground">Ctrl+V（貼り付け）</span>
+                  も使えます。
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">JPEG / PNG / WebP / GIF（複数可）</p>
               </>

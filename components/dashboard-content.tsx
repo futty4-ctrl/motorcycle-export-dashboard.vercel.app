@@ -8,13 +8,15 @@ import {
   getVehiclesFromSheet,
   getSummaryFromSheet,
   getConnectionStatus,
+  createVehicleAndImportFromBdsUrl,
   type SummaryData,
 } from "@/app/actions/vehicles"
 import type { VehicleDisplay } from "@/lib/vehicle-display"
 import { SummaryCards } from "@/components/summary-cards"
 import { VehicleList } from "@/components/vehicle-list"
 import { ScreenshotUploader } from "@/components/screenshot-uploader"
-import { Loader2 } from "lucide-react"
+import { Loader2, Link2 } from "lucide-react"
+import { toast } from "sonner"
 
 export function DashboardContent() {
   const router = useRouter()
@@ -30,6 +32,8 @@ export function DashboardContent() {
     sheetsConfigured: boolean
   } | null>(null)
 
+  const [bdsUrl, setBdsUrl] = useState("")
+  const [bdsUrlSubmitting, setBdsUrlSubmitting] = useState(false)
   const headerSearch = searchParams.get("q") ?? ""
   const setHeaderSearch = (v: string) => {
     const p = new URLSearchParams(searchParams.toString())
@@ -37,6 +41,30 @@ export function DashboardContent() {
     else p.delete("q")
     const query = p.toString()
     router.replace(query ? `/?${query}` : "/", { scroll: false })
+  }
+
+  const handleBdsUrlSubmit = async () => {
+    const url = bdsUrl.trim()
+    if (!url) {
+      toast.error("BDS車両ページのURLを入力してください")
+      return
+    }
+    setBdsUrlSubmitting(true)
+    const res = await createVehicleAndImportFromBdsUrl(url)
+    setBdsUrlSubmitting(false)
+    if (res.vehicleId) {
+      setBdsUrl("")
+      if (res.success) {
+        toast.success(res.count ? `${res.count}枚の写真を取り込みました` : "車両を登録しました", {
+          description: "車両詳細を開きます",
+        })
+      } else if (res.error) {
+        toast.error(res.error, { description: "車両詳細で写真を追加できます。" })
+      }
+      router.push(`/vehicle/${res.vehicleId}`)
+    } else {
+      toast.error(res.error ?? "登録・取り込みに失敗しました")
+    }
   }
 
   useEffect(() => {
@@ -199,6 +227,36 @@ export function DashboardContent() {
               </Link>
             </div>
           )}
+        </div>
+      )}
+      {connectionStatus?.supabase === "ok" && (
+        <div className="mb-4 rounded-xl border border-border bg-card p-4">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
+            <Link2 className="h-4 w-4" />
+            BDS URL から車両を追加
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            URLを貼ると車両を1件登録し、ページから写真を自動で取り込みます。既に同じURLの車両がある場合は写真のみ追加します。
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input
+              type="url"
+              placeholder="https://..."
+              value={bdsUrl}
+              onChange={(e) => setBdsUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleBdsUrlSubmit()}
+              className="min-w-[200px] flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={handleBdsUrlSubmit}
+              disabled={bdsUrlSubmitting}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {bdsUrlSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+              {bdsUrlSubmitting ? "取り込み中…" : "登録して写真を取り込む"}
+            </button>
+          </div>
         </div>
       )}
       <div className="mb-4">
