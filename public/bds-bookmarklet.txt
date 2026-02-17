@@ -1,0 +1,27 @@
+BDSページURLをNext.jsアプリに送るブックマークレット
+================================================
+
+【使い方】
+1. 下の「ブックマークレット用コード」をすべてコピーする
+2. ブラウザのブックマークバーに「新しいブックマーク」を追加
+3. 名前: 例）BDSをアプリに送る
+4. URL欄にコピーしたコードをそのまま貼り付けて保存
+
+【注意】
+- YOUR_APP_URL を、あなたのアプリのURLに置き換えてください。
+  例: https://your-app.vercel.app
+      または http://localhost:3000（ローカル開発時）
+- BDSの車両ページを開いた状態でブックマークをクリックすると、
+  そのページのURLが /api/bds-import にPOSTされます。
+
+================================================
+ブックマークレット用コード（YOUR_APP_URL を置き換えてから使う）
+================================================
+
+javascript:(function(){var u=location.href;var api='YOUR_APP_URL/api/bds-import';fetch(api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u})}).then(function(r){return r.json();}).then(function(d){alert(d.ok?'送信しました: '+u:('エラー: '+(d.error||'不明')));}).catch(function(e){alert('送信失敗: '+e.message);});})();
+
+================================================
+ローカル開発用（localhost:3000 固定）
+================================================
+
+javascript:(function(){var u=location.href;var api='http://localhost:3000/api/bds-import';fetch(api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u})}).then(function(r){return r.json();}).then(function(d){alert(d.ok?'送信しました: '+u:('エラー: '+(d.error||'不明')));}).catch(function(e){alert('送信失敗: '+e.message);});})();

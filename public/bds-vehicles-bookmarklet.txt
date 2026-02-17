@@ -1,0 +1,79 @@
+BDSページから詳細を抜いて車両APIに送るブックマークレット
+========================================================
+
+【使い方】
+1. 下の「ブックマークレット用コード」をすべてコピーする
+2. ブラウザのブックマークバーに「新しいブックマーク」を追加
+3. 名前: 例）BDS→車両登録
+4. URL欄にコピーしたコードをそのまま貼り付けて保存
+5. YOUR_APP_URL と YOUR_API_KEY を実際の値に置き換える（1行目付近）
+
+【送信先】
+- POST YOUR_APP_URL/api/vehicles/bookmarklet
+- ヘッダー: Content-Type: application/json, x-gami-api-key: YOUR_API_KEY
+- 本文: メイン写真URL / 出品番号 / 車種名 / 総合評価点 / 現在ページURL をJSONで送信
+
+【抜き出す項目】
+- メイン写真のURL（og:image またはメイン画像）
+- 出品番号 (Lot No)
+- 車種名（h1 またはタイトル要素）
+- 総合評価点（「総合評価」付近の値）
+- 現在のページURL
+
+【画像表示について】
+- BDSの画像をアプリ内で表示するには、next.config.mjs の images.remotePatterns に
+  BDSの画像ドメインが含まれている必要があります。既定では bds-net.co.jp を許可しています。
+  実際のBDSサイトの画像ホストが異なる場合は、next.config.mjs の hostname を差し替えてください。
+
+========================================================
+ブックマークレット用コード（YOUR_APP_URL / YOUR_API_KEY を置き換えてから使う）
+========================================================
+
+javascript:(function(){var API_BASE='YOUR_APP_URL',API_KEY='YOUR_API_KEY';var d=document,h=d.documentElement.outerHTML,base=location.origin,url=location.href;var imageUrl=null;var og=d.querySelector('meta[property="og:image"]');if(og&&og.content)imageUrl=og.content;if(!imageUrl){var im=d.querySelector('img[src*="photo"],img[src*="image"],.main-image img,.vehicle-image img,.detail-image img,.main img');if(im&&im.src)imageUrl=im.src;}if(!imageUrl){var first=d.querySelector('img[src]');if(first)imageUrl=first.src;}if(imageUrl&&imageUrl.startsWith('/'))imageUrl=base+imageUrl;var lotNumber=null;var lotM=h.match(/(?:出品番号|Lot\s*No?\.?|ロット)\s*[：:]\s*([A-Za-z0-9\-]+)/i)||h.match(/(?:出品番号|Lot)\s*[：:]?\s*([A-Za-z0-9\-]{4,})/i);if(lotM)lotNumber=lotM[1].trim();var vehicleName=null;var h1=d.querySelector('h1');if(h1)vehicleName=h1.textContent.trim();if(!vehicleName){var t=d.querySelector('[class*="title"],[class*="vehicle-name"],[class*="detail-title"],.car-name');if(t)vehicleName=t.textContent.trim();}if(!vehicleName){var hm=h.match(/<h1[^>]*>([^<]+)</);if(hm)vehicleName=hm[1].replace(/\s+/g,' ').trim();}var overallGrade=null;var gm=h.match(/総合評価(?:点)?\s*[：:]?\s*([A-Za-z0-9\.\-]+)/);if(gm)overallGrade=gm[1].trim();if(!overallGrade){var ge=d.querySelector('[class*="overall"],[class*="total-grade"],[class*="grade"]');if(ge)overallGrade=ge.textContent.replace(/[^0-9.A-Za-z\-]/g,'').trim();}var body=JSON.stringify({url:url,imageUrl:imageUrl||undefined,lotNumber:lotNumber||undefined,vehicleName:vehicleName||undefined,overallGrade:overallGrade||undefined});fetch(API_BASE+'/api/vehicles/bookmarklet',{method:'POST',headers:{'Content-Type':'application/json','x-gami-api-key':API_KEY},body:body}).then(function(r){return r.json();}).then(function(res){alert(res.error?('エラー: '+res.error):('OK: '+(res.action||'created')+' vehicleId='+res.vehicleId);}).catch(function(e){alert('送信失敗: '+e.message);});})();
+
+========================================================
+読みやすいパーサー（参考・デバッグ用）
+========================================================
+
+// メイン写真URL
+var imageUrl = null;
+var og = document.querySelector('meta[property="og:image"]');
+if (og && og.content) imageUrl = og.content;
+if (!imageUrl) {
+  var img = document.querySelector('img[src*="photo"], img[src*="image"], .main-image img, .vehicle-image img, .detail-image img, .main img');
+  if (img && img.src) imageUrl = img.src;
+}
+if (!imageUrl) {
+  var first = document.querySelector('img[src]');
+  if (first) imageUrl = first.src;
+}
+if (imageUrl && imageUrl.startsWith('/')) imageUrl = location.origin + imageUrl;
+
+// 出品番号
+var html = document.documentElement.outerHTML;
+var lotMatch = html.match(/(?:出品番号|Lot\s*No?\.?|ロット)\s*[：:]\s*([A-Za-z0-9\-]+)/i)
+  || html.match(/(?:出品番号|Lot)\s*[：:]?\s*([A-Za-z0-9\-]{4,})/i);
+var lotNumber = lotMatch ? lotMatch[1].trim() : null;
+
+// 車種名
+var vehicleName = null;
+var h1 = document.querySelector('h1');
+if (h1) vehicleName = h1.textContent.trim();
+if (!vehicleName) {
+  var title = document.querySelector('[class*="title"], [class*="vehicle-name"], [class*="detail-title"], .car-name');
+  if (title) vehicleName = title.textContent.trim();
+}
+if (!vehicleName) {
+  var m = html.match(/<h1[^>]*>([^<]+)</);
+  if (m) vehicleName = m[1].replace(/\s+/g, ' ').trim();
+}
+
+// 総合評価点
+var gradeMatch = html.match(/総合評価(?:点)?\s*[：:]?\s*([A-Za-z0-9\.\-]+)/);
+var overallGrade = gradeMatch ? gradeMatch[1].trim() : null;
+if (!overallGrade) {
+  var gradeEl = document.querySelector('[class*="overall"], [class*="total-grade"], [class*="grade"]');
+  if (gradeEl) overallGrade = gradeEl.textContent.replace(/[^0-9.A-Za-z\-]/g, '').trim();
+}
+
+console.log({ url: location.href, imageUrl, lotNumber, vehicleName, overallGrade });
