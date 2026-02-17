@@ -499,10 +499,10 @@ export function VehicleDetailContent({
         <div className="flex gap-4">
           <div className="relative h-32 w-40 shrink-0 overflow-hidden rounded-lg bg-muted sm:h-36 sm:w-48">
             {imageSrc.startsWith("http://") || imageSrc.startsWith("https://") ? (
-              // 外部URLは next/image の制限を避けて img で表示
+              // ブックマークレットで保存したBDS画像はプロキシ経由で表示（ホットリンク制限を回避）
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={imageSrc}
+                src={`/api/image-proxy?url=${encodeURIComponent(imageSrc)}`}
                 alt={vehicle.name}
                 className="h-full w-full object-cover"
                 onError={() => setImageSrc(FALLBACK_IMAGE)}

@@ -82,9 +82,10 @@ export function VehicleCard({ vehicle }: { vehicle: VehicleDisplay }) {
         <div className="flex gap-3 p-3 sm:gap-4 sm:p-4">
           <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-muted sm:h-28 sm:w-28 lg:h-24 lg:w-24">
             {imageSrc.startsWith("http://") || imageSrc.startsWith("https://") ? (
+              // ブックマークレットで保存したBDS画像はホットリンクでブロックされるためプロキシ経由で表示
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={imageSrc}
+                src={`/api/image-proxy?url=${encodeURIComponent(imageSrc)}`}
                 alt={vehicle.name}
                 className="h-full w-full object-cover"
                 onError={() => setImageSrc(FALLBACK_IMAGE)}
