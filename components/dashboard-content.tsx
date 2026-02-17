@@ -172,7 +172,13 @@ export function DashboardContent() {
           {error && (
             <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
               <p>{error}</p>
-              {typeof window !== "undefined" &&
+              {connectionStatus?.supabase === "ok" && dataSource === "sheets" && (
+                <p className="mt-2 font-medium">
+                  キーは設定済みですが、Supabase のデータ取得でエラーになっています。環境変数追加・変更後は必ず <strong>Deployments → Redeploy</strong> を実行してください。Redeploy 後も出る場合は、Supabase でマイグレーション（<code className="rounded bg-amber-500/20 px-1">npx supabase db push</code>）を実行したか、URL と service_role キーが<strong>同じプロジェクト</strong>のものか確認してください。
+                </p>
+              )}
+              {connectionStatus?.supabase !== "ok" &&
+                typeof window !== "undefined" &&
                 (window.location.hostname.endsWith("vercel.app") || window.location.hostname.includes("vercel.app")) && (
                 <p className="mt-2 font-medium">
                   Vercel で動かすには: プロジェクトの <strong>Settings → Environment Variables</strong> に
@@ -182,7 +188,7 @@ export function DashboardContent() {
                   を追加（.env.local と同じ値）し、<strong>Deployments → Redeploy</strong> してください。
                 </p>
               )}
-              {dataSource === "sheets" && (
+              {dataSource === "sheets" && connectionStatus?.supabase !== "ok" && (
                 <span className="mt-1 block">Supabase 未設定のためスプレッドシートを表示しています。</span>
               )}
               <Link

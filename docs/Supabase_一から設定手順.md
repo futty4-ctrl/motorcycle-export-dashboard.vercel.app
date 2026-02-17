@@ -151,6 +151,23 @@ npm run dev
 
 ---
 
+## `supabase login` で device_code エラーが出る場合
+
+「device_code: Invalid」などと出るときは、**アクセストークン**で認証できます。
+
+1. ブラウザで **https://supabase.com/dashboard/account/tokens** を開く（Supabase にログインした状態で）
+2. **Generate new token** でトークンを作成し、表示された値をコピー
+3. ターミナルで環境変数にセットしてから `link` と `db push` を実行（PowerShell の例）:
+   ```powershell
+   $env:SUPABASE_ACCESS_TOKEN = "ここにコピーしたトークンを貼る"
+   cd c:\Users\user\Downloads\motorcycle-export-dashboard
+   npx supabase link --project-ref あなたのプロジェクトID
+   npx supabase db push
+   ```
+4. プロジェクトIDは Supabase の Project URL（`https://xxxx.supabase.co`）の `xxxx` の部分、または Settings → General の Reference ID
+
+---
+
 ## まとめ
 
 | やること | 詳細 |

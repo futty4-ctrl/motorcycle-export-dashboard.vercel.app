@@ -978,7 +978,12 @@ export async function getVehiclesFromSupabase(): Promise<{
 
     return { success: true, vehicles }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Supabase からの取得に失敗しました"
+    const message =
+      err && typeof err === "object" && "message" in err
+        ? String((err as { message?: unknown }).message)
+        : err instanceof Error
+          ? err.message
+          : "Supabase からの取得に失敗しました"
     return { success: false, error: message }
   }
 }
