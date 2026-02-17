@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { fetchAndUploadVehicleImage } from "@/lib/supabase/upload-vehicle-image"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -111,6 +112,11 @@ export async function POST(req: Request) {
     }
 
     if (existingId) {
+      let finalImageUrl: string | null = null
+      if (imageUrl) {
+        const uploaded = await fetchAndUploadVehicleImage(imageUrl, existingId)
+        if ("publicUrl" in uploaded) finalImageUrl = uploaded.publicUrl
+      }
       const { error: updateError } = await supabase
         .from("vehicles")
         .update({
@@ -119,7 +125,7 @@ export async function POST(req: Request) {
           ...(overallGrade != null && { bds_rating: overallGrade }),
           ...(lotNumber != null && { lot_number: lotNumber }),
           ...(url != null && { source_url: url }),
-          ...(imageUrl != null && { image_url: imageUrl }),
+          ...(finalImageUrl != null && { image_url: finalImageUrl }),
         })
         .eq("id", existingId)
       if (updateError) throw updateError
@@ -156,7 +162,6 @@ export async function POST(req: Request) {
         bds_rating: overallGrade ?? null,
         lot_number: lotNumber ?? null,
         source_url: url ?? null,
-        image_url: imageUrl ?? null,
       })
       .select("id")
       .single()
@@ -164,6 +169,13 @@ export async function POST(req: Request) {
     if (insertError) throw insertError
     const vehicleId = inserted?.id
     if (!vehicleId) throw new Error("Insert did not return id")
+
+    if (imageUrl) {
+      const uploaded = await fetchAndUploadVehicleImage(imageUrl, vehicleId)
+      if ("publicUrl" in uploaded) {
+        await supabase.from("vehicles").update({ image_url: uploaded.publicUrl }).eq("id", vehicleId)
+      }
+    }
 
     if (price != null && price > 0) {
       await supabase.from("scenarios").insert({

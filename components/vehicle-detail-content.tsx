@@ -205,6 +205,9 @@ export function VehicleDetailContent({
   const [ebayFeesUsd, setEbayFeesUsd] = useState(50)
   const [ebayShippingUsd, setEbayShippingUsd] = useState(40)
 
+  const [appraiseLoading, setAppraiseLoading] = useState(false)
+  const appraiseInputRef = useRef<HTMLInputElement>(null)
+
   const [wonDialogOpen, setWonDialogOpen] = useState(false)
   const [wonPriceJpy, setWonPriceJpy] = useState(0)
   const [wonCounterparty, setWonCounterparty] = useState("")
@@ -639,13 +642,78 @@ export function VehicleDetailContent({
 
       {/* BDS仕入れ 利益シミュレーター */}
       <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-          <Target className="h-5 w-5" />
-          利益シミュレーター
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          入札上限・経費を入力すると、ヤフオク販売時とeBayパーツ販売時の予想利益をリアルタイム表示します。
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <Target className="h-5 w-5" />
+              利益シミュレーター
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              入札上限・経費を入力すると、ヤフオク販売時とeBayパーツ販売時の予想利益をリアルタイム表示します。
+            </p>
+          </div>
+          <div>
+            <input
+              ref={appraiseInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={async (e) => {
+                const files = e.target.files
+                if (!files?.length) return
+                setAppraiseLoading(true)
+                try {
+                  const formData = new FormData()
+                  for (let i = 0; i < Math.min(files.length, 10); i++) {
+                    formData.append("image", files[i]!)
+                  }
+                  const res = await fetch("/api/analyze-photo", {
+                    method: "POST",
+                    body: formData,
+                  })
+                  const data = await res.json()
+                  if (!res.ok) throw new Error(data?.error ?? "AI査定に失敗しました")
+                  const purchaseLimit = data.purchaseLimitJpy ?? (data.estimatedDomesticJpy ? Math.round(data.estimatedDomesticJpy * 0.7) : maxBid)
+                  setMaxBid(purchaseLimit)
+                  if (data.estimatedDomesticJpy != null) setYahooExpectedSale(data.estimatedDomesticJpy)
+                  if (data.estimatedExportUsd != null) setEbayExpectedSaleUsd(data.estimatedExportUsd)
+                  const descParts: string[] = []
+                  if (data.modelName) descParts.push(`${data.modelName}${data.modelType ? ` (${data.modelType})` : ""}`)
+                  descParts.push(`外装${data.exteriorCondition}/5`)
+                  if (data.purchaseLimitJpy > 0) {
+                    const pct = data.conditionCoefficient != null ? Math.round(data.conditionCoefficient * 100) : 100
+                    descParts.push(`仕入れ上限 ¥${data.purchaseLimitJpy.toLocaleString()}（${data.pastSampleCount > 0 ? `過去${data.pastSampleCount}件相場の${pct}%` : `査定相場の${pct}%`}）`)
+                  }
+                  toast.success("AI査定で初期値を入力しました", {
+                    description: descParts.join(" · "),
+                  })
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "AI査定に失敗しました")
+                } finally {
+                  setAppraiseLoading(false)
+                  e.target.value = ""
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => appraiseInputRef.current?.click()}
+              disabled={appraiseLoading}
+              className="inline-flex items-center gap-2 rounded-lg border border-primary/50 bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
+            >
+              {appraiseLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {appraiseLoading ? "解析中…" : "AI査定で初期値入力"}
+            </button>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              BDSの車両詳細にある複数写真（フロント・リア・エンジン・メーター等）を一括選択すると、1台として総合査定し仕入れ上限価格を算出します。
+            </p>
+          </div>
+        </div>
 
         <div className="mt-4 space-y-4">
           <div>
