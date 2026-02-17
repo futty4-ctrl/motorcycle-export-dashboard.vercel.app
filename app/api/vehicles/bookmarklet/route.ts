@@ -5,6 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, X-GAMI-API-KEY",
+  "Access-Control-Max-Age": "86400",
 }
 
 const DEFAULT_API_KEY = "gami-bk-7f3a9c2e1b8d4f6a0e5c9b3d7f1a8e2c"

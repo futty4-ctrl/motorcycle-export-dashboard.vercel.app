@@ -74,6 +74,15 @@ export default function SetupPage() {
                       </li>
                       <li>プロジェクト直下で <code className="rounded bg-muted px-1">npx supabase db push</code> でテーブル作成</li>
                     </ul>
+                    <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                      <p className="text-sm font-medium text-foreground">Vercel でデプロイしている場合</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        .env.local は Vercel に送られません。Vercel のプロジェクト → <strong>Settings → Environment Variables</strong> に
+                        <code className="mx-1 rounded bg-muted px-1">NEXT_PUBLIC_SUPABASE_URL</code> と
+                        <code className="mx-1 rounded bg-muted px-1">SUPABASE_SERVICE_ROLE_KEY</code> を追加（.env.local と同じ値）し、
+                        <strong>Deployments → Redeploy</strong> を実行してください。
+                      </p>
+                    </div>
                   </div>
                   <div className="rounded-lg border border-border bg-muted/30 p-3">
                     <p className="text-sm font-medium text-foreground">パターンC: 写真解析・査定（AI）も試したい</p>

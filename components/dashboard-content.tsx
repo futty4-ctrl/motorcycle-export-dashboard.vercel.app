@@ -175,7 +175,11 @@ export function DashboardContent() {
               {typeof window !== "undefined" &&
                 (window.location.hostname.endsWith("vercel.app") || window.location.hostname.includes("vercel.app")) && (
                 <p className="mt-2 font-medium">
-                  Vercel で動かすには: プロジェクトの Settings → Environment Variables に .env.local と同じ変数・値を追加し、Deployments から Redeploy してください。
+                  Vercel で動かすには: プロジェクトの <strong>Settings → Environment Variables</strong> に
+                  <code className="mx-1 rounded bg-amber-500/20 px-1 text-xs">NEXT_PUBLIC_SUPABASE_URL</code>
+                  と
+                  <code className="mx-1 rounded bg-amber-500/20 px-1 text-xs">SUPABASE_SERVICE_ROLE_KEY</code>
+                  を追加（.env.local と同じ値）し、<strong>Deployments → Redeploy</strong> してください。
                 </p>
               )}
               {dataSource === "sheets" && (
@@ -185,7 +189,7 @@ export function DashboardContent() {
                 href="/setup"
                 className="mt-2 inline-block font-medium text-amber-800 underline dark:text-amber-300 hover:no-underline"
               >
-                はじめての使い方を見る →
+                はじめての使い方・Vercel 環境変数の詳細 →
               </Link>
             </div>
           )}

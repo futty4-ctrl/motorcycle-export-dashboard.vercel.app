@@ -25,11 +25,40 @@ BDSページから詳細を抜いて車両APIに送るブックマークレッ�
   BDSの画像ドメインが含まれている必要があります。既定では bds-net.co.jp を許可しています。
   実際のBDSサイトの画像ホストが異なる場合は、next.config.mjs の hostname を差し替えてください。
 
+【「TypeError: Failed to fetch」が出る場合】
+- bdsc.jupiter.ac は HTTPS のため、YOUR_APP_URL は必ず https:// で始めてください。
+  （http://localhost は開発時のみ。本番では https://あなたのアプリ.vercel.app など）
+- YOUR_APP_URL の末尾にスラッシュを付けない（例: https://xxx.vercel.app のみ）
+- ブックマークレット内の API_BASE が 'YOUR_APP_URL' のままになっていないか確認
+- ファイアウォール・広告ブロックが API ドメインをブロックしていないか確認
+
 ========================================================
 ブックマークレット用コード（YOUR_APP_URL / YOUR_API_KEY を置き換えてから使う）
 ========================================================
 
 javascript:(function(){var API_BASE='YOUR_APP_URL',API_KEY='YOUR_API_KEY';var d=document,h=d.documentElement.outerHTML,base=location.origin,url=location.href;var imageUrl=null;var og=d.querySelector('meta[property="og:image"]');if(og&&og.content)imageUrl=og.content;if(!imageUrl){var im=d.querySelector('img[src*="photo"],img[src*="image"],.main-image img,.vehicle-image img,.detail-image img,.main img');if(im&&im.src)imageUrl=im.src;}if(!imageUrl){var first=d.querySelector('img[src]');if(first)imageUrl=first.src;}if(imageUrl&&imageUrl.startsWith('/'))imageUrl=base+imageUrl;var lotNumber=null;var lotM=h.match(/(?:出品番号|Lot\s*No?\.?|ロット)\s*[：:]\s*([A-Za-z0-9\-]+)/i)||h.match(/(?:出品番号|Lot)\s*[：:]?\s*([A-Za-z0-9\-]{4,})/i);if(lotM)lotNumber=lotM[1].trim();var vehicleName=null;var h1=d.querySelector('h1');if(h1)vehicleName=h1.textContent.trim();if(!vehicleName){var t=d.querySelector('[class*="title"],[class*="vehicle-name"],[class*="detail-title"],.car-name');if(t)vehicleName=t.textContent.trim();}if(!vehicleName){var hm=h.match(/<h1[^>]*>([^<]+)</);if(hm)vehicleName=hm[1].replace(/\s+/g,' ').trim();}var overallGrade=null;var gm=h.match(/総合評価(?:点)?\s*[：:]?\s*([A-Za-z0-9\.\-]+)/);if(gm)overallGrade=gm[1].trim();if(!overallGrade){var ge=d.querySelector('[class*="overall"],[class*="total-grade"],[class*="grade"]');if(ge)overallGrade=ge.textContent.replace(/[^0-9.A-Za-z\-]/g,'').trim();}var body=JSON.stringify({url:url,imageUrl:imageUrl||undefined,lotNumber:lotNumber||undefined,vehicleName:vehicleName||undefined,overallGrade:overallGrade||undefined});fetch(API_BASE+'/api/vehicles/bookmarklet',{method:'POST',headers:{'Content-Type':'application/json','x-gami-api-key':API_KEY},body:body}).then(function(r){return r.json();}).then(function(res){if(res.error){alert('エラー: '+res.error);}else{window.open(API_BASE+'/vehicle/'+res.vehicleId,'_blank');alert('登録しました。車両ページを開きました。');}}).catch(function(e){alert('送信失敗: '+e.message);});})();
+
+========================================================
+bdsc.jupiter.ac 用（セレクタ指定版・API URL は要変更）
+========================================================
+※ 下記の API_BASE を本番 URL（https://〜.vercel.app）に置き換えてから使用してください。
+
+javascript:(function(){const getT=(s)=>document.querySelector(s)?.innerText?.trim()||'';const getI=(s)=>document.querySelector(s)?.src||'';const API_BASE='https://motorcycle-export-dashboard-a4a67wqt4-futty4-9510s-projects.vercel.app';const mainImgSel='#'+'main-img';const d={vehicleName:getT('.vehicle-name')||getT('.detail-title')||document.title,lotNumber:getT('.lot-number')||getT('.lot-no')||'未取得',overallGrade:getT('.total-evaluation')||getT('.grade')||'-',imageUrl:getI('.main-image img')||getI(mainImgSel)||getI('.photo-main img')||'',url:window.location.href,timestamp:new Date().toISOString()};fetch(API_BASE+'/api/vehicles/bookmarklet',{method:'POST',headers:{'Content-Type':'application/json','X-GAMI-API-KEY':'gami-bk-7f3a9c2e1b8d4f6a0e5c9b3d7f1a8e2c'},body:JSON.stringify(d)}).then(r=>r.ok?r.json():Promise.reject(new Error('サーバー拒否'))).then(res=>{if(res.error)alert('エラー: '+res.error);else{alert('【GAMI】転送成功！');if(res.vehicleId)window.open(API_BASE+'/vehicle/'+res.vehicleId,'_blank');}}).catch(e=>alert('エラー: '+e.message));})();
+
+========================================================
+jupiter 用（本番 URL 固定・転送成功で車種名表示・車両ページを開く）
+========================================================
+※ # は URL 内でフラグメントになるため %23 にエンコード。API_BASE は末尾スラッシュなし。
+※ 成功時: 「【GAMI】転送成功！」＋0.5秒後に車両詳細を新しいタブで開く（404 になる場合はダッシュボードを更新して一覧から選択）。
+
+javascript:(function(){const getT=(s)=>document.querySelector(s)?.innerText?.trim()||'';const getI=(s)=>document.querySelector(s)?.src||'';const API_BASE='https://motorcycle-export-dashboard.vercel.app';const mainImgSel=String.fromCharCode(35)+'main-img';const d={vehicleName:getT('.vehicle-name')||getT('.detail-title')||document.title,lotNumber:getT('.lot-number')||getT('.lot-no')||'未取得',overallGrade:getT('.total-evaluation')||getT('.grade')||'-',imageUrl:getI('.main-image img')||getI(mainImgSel)||getI('.photo-main img')||'',url:window.location.href,timestamp:new Date().toISOString()};fetch(API_BASE+'/api/vehicles/bookmarklet',{method:'POST',headers:{'Content-Type':'application/json','X-GAMI-API-KEY':'gami-bk-7f3a9c2e1b8d4f6a0e5c9b3d7f1a8e2c'},body:JSON.stringify(d)}).then(r=>r.ok?r.json():Promise.reject(new Error('サーバー拒否'))).then(res=>{if(res.error)alert('エラー: '+res.error);else{alert('【GAMI】転送成功！');if(res.vehicleId)setTimeout(function(){window.open(API_BASE+'/vehicle/'+res.vehicleId,'_blank');},500);}}).catch(e=>alert('エラー: '+e.message));})();
+
+========================================================
+上記の URL 用エンコード版（ブックマークに貼る際に # で切れる場合用）
+========================================================
+※ mainImgSel を %23（#）で組み立て、API_BASE 末尾にスラッシュなし。
+
+javascript:(function(){const getT=(s)=>document.querySelector(s)?.innerText?.trim()||%27%27;const getI=(s)=>document.querySelector(s)?.src||%27%27;const API_BASE=%27https://motorcycle-export-dashboard.vercel.app%27;const mainImgSel=%27%23%27+%27main-img%27;const d={vehicleName:getT('.vehicle-name')||getT('.detail-title')||document.title,lotNumber:getT('.lot-number')||getT('.lot-no')||'未取得',overallGrade:getT('.total-evaluation')||getT('.grade')||'-',imageUrl:getI('.main-image img')||getI(mainImgSel)||getI('.photo-main img')||'',url:window.location.href,timestamp:new Date().toISOString()};fetch(API_BASE+'/api/vehicles/bookmarklet',{method:'POST',headers:{'Content-Type':'application/json','X-GAMI-API-KEY':'gami-bk-7f3a9c2e1b8d4f6a0e5c9b3d7f1a8e2c'},body:JSON.stringify(d)}).then(r=>r.ok?r.json():Promise.reject(new Error('サーバー拒否'))).then(res=>{if(res.error)alert('エラー: '+res.error);else{alert('【GAMI】転送成功！');if(res.vehicleId)setTimeout(function(){window.open(API_BASE+'/vehicle/'+res.vehicleId,'_blank');},500);}}).catch(e=>alert('エラー: '+e.message));})();
 
 ========================================================
 読みやすいパーサー（参考・デバッグ用）

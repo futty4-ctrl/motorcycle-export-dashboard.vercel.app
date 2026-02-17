@@ -4,6 +4,28 @@
 
 ---
 
+## 「Supabase からの取得に失敗しました」が出たら（クイック対処）
+
+Vercel の URL を開いて次のメッセージが出る場合:
+
+- **Supabase からの取得に失敗しました**
+- **Supabase 未設定のためスプレッドシートを表示しています**
+- **Vercel で動かすには: プロジェクトの Settings → Environment Variables に…**
+
+**原因**: Vercel には `.env.local` がデプロイされないため、環境変数が未設定です。
+
+**対処（3ステップ）**:
+
+1. [vercel.com](https://vercel.com) にログインし、**該当プロジェクト**を開く
+2. **Settings** → **Environment Variables** で、次の2つを **必須**で追加（値はローカルの `.env.local` からコピー）
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+3. **Deployments** タブ → 最新デプロイの **⋯** → **Redeploy** を実行
+
+再デプロイが終わると、同じ URL で Supabase から車両データが表示されます。その他の変数（Gemini・スプレッドシート・ブックマークレット用キーなど）は下記「4. 環境変数」を参照。
+
+---
+
 ## Vercel で動かすためのチェックリスト
 
 | やること | 詳細 |
@@ -58,15 +80,25 @@ Vercel で「Supabase の設定がありません」になる場合は、次の�
 1. [vercel.com](https://vercel.com) にログイン
 2. **該当プロジェクト**（motorcycle-export-dashboard など）をクリック
 3. 上タブの **Settings** → 左メニュー **Environment Variables**
-4. **Key** と **Value** を入力して **Save**。以下を **ローカルの .env.local と同じ値**で追加する:
+4. **Key** と **Value** を入力して **Save**。
 
-   | Key | どこに貼るか |
-   |-----|----------------|
-   | `NEXT_PUBLIC_SUPABASE_URL` | .env.local の値そのまま（必須） |
-   | `SUPABASE_SERVICE_ROLE_KEY` | .env.local の値そのまま（必須） |
-   | `GOOGLE_SHEETS_SPREADSHEET_ID` | スプレッドシートを使う場合。.env.local の値 |
-   | `GOOGLE_SERVICE_ACCOUNT_JSON` | 下記「GOOGLE_SERVICE_ACCOUNT_JSON の入れ方」を参照 |
-   | `GOOGLE_GEMINI_API_KEY` | 写真解析・査定を使う場合。.env.local の値 |
+   **必須（この2つだけで車両一覧は表示できる）**
+
+   | Key | 説明 |
+   |-----|------|
+   | `NEXT_PUBLIC_SUPABASE_URL` | Supabase の Project URL（.env.local と同じ値） |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase の service_role キー（.env.local と同じ値） |
+
+   **任意（使う機能に応じて追加）**
+
+   | Key | いつ必要か |
+   |-----|------------|
+   | `GOOGLE_GEMINI_API_KEY` | 写真解析・AI査定を使うとき |
+   | `GOOGLE_SHEETS_SPREADSHEET_ID` | Supabase が使えないときのスプレッドシート表示用 |
+   | `GOOGLE_SERVICE_ACCOUNT_JSON` | スプレッドシート・Drive 連携を使うとき（1行JSON） |
+   | `GOOGLE_DRIVE_PARENT_FOLDER_ID` | 車両写真を Drive の指定フォルダに保存するとき |
+   | `GAMI_BOOKMARKLET_API_KEY` | ブックマークレットで既定キー以外を使うとき（**Key 名は GAMI_BOOKMARKLET_API_KEY**。GAMI_API_KEY では読まれません） |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 現状は未使用（RLS で anon はテーブル不可のため省略可） |
 
    **GOOGLE_SERVICE_ACCOUNT_JSON の入れ方（「JSON が不正です」を防ぐ）**
    - 環境変数は **1 行** しか入れられないので、JSON を 1 行にまとめてから貼る。
