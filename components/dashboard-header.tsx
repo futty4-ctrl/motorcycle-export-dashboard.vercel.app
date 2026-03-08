@@ -29,13 +29,13 @@ function HeaderSearchInput() {
   return (
     <div className="relative flex-1">
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <input
-        type="text"
-        placeholder="車両、VIN、オークション検索..."
-        value={searchValue}
-        onChange={(e) => setSearchValue(e.target.value)}
-        className="h-10 w-full rounded-lg border border-input bg-card pl-10 pr-4 text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring lg:h-9"
-      />
+        <input
+          type="text"
+          placeholder="車両、VIN、オークション検索..."
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
+          className="h-11 min-h-[44px] w-full rounded-lg border border-input bg-card pl-10 pr-4 text-base text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:text-sm lg:h-9 lg:min-h-0"
+        />
     </div>
   )
 }
@@ -45,7 +45,7 @@ export function DashboardHeader() {
   const [hasNotifications] = useState(true)
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-border bg-background/80 pt-[env(safe-area-inset-top)] backdrop-blur-md">
       <div className="flex items-center gap-3 px-4 py-3 lg:px-6">
         <div className="lg:hidden flex items-center gap-2 shrink-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
@@ -60,7 +60,7 @@ export function DashboardHeader() {
 
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-card text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:h-9 lg:w-9"
+          className="relative flex h-11 min-h-[44px] w-11 min-w-[44px] shrink-0 touch-manipulation items-center justify-center rounded-lg border border-input bg-card text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground active:opacity-80 lg:h-9 lg:w-9 lg:min-h-0 lg:min-w-0"
           aria-label="テーマ切替"
         >
           <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -68,7 +68,7 @@ export function DashboardHeader() {
         </button>
 
         <button
-          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-input bg-card text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:h-9 lg:w-9"
+          className="relative flex h-11 min-h-[44px] w-11 min-w-[44px] shrink-0 touch-manipulation items-center justify-center rounded-lg border border-input bg-card text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground active:opacity-80 lg:h-9 lg:w-9 lg:min-h-0 lg:min-w-0"
           aria-label="通知"
         >
           <Bell className="h-4 w-4" />

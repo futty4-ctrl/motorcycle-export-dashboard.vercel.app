@@ -150,6 +150,52 @@ export type DriveUploadInsert = {
   created_at?: string
 }
 
+// ========== inspection_checklist_items: 現物確認項目マスタ ==========
+export type InspectionChecklistItemRow = {
+  id: string
+  category: string
+  label: string
+  sort_order: number
+  created_at: string
+}
+
+export type InspectionChecklistItemInsert = {
+  id?: string
+  category: string
+  label: string
+  sort_order?: number
+  created_at?: string
+}
+
+// ========== vehicle_inspection_results: 各車両のチェック結果 ==========
+export type InspectionResultStatus = "ok" | "ng" | "needs_check"
+
+export type VehicleInspectionResultRow = {
+  id: string
+  vehicle_id: string
+  item_id: string
+  status: InspectionResultStatus
+  note: string | null
+  checked_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type VehicleInspectionResultInsert = {
+  id?: string
+  vehicle_id: string
+  item_id: string
+  status?: InspectionResultStatus
+  note?: string | null
+  checked_at?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type VehicleInspectionResultUpdate = Partial<
+  Omit<VehicleInspectionResultInsert, "id" | "vehicle_id" | "item_id">
+>
+
 // ========== Supabase Database 型（クライアントの型推論用） ==========
 export type Database = {
   public: {
@@ -183,6 +229,15 @@ export type Database = {
         Row: BadCaseRow
         Insert: BadCaseInsert
         Update: Partial<Omit<BadCaseInsert, "id" | "evaluation_id" | "vehicle_id">>
+      }
+      inspection_checklist_items: {
+        Row: InspectionChecklistItemRow
+        Insert: InspectionChecklistItemInsert
+      }
+      vehicle_inspection_results: {
+        Row: VehicleInspectionResultRow
+        Insert: VehicleInspectionResultInsert
+        Update: VehicleInspectionResultUpdate
       }
     }
   }

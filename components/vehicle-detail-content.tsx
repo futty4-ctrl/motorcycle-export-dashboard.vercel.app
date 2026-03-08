@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   AlertCircle,
   Upload,
+  ClipboardList,
 } from "lucide-react"
 import {
   Dialog,
@@ -26,11 +27,20 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { AiZoomInspection } from "@/components/ai-zoom-inspection"
 import { getConsumablesBreakdown } from "@/lib/consumables"
 import type { VehicleDisplay } from "@/lib/vehicle-display"
 import { getProfitBarColorClass, getProfitBarTrackClass } from "@/lib/vehicle-display"
 import type { VehicleStatus } from "@/lib/data"
+import type { InspectionChecklistItemRow, VehicleInspectionResultRow, InspectionResultStatus } from "@/lib/db/types"
 import {
   updateVehicleStatus,
   addPart,
@@ -48,6 +58,11 @@ import {
 } from "@/app/actions/evaluate"
 import { getSettings } from "@/app/actions/settings"
 import { saveBadCase } from "@/app/actions/bad-cases"
+import {
+  getInspectionChecklistItems,
+  getVehicleInspectionResults,
+  saveVehicleInspectionResult,
+} from "@/app/actions/inspections"
 import { toast } from "sonner"
 import {
   calcYahooBodyScenario,
@@ -227,6 +242,7 @@ export function VehicleDetailContent({
   const [baseFeeJpy, setBaseFeeJpy] = useState(0)
   const [gamiShippingType, setGamiShippingType] = useState<GamiShippingType>("normal")
   const [gamiListingType, setGamiListingType] = useState<GamiListingType>("body")
+  const [targetProfitJpy, setTargetProfitJpy] = useState(45000)
 
   const [appraiseLoading, setAppraiseLoading] = useState(false)
   const appraiseInputRef = useRef<HTMLInputElement>(null)
@@ -234,6 +250,12 @@ export function VehicleDetailContent({
   const [wonDialogOpen, setWonDialogOpen] = useState(false)
   const [wonPriceJpy, setWonPriceJpy] = useState(0)
   const [wonCounterparty, setWonCounterparty] = useState("")
+
+  // 現物確認チェックリスト
+  const [checklistItems, setChecklistItems] = useState<InspectionChecklistItemRow[]>([])
+  const [inspectionResults, setInspectionResults] = useState<VehicleInspectionResultRow[]>([])
+  const [inspectionLoading, setInspectionLoading] = useState(false)
+  const [inspectionSavingId, setInspectionSavingId] = useState<string | null>(null)
 
   async function handleStatusChange(newStatus: VehicleStatus) {
     if (source !== "supabase") return
@@ -411,6 +433,24 @@ export function VehicleDetailContent({
   }, [evaluations])
 
   useEffect(() => {
+    if (source !== "supabase") return
+    setInspectionLoading(true)
+    let cancelled = false
+    Promise.all([getInspectionChecklistItems(), getVehicleInspectionResults(vehicle.id)]).then(
+      ([itemsRes, resultsRes]) => {
+        if (cancelled) return
+        if (itemsRes.success && itemsRes.items) setChecklistItems(itemsRes.items)
+        if (resultsRes.success && resultsRes.results) setInspectionResults(resultsRes.results)
+      }
+    ).finally(() => {
+      if (!cancelled) setInspectionLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [source, vehicle.id])
+
+  useEffect(() => {
     let cancelled = false
     Promise.all([fetchUsdJpyRate(), getSettings()]).then(([rateRes, settings]) => {
       if (cancelled) return
@@ -497,6 +537,52 @@ export function VehicleDetailContent({
   const evaluationIdForBadCase = evaluations.find(
     (e) => e.photo_analysis && Object.keys(e.photo_analysis).length > 0
   )?.id
+
+  function getResultForItem(itemId: string): { status: InspectionResultStatus; note: string } | undefined {
+    const r = inspectionResults.find((x) => x.item_id === itemId)
+    if (!r) return undefined
+    return { status: r.status as InspectionResultStatus, note: r.note ?? "" }
+  }
+
+  async function handleSaveInspectionResult(
+    itemId: string,
+    status: InspectionResultStatus,
+    note: string | null
+  ) {
+    if (source !== "supabase") return
+    setInspectionSavingId(itemId)
+    const res = await saveVehicleInspectionResult({
+      vehicleId: vehicle.id,
+      itemId,
+      status,
+      note: note?.trim() || null,
+    })
+    setInspectionSavingId(null)
+    if (res.success) {
+      setInspectionResults((prev) => {
+        const existing = prev.find((x) => x.item_id === itemId)
+        const next = prev.filter((x) => x.item_id !== itemId)
+        const updated = {
+          ...(existing ?? {
+            id: crypto.randomUUID(),
+            vehicle_id: vehicle.id,
+            item_id: itemId,
+            status: "needs_check" as InspectionResultStatus,
+            note: null,
+            checked_at: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }),
+          status,
+          note: note?.trim() || null,
+          checked_at: ["ok", "ng"].includes(status) ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        }
+        return [...next, updated as VehicleInspectionResultRow]
+      })
+      toast.success("チェック結果を保存しました")
+    } else toast.error(res.error)
+  }
 
   async function handleSaveBadCase() {
     if (!evaluationIdForBadCase) return
@@ -586,7 +672,12 @@ export function VehicleDetailContent({
     shippingType: gamiShippingType,
     listingType: gamiListingType,
     repairCostJpy: totalRepairCost,
+    targetProfitJpy,
   })
+  const profitRate =
+    yahooExpectedSale > 0
+      ? (gamiResult.finalProfitJpy / yahooExpectedSale) * 100
+      : 0
 
   return (
     <div className="space-y-8">
@@ -704,7 +795,7 @@ export function VehicleDetailContent({
               利益シミュレーター
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              GAMI専用ルール：成約料・送料・出品タイプを設定し、最終利益と「あと○円以内の落札なら利益4万確保」を表示します。
+              GAMI専用ルール：成約料・送料・出品タイプ・目標利益を設定し、最終利益・利益率・「あと○円以内の落札なら目標利益確保」を表示します。
             </p>
           </div>
           <div>
@@ -729,10 +820,11 @@ export function VehicleDetailContent({
                   })
                   const data = await res.json()
                   if (!res.ok) throw new Error(data?.error ?? "AI査定に失敗しました")
-                  const purchaseLimit = data.purchaseLimitJpy ?? (data.estimatedDomesticJpy ? Math.round(data.estimatedDomesticJpy * 0.7) : maxBid)
+                  const purchaseLimit = data.purchaseLimitJpy ?? (data.estimatedDomesticJpy ? Math.round(data.estimatedDomesticJpy * 0.6) : maxBid)
                   setMaxBid(purchaseLimit)
                   const salePrice = data.estimatedDomesticSaleJpy ?? data.estimatedDomesticJpy
-                  if (salePrice != null && salePrice > 0) setYahooExpectedSale(salePrice)
+                  const SALE_MARGIN = 0.9
+                  if (salePrice != null && salePrice > 0) setYahooExpectedSale(Math.round(salePrice * SALE_MARGIN))
                   if (data.estimatedExportUsd != null) setEbayExpectedSaleUsd(data.estimatedExportUsd)
                   const descParts: string[] = []
                   if (data.modelName) descParts.push(`${data.modelName}${data.modelType ? ` (${data.modelType})` : ""}`)
@@ -786,6 +878,7 @@ export function VehicleDetailContent({
               />
               <input
                 type="number"
+                inputMode="decimal"
                 min={0}
                 value={maxBid}
                 onChange={(e) => setMaxBid(Number(e.target.value) || 0)}
@@ -795,9 +888,22 @@ export function VehicleDetailContent({
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
+              <label className="text-xs text-muted-foreground">目標利益額（円）</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step={1000}
+                value={targetProfitJpy}
+                onChange={(e) => setTargetProfitJpy(Math.max(0, Number(e.target.value) || 0))}
+                className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
               <label className="text-xs text-muted-foreground">成約料・Base（円）</label>
               <input
                 type="number"
+                inputMode="decimal"
                 min={0}
                 value={baseFeeJpy}
                 onChange={(e) => setBaseFeeJpy(Number(e.target.value) || 0)}
@@ -830,6 +936,7 @@ export function VehicleDetailContent({
               <label className="text-xs text-muted-foreground">整備費（円）</label>
               <input
                 type="number"
+                inputMode="decimal"
                 value={totalRepairCost}
                 readOnly
                 className="mt-0.5 w-full rounded-lg border border-input bg-muted/50 px-2 py-1.5 text-sm"
@@ -844,6 +951,7 @@ export function VehicleDetailContent({
               <label className="text-xs text-muted-foreground">販売予想価格（円）</label>
               <input
                 type="number"
+                inputMode="decimal"
                 value={yahooExpectedSale}
                 onChange={(e) => setYahooExpectedSale(Number(e.target.value) || 0)}
                 className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-sm"
@@ -853,6 +961,7 @@ export function VehicleDetailContent({
               <label className="text-xs text-muted-foreground">陸送費（円・従来式用）</label>
               <input
                 type="number"
+                inputMode="decimal"
                 value={domesticShipping}
                 onChange={(e) => setDomesticShipping(Number(e.target.value) || 0)}
                 className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-sm"
@@ -862,6 +971,7 @@ export function VehicleDetailContent({
               <label className="text-xs text-muted-foreground">eBay予想売却（USD）</label>
               <input
                 type="number"
+                inputMode="decimal"
                 value={ebayExpectedSaleUsd}
                 onChange={(e) => setEbayExpectedSaleUsd(Number(e.target.value) || 0)}
                 className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-sm"
@@ -891,10 +1001,15 @@ export function VehicleDetailContent({
               </span>
               <span className={`text-lg font-bold ${gamiResult.finalProfitJpy >= 0 ? "text-foreground" : "text-destructive"}`}>
                 最終利益 {formatJPY(gamiResult.finalProfitJpy)}
+                {yahooExpectedSale > 0 && (
+                  <span className="ml-2 text-base font-medium text-muted-foreground">
+                    （利益率 {profitRate >= 0 ? "" : "−"}{Math.abs(profitRate).toFixed(1)}%）
+                  </span>
+                )}
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
-              あと <strong className="text-foreground">{formatJPY(gamiResult.maxBidForTargetProfitJpy)}</strong> 以内の落札なら利益4万確保
+              あと <strong className="text-foreground">{formatJPY(gamiResult.maxBidForTargetProfitJpy)}</strong> 以内の落札なら目標利益 {formatJPY(targetProfitJpy)} 確保
             </p>
           </div>
 
@@ -1424,6 +1539,7 @@ export function VehicleDetailContent({
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <input
               type="number"
+              inputMode="decimal"
               placeholder="落札額（円）"
               value={evalWinningBid}
               onChange={(e) => setEvalWinningBid(e.target.value)}
@@ -1431,6 +1547,7 @@ export function VehicleDetailContent({
             />
             <input
               type="number"
+              inputMode="decimal"
               placeholder="ヤフオク予想価格（円）"
               value={evalYahooSale}
               onChange={(e) => setEvalYahooSale(e.target.value)}
@@ -1438,6 +1555,7 @@ export function VehicleDetailContent({
             />
             <input
               type="number"
+              inputMode="decimal"
               placeholder="eBay予想価格（USD）"
               value={evalEbaySale}
               onChange={(e) => setEvalEbaySale(e.target.value)}
@@ -1484,6 +1602,7 @@ export function VehicleDetailContent({
               <label className="text-xs text-muted-foreground">実際の修理費（円）</label>
               <input
                 type="number"
+                inputMode="decimal"
                 placeholder="例: 25000"
                 value={actualRepairCost}
                 onChange={(e) => setActualRepairCost(e.target.value)}
@@ -1494,6 +1613,7 @@ export function VehicleDetailContent({
               <label className="text-xs text-muted-foreground">実際の売却額（円）</label>
               <input
                 type="number"
+                inputMode="decimal"
                 placeholder="例: 180000"
                 value={actualSalePrice}
                 onChange={(e) => setActualSalePrice(e.target.value)}
@@ -1504,6 +1624,7 @@ export function VehicleDetailContent({
               <label className="text-xs text-muted-foreground">実際の利益（円）</label>
               <input
                 type="number"
+                inputMode="decimal"
                 placeholder="例: 45000"
                 value={actualProfit}
                 onChange={(e) => setActualProfit(e.target.value)}
@@ -1592,6 +1713,118 @@ export function VehicleDetailContent({
         )}
       </div>
 
+      {/* 現物確認チェックリスト */}
+      {source === "supabase" && (
+        <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+            <ClipboardList className="h-5 w-5" />
+            現物確認チェックリスト
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            現地で確認した項目をチェックし、メモを保存できます。写真では分からない内容を記録しましょう。
+          </p>
+          {inspectionLoading && checklistItems.length === 0 ? (
+            <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              読み込み中…
+            </p>
+          ) : (
+            <ul className="mt-4 space-y-4">
+              {checklistItems.map((item) => {
+                const result = getResultForItem(item.id)
+                const status = result?.status ?? "needs_check"
+                const note = result?.note ?? ""
+                const saving = inspectionSavingId === item.id
+                return (
+                  <li
+                    key={item.id}
+                    className="rounded-lg border border-border bg-muted/20 p-3 sm:p-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-foreground">{item.label}</p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <Select
+                            value={status}
+                            onValueChange={(v) =>
+                              handleSaveInspectionResult(
+                                item.id,
+                                v as InspectionResultStatus,
+                                note || null
+                              )
+                            }
+                            disabled={saving}
+                          >
+                            <SelectTrigger className="h-9 w-36 border-input bg-background">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="needs_check">要確認</SelectItem>
+                              <SelectItem value="ok">OK</SelectItem>
+                              <SelectItem value="ng">NG</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {saving && (
+                            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
+                        <Textarea
+                          placeholder="メモ（任意）"
+                          value={note}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            setInspectionResults((prev) => {
+                              const r = prev.find((x) => x.item_id === item.id)
+                              const rest = prev.filter((x) => x.item_id !== item.id)
+                              const base = r ?? {
+                                id: crypto.randomUUID(),
+                                vehicle_id: vehicle.id,
+                                item_id: item.id,
+                                status: "needs_check" as const,
+                                note: null,
+                                checked_at: null,
+                                created_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString(),
+                              }
+                              return [...rest, { ...base, note: v } as VehicleInspectionResultRow]
+                            })
+                          }}
+                          onBlur={(e) => {
+                            const v = (e.target as HTMLTextAreaElement).value
+                            if (v.trim() || status !== "needs_check")
+                              handleSaveInspectionResult(
+                                item.id,
+                                status as InspectionResultStatus,
+                                v.trim() || null
+                              )
+                          }}
+                          rows={2}
+                          className="mt-2 min-h-[60px] border-input bg-background text-sm"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleSaveInspectionResult(
+                            item.id,
+                            status as InspectionResultStatus,
+                            note || null
+                          )
+                        }
+                        disabled={saving}
+                        className="shrink-0 self-end rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "保存"}
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+
       <Dialog open={badCaseOpen} onOpenChange={setBadCaseOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1667,6 +1900,7 @@ export function VehicleDetailContent({
               <label className="text-sm font-medium text-foreground">代金（円）</label>
               <input
                 type="number"
+                inputMode="decimal"
                 min={0}
                 value={wonPriceJpy || ""}
                 onChange={(e) => setWonPriceJpy(Number(e.target.value) || 0)}

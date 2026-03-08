@@ -72,8 +72,8 @@ export const GAMI_SHIPPING_OSAKA_JPY = 5000
 /** GAMI専用: 車体出品時のヤフオク手数料（円） */
 export const GAMI_YAHOO_FEE_BODY_JPY = 1980
 
-/** GAMI専用: 利益4万確保の閾値（円） */
-export const GAMI_TARGET_PROFIT_JPY = 40000
+/** GAMI専用: 仕入れ可判定の利益閾値（円）。この額以上で「仕入れ可」 */
+export const GAMI_TARGET_PROFIT_JPY = 45000
 
 export type GamiListingType = "body" | "parts"
 export type GamiShippingType = "normal" | "osaka"
@@ -93,9 +93,9 @@ export type GamiProfitResult = {
   totalCostJpy: number
   /** 最終利益 */
   finalProfitJpy: number
-  /** 仕入れ可（最終利益>=4万） */
+  /** 仕入れ可（最終利益>=4.5万） */
   isPurchasable: boolean
-  /** 利益4万確保できる最大落札額（円）。これ以下で落札すれば利益4万以上 */
+  /** 利益4.5万確保できる最大落札額（円）。これ以下で落札すれば利益4.5万以上 */
   maxBidForTargetProfitJpy: number
 }
 
@@ -113,6 +113,8 @@ export function calcGamiProfit(params: {
   shippingType: GamiShippingType
   listingType: GamiListingType
   repairCostJpy: number
+  /** 目標利益額（円）。指定しない場合は GAMI_TARGET_PROFIT_JPY を使用 */
+  targetProfitJpy?: number
 }): GamiProfitResult {
   const consumptionTaxJpy = Math.round(params.baseFeeJpy * 0.1)
   const shippingJpy =
@@ -129,11 +131,12 @@ export function calcGamiProfit(params: {
     yahooFeeJpy +
     params.repairCostJpy
   const finalProfitJpy = params.expectedSalePriceJpy - totalCostJpy
-  const isPurchasable = finalProfitJpy >= GAMI_TARGET_PROFIT_JPY
+  const targetJpy = params.targetProfitJpy ?? GAMI_TARGET_PROFIT_JPY
+  const isPurchasable = finalProfitJpy >= targetJpy
   const maxBidForTargetProfitJpy = Math.max(
     0,
     params.expectedSalePriceJpy -
-      GAMI_TARGET_PROFIT_JPY -
+      targetJpy -
       params.baseFeeJpy -
       consumptionTaxJpy -
       shippingJpy -

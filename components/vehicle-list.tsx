@@ -63,7 +63,7 @@ export function VehicleList({
         </span>
       </div>
 
-      <div className="mt-3 flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 sm:mt-2">
+      <div className="mt-3 flex min-h-[44px] items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 sm:mt-2 sm:min-h-0">
         <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
         <input
           type="search"
@@ -71,7 +71,7 @@ export function VehicleList({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="車両検索"
-          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground sm:text-sm"
         />
       </div>
 

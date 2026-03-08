@@ -39,12 +39,12 @@ export async function getBdsPastAverageByModelName(
   }
 }
 
-/** 外装コンディション（1〜5）に応じた相場係数。5・4=100%、3=80%、2=60%、1=40% */
+/** 外装コンディション（1〜5）に応じた相場係数（厳しめ）。5・4=90%、3=70%、2=50%、1=35% */
 export function getConditionCoefficient(exteriorCondition: number): number {
-  if (exteriorCondition >= 5) return 1.0
-  if (exteriorCondition >= 4) return 1.0
-  if (exteriorCondition >= 3) return 0.8
-  if (exteriorCondition >= 2) return 0.6
-  if (exteriorCondition >= 1) return 0.4
-  return 0.8
+  if (exteriorCondition >= 5) return 0.9
+  if (exteriorCondition >= 4) return 0.9
+  if (exteriorCondition >= 3) return 0.7
+  if (exteriorCondition >= 2) return 0.5
+  if (exteriorCondition >= 1) return 0.35
+  return 0.7
 }

@@ -184,15 +184,15 @@ export function DashboardContent() {
 
   return (
     <>
-      <div className="mb-4 rounded-xl border border-border bg-card p-4">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
-          <Search className="h-4 w-4" />
+      <div className="mb-4 rounded-xl border border-border bg-card p-4 sm:p-4">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-foreground sm:text-base">
+          <Search className="h-4 w-4 shrink-0" />
           ヤフオク車体 落札相場検索
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           型式や車名を入力すると、オートバイ車体カテゴリに絞った落札相場を新しいタブで開きます。
         </p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-2">
           <input
             type="text"
             placeholder="例: モンキー Z50J"
@@ -202,7 +202,7 @@ export function DashboardContent() {
               if (yahooKeywordError) setYahooKeywordError(false)
             }}
             onKeyDown={(e) => e.key === "Enter" && handleYahooSearch()}
-            className={`min-w-[200px] flex-1 rounded-lg border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
+            className={`min-h-[44px] w-full rounded-lg border px-3 py-3 text-base transition-colors focus:outline-none focus:ring-2 focus:ring-primary sm:min-h-0 sm:min-w-[200px] sm:flex-1 sm:py-2 sm:text-sm ${
               yahooKeywordError
                 ? "border-red-500 bg-red-500/10 dark:border-red-400 dark:bg-red-500/10"
                 : "border-input bg-background"
@@ -211,9 +211,9 @@ export function DashboardContent() {
           <button
             type="button"
             onClick={handleYahooSearch}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className="inline-flex min-h-[44px] touch-manipulation items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-base font-medium text-primary-foreground hover:bg-primary/90 sm:min-h-0 sm:py-2 sm:text-sm"
           >
-            <Search className="h-4 w-4" />
+            <Search className="h-4 w-4 shrink-0" />
             車体の相場を検索
           </button>
         </div>
@@ -288,20 +288,20 @@ export function DashboardContent() {
           <p className="mt-1 text-sm text-muted-foreground">
             URLを貼ると車両を1件登録し、ページから写真を自動で取り込みます。既に同じURLの車両がある場合は写真のみ追加します。
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-2">
             <input
               type="url"
               placeholder="https://..."
               value={bdsUrl}
               onChange={(e) => setBdsUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleBdsUrlSubmit()}
-              className="min-w-[200px] flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              className="min-h-[44px] w-full rounded-lg border border-input bg-background px-3 py-3 text-base sm:min-h-0 sm:min-w-[200px] sm:flex-1 sm:py-2 sm:text-sm"
             />
             <button
               type="button"
               onClick={handleBdsUrlSubmit}
               disabled={bdsUrlSubmitting}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className="inline-flex min-h-[44px] touch-manipulation items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-base font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 sm:min-h-0 sm:py-2 sm:text-sm"
             >
               {bdsUrlSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
               {bdsUrlSubmitting ? "取り込み中…" : "登録して写真を取り込む"}
@@ -323,7 +323,7 @@ export function DashboardContent() {
         <SummaryCards summary={summary} />
       </div>
       <p className="mt-6 text-sm text-muted-foreground">
-        「あと○円以内の落札なら利益4万確保」は各車両をクリックし、詳細の利益シミュレーター（GAMI専用ルール）で確認できます。
+        「あと○円以内の落札なら目標利益確保」は各車両をクリックし、詳細の利益シミュレーター（GAMI専用ルール）で目標利益額を設定して確認できます。
       </p>
       <div className="mt-2">
         <VehicleList

@@ -34,7 +34,7 @@ export default async function VehicleDetailPage({
       <DesktopSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <DashboardHeader />
-        <main className="flex-1 overflow-y-auto pb-20 lg:pb-6">
+        <main className="flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-6">
           <div className="mx-auto max-w-3xl px-4 py-5 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
             <Link
               href="/"

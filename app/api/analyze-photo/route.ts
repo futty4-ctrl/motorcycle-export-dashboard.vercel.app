@@ -86,11 +86,12 @@ export async function POST(request: NextRequest) {
       pastAverageJpy = past.averagePriceJpy
       pastSampleCount = past.sampleCount
     }
+    const SAFETY_MARGIN = 0.92
     const purchaseLimitJpy =
       pastAverageJpy > 0
-        ? Math.round(pastAverageJpy * coefficient)
+        ? Math.round(pastAverageJpy * coefficient * SAFETY_MARGIN)
         : result.estimatedDomesticJpy > 0
-          ? Math.round(result.estimatedDomesticJpy * coefficient)
+          ? Math.round(result.estimatedDomesticJpy * coefficient * SAFETY_MARGIN)
           : 0
 
     return NextResponse.json({
