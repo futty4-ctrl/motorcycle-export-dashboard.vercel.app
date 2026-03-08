@@ -23,6 +23,8 @@ export type VehicleRow = {
   bds_rating: string | null
   chassis_number: string | null
   drive_link: string | null
+  onsite_notes: string | null
+  seller_info: string | null
   created_at: string
   updated_at: string
 }
@@ -33,6 +35,8 @@ export type VehicleInsert = {
   bds_rating?: string | null
   chassis_number?: string | null
   drive_link?: string | null
+  onsite_notes?: string | null
+  seller_info?: string | null
   created_at?: string
   updated_at?: string
 }

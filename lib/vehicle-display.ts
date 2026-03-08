@@ -24,6 +24,10 @@ export type VehicleDisplay = {
   chassisNumber?: string | null
   /** 当該車両の Drive フォルダ URL（写真アップロード先の親） */
   driveLink?: string | null
+  /** 現地メモ・所見（Phase 2） */
+  onsiteNotes?: string | null
+  /** 売主からのヒアリング情報（Phase 2） */
+  sellerInfo?: string | null
 }
 
 /** 利益率（0-100）に応じたプログレスバーの色クラス */

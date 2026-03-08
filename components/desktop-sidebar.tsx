@@ -13,10 +13,12 @@ import {
   GanttChartSquare,
   BarChart3,
   Calculator,
+  TrendingUp,
 } from "lucide-react"
 
 const navItems = [
   { label: "ダッシュボード", href: "/", icon: LayoutDashboard },
+  { label: "BDS過去相場", href: "/market", icon: TrendingUp },
   { label: "見積・請求", href: "/documents", icon: Calculator },
   { label: "オークション・プレビュー", href: "/auction-preview", icon: GanttChartSquare },
   { label: "在庫管理", href: "/inventory", icon: Package },

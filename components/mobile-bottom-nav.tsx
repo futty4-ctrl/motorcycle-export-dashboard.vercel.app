@@ -2,12 +2,13 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Package, ShoppingBag, Settings, Calculator } from "lucide-react"
+import { LayoutDashboard, Package, ShoppingBag, Settings, Calculator, TrendingUp } from "lucide-react"
 
 const navItems = [
   { label: "ホーム", href: "/", icon: LayoutDashboard },
+  { label: "相場", href: "/market", icon: TrendingUp },
   { label: "在庫", href: "/inventory", icon: Package },
-  { label: "見積・請求", href: "/documents", icon: Calculator },
+  { label: "見積", href: "/documents", icon: Calculator },
   { label: "出品", href: "/ebay", icon: ShoppingBag },
   { label: "設定", href: "/settings", icon: Settings },
 ]

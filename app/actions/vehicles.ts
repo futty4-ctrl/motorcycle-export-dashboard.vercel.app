@@ -299,7 +299,7 @@ export async function getVehicleById(id: string): Promise<{
       const supabase = createServerSupabaseClient()
       const { data: row, error } = await supabase
       .from("vehicles")
-      .select("id, status, bds_rating, chassis_number, drive_link, image_url, name")
+      .select("id, status, bds_rating, chassis_number, drive_link, image_url, name, onsite_notes, seller_info")
       .eq("id", id)
       .single()
 
@@ -311,6 +311,7 @@ export async function getVehicleById(id: string): Promise<{
       const maxProfit = Math.max(0, ...(scenariosRows ?? []).map((r) => Number(r.profit ?? 0)))
       const profitScore = Math.min(100, Math.max(0, Math.round(maxProfit / 3000)))
       const imageUrl = (row as { image_url?: string | null }).image_url?.trim()
+      const r = row as { onsite_notes?: string | null; seller_info?: string | null }
       return {
         success: true,
         source: "supabase",
@@ -324,6 +325,8 @@ export async function getVehicleById(id: string): Promise<{
           driveLink: row.drive_link,
           bdsRating: row.bds_rating,
           chassisNumber: row.chassis_number,
+          onsiteNotes: r.onsite_notes?.trim() || null,
+          sellerInfo: r.seller_info?.trim() || null,
         },
       }
     }
@@ -387,6 +390,28 @@ export async function updateVehicleStatus(
     return { success: true }
   } catch (err) {
     const message = err instanceof Error ? err.message : "ステータスの更新に失敗しました"
+    return { success: false, error: message }
+  }
+}
+
+/**
+ * 車両の現地メモ・売主情報を更新（Phase 2）
+ */
+export async function updateVehicleNotes(
+  vehicleId: string,
+  params: { onsite_notes?: string | null; seller_info?: string | null }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = createServerSupabaseClient()
+    const updates: { onsite_notes?: string | null; seller_info?: string | null } = {}
+    if (params.onsite_notes !== undefined) updates.onsite_notes = params.onsite_notes?.trim() || null
+    if (params.seller_info !== undefined) updates.seller_info = params.seller_info?.trim() || null
+    if (Object.keys(updates).length === 0) return { success: true }
+    const { error } = await supabase.from("vehicles").update(updates).eq("id", vehicleId)
+    if (error) throw error
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "メモの保存に失敗しました"
     return { success: false, error: message }
   }
 }
@@ -1069,6 +1094,73 @@ export async function getAnalyticsData(): Promise<{
     return { success: true, rows }
   } catch (err) {
     const message = err instanceof Error ? err.message : "分析データの取得に失敗しました"
+    return { success: false, error: message }
+  }
+}
+
+/** Phase 4: 車種別 BDS 過去落札相場（bookmarklet シナリオの profit を集計） */
+export type BdsMarketRow = {
+  modelName: string
+  averagePriceJpy: number
+  minPriceJpy: number
+  maxPriceJpy: number
+  count: number
+}
+
+export async function getBdsMarketByModel(): Promise<{
+  success: boolean
+  rows?: BdsMarketRow[]
+  error?: string
+}> {
+  try {
+    const supabase = createServerSupabaseClient()
+    const { data: scenarios, error: scErr } = await supabase
+      .from("scenarios")
+      .select("vehicle_id, profit")
+      .eq("scenario_type", "bookmarklet")
+      .gt("profit", 0)
+    if (scErr) throw scErr
+    if (!scenarios?.length) return { success: true, rows: [] }
+
+    const vehicleIds = [...new Set(scenarios.map((s) => s.vehicle_id))]
+    const { data: vehicles, error: vErr } = await supabase
+      .from("vehicles")
+      .select("id, name, chassis_number")
+      .in("id", vehicleIds)
+    if (vErr) throw vErr
+
+    const nameById = new Map<string, string>()
+    for (const v of vehicles ?? []) {
+      const label = (v as { name?: string | null }).name?.trim() || v.chassis_number?.trim() || ""
+      if (label) nameById.set(v.id, label)
+    }
+
+    const byModel = new Map<string, number[]>()
+    for (const s of scenarios) {
+      const profit = Number(s.profit)
+      if (!Number.isFinite(profit) || profit <= 0) continue
+      const name = nameById.get(s.vehicle_id)?.trim() || "（車種不明）"
+      const key = name.slice(0, 50)
+      if (!byModel.has(key)) byModel.set(key, [])
+      byModel.get(key)!.push(profit)
+    }
+
+    const rows: BdsMarketRow[] = []
+    for (const [modelName, prices] of byModel.entries()) {
+      if (prices.length === 0) continue
+      const sum = prices.reduce((a, b) => a + b, 0)
+      rows.push({
+        modelName,
+        averagePriceJpy: Math.round(sum / prices.length),
+        minPriceJpy: Math.min(...prices),
+        maxPriceJpy: Math.max(...prices),
+        count: prices.length,
+      })
+    }
+    rows.sort((a, b) => b.count - a.count)
+    return { success: true, rows }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "BDS相場データの取得に失敗しました"
     return { success: false, error: message }
   }
 }

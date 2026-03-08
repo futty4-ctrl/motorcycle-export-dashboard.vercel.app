@@ -43,6 +43,7 @@ import type { VehicleStatus } from "@/lib/data"
 import type { InspectionChecklistItemRow, VehicleInspectionResultRow, InspectionResultStatus } from "@/lib/db/types"
 import {
   updateVehicleStatus,
+  updateVehicleNotes,
   addPart,
   runPhotoAnalysis,
   runStrictInspection,
@@ -250,6 +251,11 @@ export function VehicleDetailContent({
   const [wonDialogOpen, setWonDialogOpen] = useState(false)
   const [wonPriceJpy, setWonPriceJpy] = useState(0)
   const [wonCounterparty, setWonCounterparty] = useState("")
+
+  // Phase 2: 現地メモ・売主情報
+  const [onsiteNotes, setOnsiteNotes] = useState(vehicle.onsiteNotes ?? "")
+  const [sellerInfo, setSellerInfo] = useState(vehicle.sellerInfo ?? "")
+  const [savingNotes, setSavingNotes] = useState(false)
 
   // 現物確認チェックリスト
   const [checklistItems, setChecklistItems] = useState<InspectionChecklistItemRow[]>([])
@@ -466,6 +472,11 @@ export function VehicleDetailContent({
     }
   }, [])
 
+  useEffect(() => {
+    setOnsiteNotes(vehicle.onsiteNotes ?? "")
+    setSellerInfo(vehicle.sellerInfo ?? "")
+  }, [vehicle.onsiteNotes, vehicle.sellerInfo])
+
   const latestEvalForActuals = evaluations[0]
   useEffect(() => {
     if (!latestEvalForActuals) return
@@ -537,6 +548,18 @@ export function VehicleDetailContent({
   const evaluationIdForBadCase = evaluations.find(
     (e) => e.photo_analysis && Object.keys(e.photo_analysis).length > 0
   )?.id
+
+  async function handleSaveNotes() {
+    if (source !== "supabase") return
+    setSavingNotes(true)
+    const res = await updateVehicleNotes(vehicle.id, {
+      onsite_notes: onsiteNotes.trim() || null,
+      seller_info: sellerInfo.trim() || null,
+    })
+    setSavingNotes(false)
+    if (res.success) toast.success("メモを保存しました")
+    else toast.error(res.error)
+  }
 
   function getResultForItem(itemId: string): { status: InspectionResultStatus; note: string } | undefined {
     const r = inspectionResults.find((x) => x.item_id === itemId)
@@ -1712,6 +1735,47 @@ export function VehicleDetailContent({
           </div>
         )}
       </div>
+
+      {/* Phase 2: 現地メモ・売主情報 */}
+      {source === "supabase" && (
+        <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+          <h2 className="text-lg font-semibold text-foreground">現地メモ・売主情報</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            現場での自由メモや、売主から聞いた条件などを記録できます。
+          </p>
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className="text-sm font-medium text-foreground">現地メモ・所見</label>
+              <Textarea
+                placeholder="現地で気づいたこと、写真では分からない所見など"
+                value={onsiteNotes}
+                onChange={(e) => setOnsiteNotes(e.target.value)}
+                rows={3}
+                className="mt-1 border-input bg-background"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground">売主からの情報（条件など）</label>
+              <Textarea
+                placeholder="売主にヒアリングした条件・希望・備考"
+                value={sellerInfo}
+                onChange={(e) => setSellerInfo(e.target.value)}
+                rows={2}
+                className="mt-1 border-input bg-background"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveNotes}
+              disabled={savingNotes}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {savingNotes ? <Loader2 className="inline h-4 w-4 animate-spin" /> : null}
+              保存
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 現物確認チェックリスト */}
       {source === "supabase" && (
