@@ -1,11 +1,11 @@
 /**
- * riskAreas の fileId を画像表示用 URL に変換する。
+ * riskAreas の fileId または path を画像表示用 URL に変換する。
  * - 既に URL（http 始まり）→ そのまま
  * - Supabase Storage パス形式（vehicleId/ファイル名）→ getPublicUrl
  * - それ以外（従来の Drive ID）→ Drive サムネURL（後方互換）
  */
-export function getRiskAreaImageUrl(fileId: string): { src: string; href: string } {
-  const trimmed = fileId?.trim()
+export function getRiskAreaImageUrl(fileIdOrPath: string): { src: string; href: string } {
+  const trimmed = fileIdOrPath?.trim()
   if (!trimmed) return { src: "", href: "" }
 
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {

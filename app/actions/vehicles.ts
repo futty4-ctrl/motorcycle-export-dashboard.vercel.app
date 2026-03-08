@@ -22,7 +22,6 @@ import {
   analyzeStrictInspection,
   type PhotoAnalysisResult,
 } from "@/lib/ai/photo-analyzer"
-import { getBadCaseFocusPoints } from "@/app/actions/bad-cases"
 import { analyzeFourMini } from "@/lib/ai/fourmini-analyzer"
 import { resizeImageForAnalysis } from "@/lib/image-resize"
 import {
@@ -300,7 +299,7 @@ export async function getVehicleById(id: string): Promise<{
       const supabase = createServerSupabaseClient()
       const { data: row, error } = await supabase
       .from("vehicles")
-      .select("id, status, bds_rating, chassis_number, drive_link, image_url")
+      .select("id, status, bds_rating, chassis_number, drive_link, image_url, name")
       .eq("id", id)
       .single()
 
@@ -318,7 +317,7 @@ export async function getVehicleById(id: string): Promise<{
         vehicle: {
           id: row.id,
           status: row.status as VehicleStatus,
-          name: row.chassis_number?.trim() || `車両 ${row.id.slice(0, 8)}`,
+          name: (row as { name?: string | null }).name?.trim() || row.chassis_number?.trim() || `車両 ${row.id.slice(0, 8)}`,
           image: imageUrl || PLACEHOLDER_IMAGE,
           profitScore,
           expectedProfitJPY: maxProfit,
@@ -450,31 +449,36 @@ export async function runPhotoAnalysis(vehicleId: string): Promise<{
     if (images.length === 0) {
       return { success: false, error: "画像の取得に失敗しました。" }
     }
-    const { focusPoints } = await getBadCaseFocusPoints()
-    const analysis = await analyzeVehiclePhotosWithGrades(images, {
-      focusPoints: focusPoints ?? undefined,
-    })
-    const allNegative = [
-      ...(analysis.exteriorDamage ?? []),
-      ...(analysis.engineCorrosion ?? []),
-      ...(analysis.consumableWear ?? []),
-    ]
-    const riskAreasWithFileId = (analysis.riskAreas ?? []).map((r) => {
+    const analysis = await analyzeVehiclePhotosWithGrades(images)
+    const allNegative = analysis.negativeItems ?? []
+    const imagePathsForStorage = toFetch.map((f) => f.path)
+    const riskAreasWithFileId = ((analysis.riskAreas ?? []).length > 0 ? analysis.riskAreas : []).map((r) => {
       const idx = Math.max(0, Math.min(r.imageIndex - 1, publicUrls.length - 1))
       const fileId = publicUrls[idx] ?? null
+      const path = imagePathsForStorage[idx] ?? null
       return {
         description: r.description,
+        imageIndex: r.imageIndex,
         fileId: fileId ?? undefined,
+        path: path ?? undefined,
         ...(r.bbox && { bbox: r.bbox }),
       }
-    }).filter((r) => r.fileId) as { description: string; fileId: string; bbox?: { x: number; y: number; width: number; height: number } }[]
-    const photoAnalysisSave: PhotoAnalysisResult & { riskAreas?: { description: string; fileId: string; bbox?: { x: number; y: number; width: number; height: number } }[] } = {
+    }).filter((r) => r.fileId || r.path) as { description: string; imageIndex?: number; fileId?: string; path?: string; bbox?: { x: number; y: number; width: number; height: number } }[]
+    const photoAnalysisSave: PhotoAnalysisResult & {
+      riskAreas?: { description: string; imageIndex?: number; fileId?: string; path?: string; bbox?: { x: number; y: number; width: number; height: number } }[]
+      imagePaths?: string[]
+    } = {
       ...analysis,
       riskAreas: riskAreasWithFileId,
+      imagePaths: imagePathsForStorage,
     }
-    const modelName = analysis.modelName?.trim()
-    if (modelName) {
-      await supabase.from("vehicles").update({ name: modelName }).eq("id", vehicleId)
+    const vehicleName = analysis.vehicleName?.trim()
+    const updates: Record<string, unknown> = {}
+    if (vehicleName) updates.name = vehicleName
+    if (analysis.overallGrade?.trim()) updates.bds_rating = analysis.overallGrade.trim()
+    if (analysis.lotNumber?.trim()) updates.lot_number = analysis.lotNumber.trim()
+    if (Object.keys(updates).length > 0) {
+      await supabase.from("vehicles").update(updates).eq("id", vehicleId)
     }
 
     const { data: inserted, error: insertError } = await supabase
@@ -1081,7 +1085,7 @@ export async function getVehiclesFromSupabase(): Promise<{
     const supabase = createServerSupabaseClient()
     const { data: vehiclesRows, error: vehiclesError } = await supabase
       .from("vehicles")
-      .select("id, status, bds_rating, chassis_number, drive_link, image_url")
+      .select("id, status, bds_rating, chassis_number, drive_link, image_url, name")
       .order("created_at", { ascending: false })
 
     if (vehiclesError) throw vehiclesError
@@ -1106,7 +1110,7 @@ export async function getVehiclesFromSupabase(): Promise<{
       return {
         id: v.id,
         status: v.status as VehicleStatus,
-        name: v.chassis_number?.trim() || `車両 ${v.id.slice(0, 8)}`,
+        name: (v as { name?: string | null }).name?.trim() || v.chassis_number?.trim() || `車両 ${v.id.slice(0, 8)}`,
         image: imageUrl || PLACEHOLDER_IMAGE,
         profitScore,
         expectedProfitJPY: profit,

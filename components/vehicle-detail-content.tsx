@@ -81,14 +81,26 @@ type PhotoAnalysisData = {
   customParts?: string[]
   highValueEbayParts?: { part: string; reason: string }[]
   note?: string
+  /** BDS解析: 車種名・年式・走行・総合評価・価格・出品番号 */
+  vehicleName?: string
+  year?: number
+  mileage?: string
+  overallGrade?: string
+  negativeItems?: string[]
+  price?: number
+  buyNowPrice?: number
+  lotNumber?: string
   exteriorGrade?: "A" | "B" | "C" | "D" | "E"
   frameGrade?: "A" | "B" | "C" | "D" | "E"
   engineGrade?: "A" | "B" | "C" | "D" | "E"
   riskAreas?: {
     description: string
     fileId?: string
+    path?: string
+    imageIndex?: number
     bbox?: { x: number; y: number; width: number; height: number }
   }[]
+  imagePaths?: string[]
   strictRepairCost?: number
   strictFindings?: string[]
   /** 4mini鑑定: 武川・キタコ・ヨシムラ・Gクラフト等 */
@@ -386,6 +398,17 @@ export function VehicleDetailContent({
       window.location.reload()
     } else toast.error(res.error)
   }
+
+  const priceInitializedRef = useRef(false)
+  useEffect(() => {
+    if (priceInitializedRef.current) return
+    const pa = evaluations.find((e) => e.photo_analysis && Object.keys(e.photo_analysis).length > 0)?.photo_analysis
+    const price = (pa as PhotoAnalysisData | undefined)?.price
+    if (typeof price === "number" && price > 0) {
+      setMaxBid(price)
+      priceInitializedRef.current = true
+    }
+  }, [evaluations])
 
   useEffect(() => {
     let cancelled = false
@@ -1173,6 +1196,64 @@ export function VehicleDetailContent({
 
           {photoAnalysisResult && (
             <div className="mt-6 space-y-4">
+              {(photoAnalysisResult.vehicleName ||
+                photoAnalysisResult.year != null ||
+                photoAnalysisResult.mileage ||
+                photoAnalysisResult.overallGrade ||
+                (typeof photoAnalysisResult.price === "number" && photoAnalysisResult.price > 0) ||
+                photoAnalysisResult.lotNumber) && (
+                <div className="rounded-lg border border-border bg-muted/30 p-4">
+                  <h3 className="text-sm font-semibold text-foreground">BDS解析結果</h3>
+                  <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
+                    {photoAnalysisResult.vehicleName && (
+                      <>
+                        <dt className="text-muted-foreground">車種名</dt>
+                        <dd className="col-span-2 sm:col-span-1 font-medium text-foreground">{photoAnalysisResult.vehicleName}</dd>
+                      </>
+                    )}
+                    {photoAnalysisResult.year != null && (
+                      <>
+                        <dt className="text-muted-foreground">年式</dt>
+                        <dd className="col-span-2 sm:col-span-1 font-medium text-foreground">{photoAnalysisResult.year}年</dd>
+                      </>
+                    )}
+                    {photoAnalysisResult.mileage && (
+                      <>
+                        <dt className="text-muted-foreground">走行距離</dt>
+                        <dd className="col-span-2 sm:col-span-1 font-medium text-foreground">{photoAnalysisResult.mileage}</dd>
+                      </>
+                    )}
+                    {photoAnalysisResult.overallGrade && (
+                      <>
+                        <dt className="text-muted-foreground">総合評価</dt>
+                        <dd className="col-span-2 sm:col-span-1 font-medium text-foreground">{photoAnalysisResult.overallGrade}</dd>
+                      </>
+                    )}
+                    {typeof photoAnalysisResult.price === "number" && photoAnalysisResult.price > 0 && (
+                      <>
+                        <dt className="text-muted-foreground">現在価格</dt>
+                        <dd className="col-span-2 sm:col-span-1 font-medium text-foreground">{formatJPY(photoAnalysisResult.price)}</dd>
+                      </>
+                    )}
+                    {photoAnalysisResult.lotNumber && (
+                      <>
+                        <dt className="text-muted-foreground">出品番号</dt>
+                        <dd className="col-span-2 sm:col-span-1 font-medium text-foreground">{photoAnalysisResult.lotNumber}</dd>
+                      </>
+                    )}
+                  </dl>
+                </div>
+              )}
+              {(photoAnalysisResult.negativeItems?.length ?? 0) > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">BDS指摘の不具合箇所</h3>
+                  <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-muted-foreground">
+                    {photoAnalysisResult.negativeItems!.map((item, i) => (
+                      <li key={i} className="text-foreground">{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {(photoAnalysisResult.exteriorGrade ||
                 photoAnalysisResult.frameGrade ||
                 photoAnalysisResult.engineGrade) && (
@@ -1211,13 +1292,14 @@ export function VehicleDetailContent({
                   </h3>
                   <ul className="mt-3 space-y-4">
                     {photoAnalysisResult.riskAreas.map((risk, i) => {
-                      const { src, href } = risk.fileId ? getRiskAreaImageUrl(risk.fileId) : { src: "", href: "" }
+                      const idOrPath = risk.path ?? risk.fileId ?? ""
+                      const { src, href } = idOrPath ? getRiskAreaImageUrl(idOrPath) : { src: "", href: "" }
                       return (
                       <li
                         key={i}
                         className="flex flex-col gap-2 rounded-lg border border-border bg-background/80 p-3 sm:flex-row sm:items-start"
                       >
-                        {risk.fileId && src && (
+                        {idOrPath && src && (
                           <a
                             href={href}
                             target="_blank"
@@ -1237,7 +1319,7 @@ export function VehicleDetailContent({
                         )}
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-foreground">{risk.description}</p>
-                          {risk.fileId && href && (
+                          {idOrPath && href && (
                             <a
                               href={href}
                               target="_blank"
@@ -1296,8 +1378,11 @@ export function VehicleDetailContent({
 
       {source === "supabase" &&
         photoAnalysisResult?.riskAreas?.length > 0 &&
-        photoAnalysisResult.riskAreas.some((r) => r.fileId) && (
-          <AiZoomInspection riskAreas={photoAnalysisResult.riskAreas} />
+        photoAnalysisResult.riskAreas.some((r) => r.fileId || r.path) && (
+          <AiZoomInspection
+            riskAreas={photoAnalysisResult.riskAreas}
+            imagePaths={photoAnalysisResult.imagePaths}
+          />
         )}
 
       {/* 査定・利益 */}

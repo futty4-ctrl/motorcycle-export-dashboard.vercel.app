@@ -15,7 +15,7 @@ import type { VehicleDisplay } from "@/lib/vehicle-display"
 import { SummaryCards } from "@/components/summary-cards"
 import { VehicleList } from "@/components/vehicle-list"
 import { ScreenshotUploader } from "@/components/screenshot-uploader"
-import { Loader2, Link2 } from "lucide-react"
+import { Loader2, Link2, Search } from "lucide-react"
 import { toast } from "sonner"
 
 export function DashboardContent() {
@@ -34,6 +34,9 @@ export function DashboardContent() {
 
   const [bdsUrl, setBdsUrl] = useState("")
   const [bdsUrlSubmitting, setBdsUrlSubmitting] = useState(false)
+
+  const [yahooKeyword, setYahooKeyword] = useState("")
+  const [yahooKeywordError, setYahooKeywordError] = useState(false)
   const headerSearch = searchParams.get("q") ?? ""
   const setHeaderSearch = (v: string) => {
     const p = new URLSearchParams(searchParams.toString())
@@ -41,6 +44,19 @@ export function DashboardContent() {
     else p.delete("q")
     const query = p.toString()
     router.replace(query ? `/?${query}` : "/", { scroll: false })
+  }
+
+  const handleYahooSearch = () => {
+    const kw = yahooKeyword.trim()
+    if (!kw) {
+      setYahooKeywordError(true)
+      toast.error("型式や車名を入力してください")
+      return
+    }
+    setYahooKeywordError(false)
+    const encoded = encodeURIComponent(kw)
+    const url = `https://auctions.yahoo.co.jp/closedsearch/closedsearch?b=2084008446&va=${encoded}`
+    window.open(url, "_blank", "noopener,noreferrer")
   }
 
   const handleBdsUrlSubmit = async () => {
@@ -168,6 +184,40 @@ export function DashboardContent() {
 
   return (
     <>
+      <div className="mb-4 rounded-xl border border-border bg-card p-4">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
+          <Search className="h-4 w-4" />
+          ヤフオク車体 落札相場検索
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          型式や車名を入力すると、オートバイ車体カテゴリに絞った落札相場を新しいタブで開きます。
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input
+            type="text"
+            placeholder="例: モンキー Z50J"
+            value={yahooKeyword}
+            onChange={(e) => {
+              setYahooKeyword(e.target.value)
+              if (yahooKeywordError) setYahooKeywordError(false)
+            }}
+            onKeyDown={(e) => e.key === "Enter" && handleYahooSearch()}
+            className={`min-w-[200px] flex-1 rounded-lg border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
+              yahooKeywordError
+                ? "border-red-500 bg-red-500/10 dark:border-red-400 dark:bg-red-500/10"
+                : "border-input bg-background"
+            }`}
+          />
+          <button
+            type="button"
+            onClick={handleYahooSearch}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Search className="h-4 w-4" />
+            車体の相場を検索
+          </button>
+        </div>
+      </div>
       {(error || connectionStatus) && (
         <div className="mb-4 space-y-3">
           {connectionStatus && (
