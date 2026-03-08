@@ -55,7 +55,7 @@ export function DashboardContent() {
     }
     setYahooKeywordError(false)
     const encoded = encodeURIComponent(kw)
-    const url = `https://auctions.yahoo.co.jp/closedsearch/closedsearch?b=2084008446&va=${encoded}`
+    const url = `https://auctions.yahoo.co.jp/closedsearch/closedsearch?auccat=2084008446&va=${encoded}`
     window.open(url, "_blank", "noopener,noreferrer")
   }
 
