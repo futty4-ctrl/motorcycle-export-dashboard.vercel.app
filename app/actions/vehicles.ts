@@ -13,6 +13,11 @@ import {
   uploadToDriveFolder,
 } from "@/lib/google-sheets"
 import {
+  listVehicleImages,
+  getVehicleImageAsBase64,
+  uploadVehicleImageToStorage,
+} from "@/lib/supabase/vehicle-images-storage"
+import {
   analyzeVehiclePhotosWithGrades,
   analyzeStrictInspection,
   type PhotoAnalysisResult,
@@ -409,8 +414,8 @@ export async function getEvaluationsByVehicleId(vehicleId: string) {
 const MAX_PHOTOS_FOR_ANALYSIS = 20
 
 /**
- * 車両の Drive フォルダ内の写真を Gemini Vision で一括解析し、evaluations に保存する。
- * 元画像は Drive にそのまま残し、解析用のみ長辺 1024px・WebP 圧縮で軽量化してから送信する。
+ * 車両の Supabase Storage (vehicle-images) 内の写真を Gemini Vision で一括解析し、evaluations に保存する。
+ * 画像は vehicle-images/{vehicleId}/ から取得。解析用のみ長辺 1024px・WebP 圧縮で軽量化してから送信する。
  */
 export async function runPhotoAnalysis(vehicleId: string): Promise<{
   success: boolean
@@ -419,28 +424,31 @@ export async function runPhotoAnalysis(vehicleId: string): Promise<{
 }> {
   try {
     const supabase = createServerSupabaseClient()
-    const { data: vehicle, error: veError } = await supabase
+    const { error: veError } = await supabase
       .from("vehicles")
-      .select("drive_link")
+      .select("id")
       .eq("id", vehicleId)
       .single()
-    if (veError || !vehicle?.drive_link) {
-      return { success: false, error: "車両または Drive フォルダが見つかりません。" }
+    if (veError) {
+      return { success: false, error: "車両が見つかりません。" }
     }
-    const folderId = extractDriveFolderId(vehicle.drive_link)
-    if (!folderId) {
-      return { success: false, error: "Drive フォルダIDを取得できませんでした。" }
-    }
-    const imageFiles = await listImageFilesInFolder(folderId)
+    const imageFiles = await listVehicleImages(vehicleId, MAX_PHOTOS_FOR_ANALYSIS)
     if (imageFiles.length === 0) {
-      return { success: false, error: "フォルダ内に画像がありません。写真をアップロードしてください。" }
+      return { success: false, error: "Storage に画像がありません。写真をアップロードしてください。" }
     }
     const toFetch = imageFiles.slice(0, MAX_PHOTOS_FOR_ANALYSIS)
     const images: { base64: string; mimeType: string }[] = []
+    const publicUrls: string[] = []
     for (const f of toFetch) {
-      const base64 = await getDriveFileContentAsBase64(f.id, f.mimeType)
-      const resized = await resizeImageForAnalysis(base64, f.mimeType ?? "image/jpeg")
+      const data = await getVehicleImageAsBase64(f.path)
+      if (!data) continue
+      const resized = await resizeImageForAnalysis(data.base64, data.mimeType)
       images.push(resized)
+      const { data: urlData } = supabase.storage.from("vehicle-images").getPublicUrl(f.path)
+      publicUrls.push(urlData.publicUrl)
+    }
+    if (images.length === 0) {
+      return { success: false, error: "画像の取得に失敗しました。" }
     }
     const { focusPoints } = await getBadCaseFocusPoints()
     const analysis = await analyzeVehiclePhotosWithGrades(images, {
@@ -452,8 +460,8 @@ export async function runPhotoAnalysis(vehicleId: string): Promise<{
       ...(analysis.consumableWear ?? []),
     ]
     const riskAreasWithFileId = (analysis.riskAreas ?? []).map((r) => {
-      const idx = Math.max(0, Math.min(r.imageIndex - 1, toFetch.length - 1))
-      const fileId = toFetch[idx]?.id ?? null
+      const idx = Math.max(0, Math.min(r.imageIndex - 1, publicUrls.length - 1))
+      const fileId = publicUrls[idx] ?? null
       return {
         description: r.description,
         fileId: fileId ?? undefined,
@@ -484,6 +492,7 @@ export async function runPhotoAnalysis(vehicleId: string): Promise<{
 
 /**
  * 高精度AI鑑定（4mini・モンキー専門査定士）。厳格チェックの修理コストを算出し、直近の evaluation の photo_analysis に保存
+ * 画像は Supabase Storage (vehicle-images) から取得する。
  */
 export async function runStrictInspection(vehicleId: string): Promise<{
   success: boolean
@@ -493,27 +502,23 @@ export async function runStrictInspection(vehicleId: string): Promise<{
 }> {
   try {
     const supabase = createServerSupabaseClient()
-    const { data: vehicle, error: veError } = await supabase
+    const { error: veError } = await supabase
       .from("vehicles")
-      .select("drive_link")
+      .select("id")
       .eq("id", vehicleId)
       .single()
-    if (veError || !vehicle?.drive_link) {
-      return { success: false, error: "車両または Drive フォルダが見つかりません。" }
+    if (veError) {
+      return { success: false, error: "車両が見つかりません。" }
     }
-    const folderId = extractDriveFolderId(vehicle.drive_link)
-    if (!folderId) {
-      return { success: false, error: "Drive フォルダIDを取得できませんでした。" }
-    }
-    const imageFiles = await listImageFilesInFolder(folderId)
+    const imageFiles = await listVehicleImages(vehicleId, MAX_PHOTOS_FOR_ANALYSIS)
     if (imageFiles.length === 0) {
-      return { success: false, error: "フォルダ内に画像がありません。" }
+      return { success: false, error: "Storage に画像がありません。" }
     }
     const toFetch = imageFiles.slice(0, MAX_PHOTOS_FOR_ANALYSIS)
     const images: { base64: string; mimeType: string }[] = []
     for (const f of toFetch) {
-      const base64 = await getDriveFileContentAsBase64(f.id, f.mimeType)
-      images.push({ base64, mimeType: f.mimeType })
+      const data = await getVehicleImageAsBase64(f.path)
+      if (data) images.push(data)
     }
     const { strictFindings, strictRepairCost } = await analyzeStrictInspection(images)
 
@@ -728,7 +733,7 @@ export async function importPhotosFromBdsUrl(
 }
 
 /**
- * 車両の Drive フォルダに複数画像を直接アップロードする（フォルダがなければ作成）。
+ * 車両の Supabase Storage (vehicle-images) に複数画像を直接アップロードする。
  * ブックマークレット登録車でも「ファイルを選択」で写真を上げたあと解析できる。
  */
 export async function uploadVehiclePhotosDirect(
@@ -745,47 +750,32 @@ export async function uploadVehiclePhotosDirect(
   }
   try {
     const supabase = createServerSupabaseClient()
-    let folderId: string
-    let folderUrl: string
-
-    const { data: vehicle } = await supabase
+    const { error: veError } = await supabase
       .from("vehicles")
-      .select("drive_link")
+      .select("id")
       .eq("id", vehicleId)
       .single()
-
-    const existingFolderId = extractDriveFolderId(vehicle?.drive_link ?? null)
-    if (existingFolderId) {
-      folderId = existingFolderId
-      folderUrl = vehicle!.drive_link!
-    } else {
-      const parentId = process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID ?? undefined
-      const created = await createVehicleDriveFolder(vehicleId, parentId)
-      folderId = created.id
-      folderUrl = created.webViewLink
-      await supabase
-        .from("vehicles")
-        .update({ drive_link: folderUrl })
-        .eq("id", vehicleId)
+    if (veError) {
+      return { success: false, error: "車両が見つかりません。" }
     }
 
-    const ext = (mime: string) => (mime.includes("png") ? "png" : "jpg")
+    const ext = (mime: string) => (mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg")
+    let firstPublicUrl: string | undefined
     for (let i = 0; i < Math.min(images.length, 50); i++) {
-      const img = images[i]
+      const img = images[i]!
       const name = `upload_${i + 1}.${ext(img.mimeType)}`
-      await uploadToDriveFolder(
-        folderId,
-        name,
-        img.mimeType,
-        img.base64
-      )
+      const result = await uploadVehicleImageToStorage(vehicleId, name, img.base64, img.mimeType)
+      if ("error" in result) {
+        return { success: false, error: result.error }
+      }
+      if (!firstPublicUrl) firstPublicUrl = result.publicUrl
     }
 
     const count = Math.min(images.length, 50)
     return {
       success: true,
       count,
-      folderUrl,
+      folderUrl: firstPublicUrl,
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "アップロードに失敗しました"
