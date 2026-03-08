@@ -33,8 +33,8 @@ export function DesktopSidebar() {
 
   return (
     <aside
-      className={`hidden lg:flex lg:flex-col lg:shrink-0 border-r border-sidebar-border bg-sidebar transition-all duration-300 ${
-        collapsed ? "lg:w-16" : "lg:w-60"
+      className={`flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ${
+        collapsed ? "w-16" : "w-60"
       }`}
     >
       <div className="flex h-14 items-center border-b border-sidebar-border px-4">
