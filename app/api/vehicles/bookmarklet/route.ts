@@ -48,6 +48,14 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders })
 }
 
+/** GET: ブックマークレットAPIの疎通確認用 */
+export async function GET() {
+  return NextResponse.json(
+    { ok: true, message: "Bookmarklet API は稼働中。POST で車両登録してください。" },
+    { status: 200, headers: corsHeaders }
+  )
+}
+
 export async function POST(req: Request) {
   try {
     const apiKey = req.headers.get("X-GAMI-API-KEY")?.trim()

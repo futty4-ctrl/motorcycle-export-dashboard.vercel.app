@@ -61,6 +61,16 @@
 
 ---
 
+## トラブルシューティング
+
+1. **疎通確認**: `GET /api/vehicles/bookmarklet` にアクセスして `{ ok: true }` が返れば API は稼働中。
+2. **401 Unauthorized**: `X-GAMI-API-KEY` が一致していない。Vercel で `GAMI_BOOKMARKLET_API_KEY` を設定している場合は、その値か既定値 `gami-bk-7f3a9c2e1b8d4f6a0e5c9b3d7f1a8e2c` をブックマークレットに設定。
+3. **Failed to fetch / CORS**: BDS は HTTPS のため、API も `https://` で始まる URL にすること。`localhost` は開発時のみ。
+4. **500 エラー**: Supabase の環境変数（`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`）を確認。Vercel では Settings → Environment Variables で設定し Redeploy。
+5. **URL の確認**: ブックマークレット内の `API_BASE` を実際のデプロイ URL（例: `https://xxx.vercel.app`）に置き換える。末尾スラッシュなし。
+
+---
+
 ## まとめ（Claude 用）
 
 - ブックマークレットは BDS 車両ページで実行され、`/api/vehicles/bookmarklet` に JSON を POST する。

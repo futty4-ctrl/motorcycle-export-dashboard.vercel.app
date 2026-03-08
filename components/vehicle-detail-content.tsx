@@ -172,6 +172,16 @@ function formatJPY(n: number) {
   return `¥${n.toLocaleString()}`
 }
 
+function formatCreatedAt(iso?: string | null): string {
+  if (!iso) return ""
+  try {
+    const d = new Date(iso)
+    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
+  } catch {
+    return ""
+  }
+}
+
 function PhotoAnalysisSection({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null
   return (
@@ -736,6 +746,11 @@ export function VehicleDetailContent({
               {(vehicle.auctionGrade ?? vehicle.bdsRating) &&
                 ` ・ 評価 ${vehicle.auctionGrade ?? vehicle.bdsRating}`}
             </p>
+            {vehicle.createdAt && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                登録日 {formatCreatedAt(vehicle.createdAt)}
+              </p>
+            )}
             <div className="mt-3">
               {source === "supabase" ? (
                 <select

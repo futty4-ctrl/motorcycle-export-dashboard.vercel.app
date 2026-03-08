@@ -38,6 +38,16 @@ function formatJPY(value: number) {
   return `¥${value.toLocaleString()}`
 }
 
+function formatCreatedAt(iso?: string | null): string {
+  if (!iso) return ""
+  try {
+    const d = new Date(iso)
+    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
+  } catch {
+    return ""
+  }
+}
+
 function formatUSD(value: number) {
   return `$${value.toLocaleString()}`
 }
@@ -163,12 +173,17 @@ export function VehicleCard({ vehicle }: { vehicle: VehicleDisplay }) {
             </div>
           </div>
 
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <span
               className={`inline-flex items-center rounded-md border px-2.5 py-1 text-sm font-medium sm:text-xs ${getStatusStyle(vehicle.status)}`}
             >
               {vehicle.status}
             </span>
+            {vehicle.createdAt && (
+              <span className="text-xs text-muted-foreground">
+                登録 {formatCreatedAt(vehicle.createdAt)}
+              </span>
+            )}
           </div>
 
           <div className="mt-3 sm:mt-2">

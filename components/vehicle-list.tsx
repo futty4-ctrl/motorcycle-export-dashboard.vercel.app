@@ -6,7 +6,32 @@ import { vehicles as fallbackVehicles, type VehicleStatus } from "@/lib/data"
 import type { VehicleDisplay } from "@/lib/vehicle-display"
 import { VehicleCard } from "./vehicle-card"
 
-const filters: (VehicleStatus | "すべて")[] = ["すべて", "仕入中", "査定中", "落札", "在庫あり", "出品中", "発送中", "売却済"]
+type StatusFilter =
+  | "すべて"
+  | "入札段階"
+  | "落札"
+  | "在庫・出品"
+  | "売却済"
+  | "仕入中"
+  | "査定中"
+  | "在庫あり"
+  | "出品中"
+  | "発送中"
+
+const STATUS_GROUPS: Record<StatusFilter, VehicleStatus[] | null> = {
+  すべて: null,
+  入札段階: ["仕入中", "査定中"],
+  落札: ["落札"],
+  "在庫・出品": ["在庫あり", "出品中", "発送中"],
+  売却済: ["売却済"],
+  仕入中: ["仕入中"],
+  査定中: ["査定中"],
+  在庫あり: ["在庫あり"],
+  出品中: ["出品中"],
+  発送中: ["発送中"],
+}
+
+const filters: StatusFilter[] = ["すべて", "入札段階", "落札", "在庫・出品", "売却済", "仕入中", "査定中", "在庫あり", "出品中", "発送中"]
 
 type VehicleListProps = {
   /** Supabase / スプレッドシートから取得した車両一覧。未指定時はフォールバックデータを使用 */
@@ -21,7 +46,7 @@ export function VehicleList({
   externalSearch,
   onExternalSearchChange,
 }: VehicleListProps) {
-  const [activeFilter, setActiveFilter] = useState<VehicleStatus | "すべて">("すべて")
+  const [activeFilter, setActiveFilter] = useState<StatusFilter>("すべて")
   const [internalSearch, setInternalSearch] = useState("")
   const search = externalSearch ?? internalSearch
   const setSearch = onExternalSearchChange ?? setInternalSearch
@@ -40,8 +65,9 @@ export function VehicleList({
       auctionGrade: v.auctionGrade,
     }))
 
+  const statuses = STATUS_GROUPS[activeFilter]
   const byStatus =
-    activeFilter === "すべて" ? vehicles : vehicles.filter((v) => v.status === activeFilter)
+    statuses === null ? vehicles : vehicles.filter((v) => statuses.includes(v.status))
   const searchLower = search.trim().toLowerCase()
   const filteredVehicles = searchLower
     ? byStatus.filter(

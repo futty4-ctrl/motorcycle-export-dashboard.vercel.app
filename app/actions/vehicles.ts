@@ -299,7 +299,7 @@ export async function getVehicleById(id: string): Promise<{
       const supabase = createServerSupabaseClient()
       const { data: row, error } = await supabase
       .from("vehicles")
-      .select("id, status, bds_rating, chassis_number, drive_link, image_url, name, onsite_notes, seller_info")
+      .select("id, status, bds_rating, chassis_number, drive_link, image_url, name, onsite_notes, seller_info, created_at")
       .eq("id", id)
       .single()
 
@@ -311,7 +311,7 @@ export async function getVehicleById(id: string): Promise<{
       const maxProfit = Math.max(0, ...(scenariosRows ?? []).map((r) => Number(r.profit ?? 0)))
       const profitScore = Math.min(100, Math.max(0, Math.round(maxProfit / 3000)))
       const imageUrl = (row as { image_url?: string | null }).image_url?.trim()
-      const r = row as { onsite_notes?: string | null; seller_info?: string | null }
+      const r = row as { onsite_notes?: string | null; seller_info?: string | null; created_at?: string | null }
       return {
         success: true,
         source: "supabase",
@@ -327,6 +327,7 @@ export async function getVehicleById(id: string): Promise<{
           chassisNumber: row.chassis_number,
           onsiteNotes: r.onsite_notes?.trim() || null,
           sellerInfo: r.seller_info?.trim() || null,
+          createdAt: r.created_at ?? null,
         },
       }
     }
@@ -1177,7 +1178,7 @@ export async function getVehiclesFromSupabase(): Promise<{
     const supabase = createServerSupabaseClient()
     const { data: vehiclesRows, error: vehiclesError } = await supabase
       .from("vehicles")
-      .select("id, status, bds_rating, chassis_number, drive_link, image_url, name")
+      .select("id, status, bds_rating, chassis_number, drive_link, image_url, name, created_at")
       .order("created_at", { ascending: false })
 
     if (vehiclesError) throw vehiclesError
@@ -1199,6 +1200,7 @@ export async function getVehiclesFromSupabase(): Promise<{
       const profit = profitByVehicle.get(v.id) ?? 0
       const profitScore = Math.min(100, Math.max(0, Math.round(profit / 3000)))
       const imageUrl = (v as { image_url?: string | null }).image_url?.trim()
+      const r = v as { created_at?: string | null }
       return {
         id: v.id,
         status: v.status as VehicleStatus,
@@ -1209,6 +1211,7 @@ export async function getVehiclesFromSupabase(): Promise<{
         driveLink: v.drive_link,
         bdsRating: v.bds_rating,
         chassisNumber: v.chassis_number,
+        createdAt: r.created_at ?? null,
       }
     })
 

@@ -307,6 +307,26 @@ export function DashboardContent() {
               {bdsUrlSubmitting ? "取り込み中…" : "登録して写真を取り込む"}
             </button>
           </div>
+          <div className="mt-4 rounded-lg border border-border/60 bg-muted/30 p-3 text-sm">
+            <p className="font-medium text-foreground">ブックマークレット</p>
+            <p className="mt-1 text-muted-foreground">
+              BDS車両ページで実行すると車両を登録します。
+              <a
+                href="/api/vehicles/bookmarklet"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-2 text-primary hover:underline"
+              >
+                API疎通確認
+              </a>
+              （新しいタブで開き「ok: true」が表示されればOK）
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              ブックマークレットの URL は <code className="rounded bg-muted px-1">YOUR_APP_URL</code> を
+              <strong className="text-foreground"> {typeof window !== "undefined" ? window.location.origin : "このアプリのURL"}</strong>
+              に置き換えてください。APIキーは未設定なら既定値を使用。詳細は public/bds-vehicles-bookmarklet.txt を参照。
+            </p>
+          </div>
         </div>
       )}
       <div className="mb-4">

@@ -28,6 +28,8 @@ export type VehicleDisplay = {
   onsiteNotes?: string | null
   /** 売主からのヒアリング情報（Phase 2） */
   sellerInfo?: string | null
+  /** 登録日（ISO8601） */
+  createdAt?: string | null
 }
 
 /** 利益率（0-100）に応じたプログレスバーの色クラス */
