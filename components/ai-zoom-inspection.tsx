@@ -1,6 +1,7 @@
 "use client"
 
 import { ExternalLink } from "lucide-react"
+import { getRiskAreaImageUrl, getRiskAreaImageUrlLarge } from "@/lib/risk-area-image-url"
 
 export type RiskAreaItem = {
   description: string
@@ -29,7 +30,7 @@ function CroppedRiskImage({
   const imgHeight = DISPLAY_HEIGHT / nh
   const marginLeft = -x * imgWidth
   const marginTop = -y * imgHeight
-  const src = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200`
+  const src = getRiskAreaImageUrlLarge(fileId)
 
   return (
     <div className="flex flex-col gap-2">
@@ -64,7 +65,7 @@ function CroppedRiskImage({
  * bbox なしの場合はサムネイル全体を表示
  */
 function FullThumbnailRiskImage({ fileId, label }: { fileId: string; label: string }) {
-  const src = `https://drive.google.com/thumbnail?id=${fileId}&sz=w600`
+  const { src } = getRiskAreaImageUrl(fileId)
 
   return (
     <div className="flex flex-col gap-2">
@@ -116,7 +117,7 @@ export function AiZoomInspection({ riskAreas }: Props) {
               <FullThumbnailRiskImage fileId={risk.fileId} label={risk.description} />
             ) : null}
             <a
-              href={`https://drive.google.com/file/d/${risk.fileId}/view`}
+              href={risk.fileId ? getRiskAreaImageUrl(risk.fileId).href : "#"}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"

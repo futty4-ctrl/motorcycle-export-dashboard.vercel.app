@@ -472,6 +472,11 @@ export async function runPhotoAnalysis(vehicleId: string): Promise<{
       ...analysis,
       riskAreas: riskAreasWithFileId,
     }
+    const modelName = analysis.modelName?.trim()
+    if (modelName) {
+      await supabase.from("vehicles").update({ name: modelName }).eq("id", vehicleId)
+    }
+
     const { data: inserted, error: insertError } = await supabase
       .from("evaluations")
       .insert({
@@ -734,6 +739,7 @@ export async function importPhotosFromBdsUrl(
 
 /**
  * 車両の Supabase Storage (vehicle-images) に複数画像を直接アップロードする。
+ * 1枚ずつ直列アップロードでVercelタイムアウトを軽減。一部失敗しても成功した枚数を返す。
  * ブックマークレット登録車でも「ファイルを選択」で写真を上げたあと解析できる。
  */
 export async function uploadVehiclePhotosDirect(
@@ -743,6 +749,7 @@ export async function uploadVehiclePhotosDirect(
   success: boolean
   error?: string
   count?: number
+  failedCount?: number
   folderUrl?: string
 }> {
   if (images.length === 0) {
@@ -761,20 +768,32 @@ export async function uploadVehiclePhotosDirect(
 
     const ext = (mime: string) => (mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg")
     let firstPublicUrl: string | undefined
-    for (let i = 0; i < Math.min(images.length, 50); i++) {
+    let successCount = 0
+    let failedCount = 0
+    const toUpload = Math.min(images.length, 50)
+
+    for (let i = 0; i < toUpload; i++) {
       const img = images[i]!
       const name = `upload_${i + 1}.${ext(img.mimeType)}`
       const result = await uploadVehicleImageToStorage(vehicleId, name, img.base64, img.mimeType)
       if ("error" in result) {
-        return { success: false, error: result.error }
+        failedCount++
+      } else {
+        successCount++
+        if (!firstPublicUrl) firstPublicUrl = result.publicUrl
       }
-      if (!firstPublicUrl) firstPublicUrl = result.publicUrl
     }
 
-    const count = Math.min(images.length, 50)
+    if (successCount === 0) {
+      return { success: false, error: "アップロードに失敗しました。" }
+    }
+    if (firstPublicUrl) {
+      await supabase.from("vehicles").update({ image_url: firstPublicUrl }).eq("id", vehicleId)
+    }
     return {
       success: true,
-      count,
+      count: successCount,
+      ...(failedCount > 0 && { failedCount }),
       folderUrl: firstPublicUrl,
     }
   } catch (err) {

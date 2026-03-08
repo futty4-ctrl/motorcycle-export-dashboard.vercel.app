@@ -61,6 +61,7 @@ import {
   calcPremiumPartsBonusJpy,
   isPremiumPartCategory,
 } from "@/lib/premium-parts-bonus"
+import { getRiskAreaImageUrl } from "@/lib/risk-area-image-url"
 
 const FALLBACK_IMAGE = "/bikes/placeholder.svg"
 const STATUSES: VehicleStatus[] = ["仕入中", "査定中", "落札", "在庫あり", "出品中", "発送中", "売却済"]
@@ -378,7 +379,10 @@ export function VehicleDetailContent({
     const res = await uploadVehiclePhotosDirect(vehicle.id, images)
     setDirectUploading(false)
     if (res.success) {
-      toast.success(`${res.count}枚を Drive にアップロードしました。続けて「写真を一括解析して保存」を実行できます。`)
+      const msg = res.failedCount
+        ? `${res.count}枚成功、${res.failedCount}枚失敗。続けて「写真を一括解析して保存」を実行できます。`
+        : `${res.count}枚をアップロードしました。続けて「写真を一括解析して保存」を実行できます。`
+      toast.success(msg)
       window.location.reload()
     } else toast.error(res.error)
   }
@@ -1206,21 +1210,23 @@ export function VehicleDetailContent({
                     AIが指摘したリスク箇所
                   </h3>
                   <ul className="mt-3 space-y-4">
-                    {photoAnalysisResult.riskAreas.map((risk, i) => (
+                    {photoAnalysisResult.riskAreas.map((risk, i) => {
+                      const { src, href } = risk.fileId ? getRiskAreaImageUrl(risk.fileId) : { src: "", href: "" }
+                      return (
                       <li
                         key={i}
                         className="flex flex-col gap-2 rounded-lg border border-border bg-background/80 p-3 sm:flex-row sm:items-start"
                       >
-                        {risk.fileId && (
+                        {risk.fileId && src && (
                           <a
-                            href={`https://drive.google.com/file/d/${risk.fileId}/view`}
+                            href={href}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="block shrink-0 overflow-hidden rounded-lg border border-border"
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                              src={`https://drive.google.com/thumbnail?id=${risk.fileId}&sz=w400`}
+                              src={src}
                               alt=""
                               className="h-24 w-32 object-cover sm:h-28 sm:w-40"
                               onError={(e) => {
@@ -1231,9 +1237,9 @@ export function VehicleDetailContent({
                         )}
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-foreground">{risk.description}</p>
-                          {risk.fileId && (
+                          {risk.fileId && href && (
                             <a
-                              href={`https://drive.google.com/file/d/${risk.fileId}/view`}
+                              href={href}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
@@ -1244,7 +1250,7 @@ export function VehicleDetailContent({
                           )}
                         </div>
                       </li>
-                    ))}
+                    )})}
                   </ul>
                 </div>
               )}

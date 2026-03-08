@@ -9,6 +9,8 @@ export type PhotoAnalysisResult = {
   customParts: string[]
   highValueEbayParts: { part: string; reason: string }[]
   note?: string
+  /** 写真から判別した車種名（modelName または vehicleName） */
+  modelName?: string
   /** 外装・フレーム・エンジンの A〜E 評価 */
   exteriorGrade?: "A" | "B" | "C" | "D" | "E"
   frameGrade?: "A" | "B" | "C" | "D" | "E"
@@ -44,9 +46,11 @@ const GRADE_PROMPT = `${FOURMINI_EXPERT_PROFILE}
 5. **カスタムパーツの有無**: 純正以外のパーツがあれば具体的に
 6. **見落としがちなリスク箇所**: 上記重点箇所を含め、サビ・漏れ・凹み・ひび等。該当する写真の番号（1始まり）を imageIndex で指定し、description に簡潔な説明を書いてください。異常が写っている画像内の位置を正規化座標（0〜1）で bbox に含めてください。bbox は { "x": 左上X, "y": 左上Y, "width": 幅, "height": 高さ } で、画像幅・高さに対する比率です。
 7. **eBayで需要が高いパーツ**: 海外で人気のモデルやレアパーツ、状態の良い純正部品。part と reason をセットで。
+8. **車種名**: 写真から判別できる場合は modelName に「メーカー名 車種名」（例：ホンダ モンキー）を入れてください。判別できない場合は null または空文字。
 
 出力は必ず次の JSON 形式のみにしてください。説明文は不要です。
 {
+  "modelName": "メーカー名 車種名（例：ホンダ モンキー）" または null,
   "exteriorGrade": "A"|"B"|"C"|"D"|"E",
   "frameGrade": "A"|"B"|"C"|"D"|"E",
   "engineGrade": "A"|"B"|"C"|"D"|"E",
@@ -245,8 +249,15 @@ function parsePhotoAnalysisJsonExtended(text: string): PhotoAnalysisResult {
           }
         })
     : []
+  const modelName =
+    typeof parsed.modelName === "string" && parsed.modelName.trim()
+      ? parsed.modelName.trim()
+      : typeof parsed.vehicleName === "string" && parsed.vehicleName.trim()
+        ? parsed.vehicleName.trim()
+        : undefined
   return {
     ...base,
+    modelName,
     exteriorGrade: grade(parsed.exteriorGrade),
     frameGrade: grade(parsed.frameGrade),
     engineGrade: grade(parsed.engineGrade),
