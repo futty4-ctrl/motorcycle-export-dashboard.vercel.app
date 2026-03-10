@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { ChevronLeft, Upload, Car, Loader2, Trash2 } from "lucide-react"
+import { ChevronLeft, Upload, Car, Loader2, Trash2, Copy, Download } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import {
   Carousel,
@@ -59,6 +59,7 @@ export function InventoryDetailContent({
   const [detailUrl, setDetailUrl] = useState("")
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const qrContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -89,6 +90,56 @@ export function InventoryDetailContent({
 
   function handleMockUpload() {
     toast.info("画像アップロードは準備中です（Supabase Storage連携予定）")
+  }
+
+  async function handleCopyUrl() {
+    try {
+      await navigator.clipboard.writeText(detailUrl)
+      toast.success("コピーしました！")
+    } catch {
+      toast.error("コピーに失敗しました")
+    }
+  }
+
+  function handleDownloadQrImage() {
+    const container = qrContainerRef.current
+    const svg = container?.querySelector("svg")
+    if (!svg) return
+    try {
+      const svgData = new XMLSerializer().serializeToString(svg)
+      const svgBlob = new Blob([svgData], {
+        type: "image/svg+xml;charset=utf-8",
+      })
+      const url = URL.createObjectURL(svgBlob)
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement("canvas")
+        const size = 512
+        canvas.width = size
+        canvas.height = size
+        const ctx = canvas.getContext("2d")
+        if (!ctx) {
+          URL.revokeObjectURL(url)
+          return
+        }
+        ctx.fillStyle = "#ffffff"
+        ctx.fillRect(0, 0, size, size)
+        ctx.drawImage(img, 0, 0, size, size)
+        const a = document.createElement("a")
+        a.href = canvas.toDataURL("image/png")
+        a.download = `${managementCode}.png`
+        a.click()
+        URL.revokeObjectURL(url)
+        toast.success("画像を保存しました")
+      }
+      img.onerror = () => {
+        URL.revokeObjectURL(url)
+        toast.error("画像の保存に失敗しました")
+      }
+      img.src = url
+    } catch {
+      toast.error("画像の保存に失敗しました")
+    }
   }
 
   async function handleDelete() {
@@ -289,7 +340,7 @@ export function InventoryDetailContent({
           この車体の詳細ページURL。印刷して車体に貼り付けて個体管理にご利用ください。
         </p>
         <div className="mt-4 flex flex-col items-center gap-4">
-          <div className="rounded-lg border border-border bg-white p-4">
+          <div ref={qrContainerRef} className="rounded-lg border border-border bg-white p-4">
             <QRCodeSVG
               value={detailUrl}
               size={180}
@@ -300,6 +351,24 @@ export function InventoryDetailContent({
           <p className="max-w-full truncate text-xs text-muted-foreground">
             {detailUrl}
           </p>
+          <div className="flex flex-wrap justify-center gap-2 w-full">
+            <button
+              type="button"
+              onClick={handleCopyUrl}
+              className="flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2.5 text-sm font-medium hover:bg-muted touch-manipulation"
+            >
+              <Copy className="h-4 w-4" />
+              URLをコピー
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadQrImage}
+              className="flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2.5 text-sm font-medium hover:bg-muted touch-manipulation"
+            >
+              <Download className="h-4 w-4" />
+              画像を保存
+            </button>
+          </div>
         </div>
       </div>
 
