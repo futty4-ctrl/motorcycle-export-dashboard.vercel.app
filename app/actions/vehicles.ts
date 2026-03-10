@@ -418,6 +418,25 @@ export async function updateVehicleNotes(
 }
 
 /**
+ * 車両を削除（Supabase のみ。入札駄目・整理用）
+ * evaluations, scenarios, parts, bad_cases は CASCADE で自動削除
+ */
+export async function deleteVehicle(vehicleId: string): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    const supabase = createServerSupabaseClient()
+    const { error } = await supabase.from("vehicles").delete().eq("id", vehicleId)
+    if (error) throw error
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "車両の削除に失敗しました"
+    return { success: false, error: message }
+  }
+}
+
+/**
  * 車両に紐づく査定結果を取得（Supabase）
  */
 export async function getEvaluationsByVehicleId(vehicleId: string) {

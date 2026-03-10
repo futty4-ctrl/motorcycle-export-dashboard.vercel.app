@@ -3,6 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import {
   ExternalLink,
   Loader2,
@@ -16,6 +17,7 @@ import {
   AlertCircle,
   Upload,
   ClipboardList,
+  Trash2,
 } from "lucide-react"
 import {
   Dialog,
@@ -44,6 +46,7 @@ import {
   importPhotosFromBdsUrl,
   uploadVehiclePhotosDirect,
   updateEvaluationActuals,
+  deleteVehicle,
 } from "@/app/actions/vehicles"
 import {
   runBdsEvaluationAndProfitCompare,
@@ -188,6 +191,7 @@ export function VehicleDetailContent({
   scenarios,
   parts,
 }: Props) {
+  const router = useRouter()
   const [status, setStatus] = useState<VehicleStatus>(vehicle.status)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [imageSrc, setImageSrc] = useState(vehicle.image?.trim() || FALLBACK_IMAGE)
@@ -223,6 +227,8 @@ export function VehicleDetailContent({
   const [badCaseActualFindings, setBadCaseActualFindings] = useState("")
   const [badCaseFocusPointsInput, setBadCaseFocusPointsInput] = useState("")
   const [savingBadCase, setSavingBadCase] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   // 経費・利益計算（手動入力ベース）
   const [maxBid, setMaxBid] = useState(100000)
@@ -595,6 +601,21 @@ export function VehicleDetailContent({
       setBadCaseFocusPointsInput("")
       toast.success("Bad Case を保存しました。次回の写真解析で重点チェックに反映されます。")
     } else toast.error(res.error)
+  }
+
+  async function handleDeleteVehicle() {
+    if (source !== "supabase") return
+    setDeleting(true)
+    const res = await deleteVehicle(vehicle.id)
+    setDeleting(false)
+    setDeleteOpen(false)
+    if (res.success) {
+      toast.success("車両を削除しました")
+      router.push("/")
+      router.refresh()
+    } else {
+      toast.error(res.error)
+    }
   }
 
   const latestEval = evaluations[0]
@@ -1515,6 +1536,59 @@ export function VehicleDetailContent({
           )}
         </div>
       )}
+
+      {/* 車両削除（Supabase のみ・入札駄目・整理用） */}
+      {source === "supabase" && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 sm:p-5">
+          <h2 className="text-lg font-semibold text-foreground">危険な操作</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            この車両を削除すると、査定・シナリオ・パーツ・Bad Case もすべて削除され、復元できません。入札に落ちた場合など、整理したいときにご利用ください。
+          </p>
+          <button
+            type="button"
+            onClick={() => setDeleteOpen(true)}
+            className="mt-4 flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/20 touch-manipulation"
+          >
+            <Trash2 className="h-4 w-4" />
+            この車両を削除
+          </button>
+        </div>
+      )}
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>車両を削除しますか？</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            この車両と紐づく査定・シナリオ・パーツ・Bad Case がすべて削除されます。復元できません。よろしいですか？
+          </p>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setDeleteOpen(false)}
+              className="rounded-lg border border-input px-4 py-2.5 text-sm font-medium touch-manipulation"
+            >
+              キャンセル
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteVehicle}
+              disabled={deleting}
+              className="rounded-lg bg-destructive px-4 py-2.5 text-sm font-semibold text-destructive-foreground touch-manipulation disabled:opacity-50"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                  削除中…
+                </>
+              ) : (
+                "削除する"
+              )}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={badCaseOpen} onOpenChange={setBadCaseOpen}>
         <DialogContent className="max-w-md">
