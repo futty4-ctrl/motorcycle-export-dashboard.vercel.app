@@ -348,6 +348,10 @@ export function DashboardContent() {
       <div className="mt-2">
         <VehicleList
           vehicles={vehicles}
+          dataSource={dataSource}
+          onVehicleDeleted={(id) =>
+            setVehicles((prev) => (prev ? prev.filter((v) => v.id !== id) : []))
+          }
           externalSearch={headerSearch}
           onExternalSearchChange={setHeaderSearch}
         />

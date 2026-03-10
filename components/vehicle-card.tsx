@@ -3,15 +3,28 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useRef, useState } from "react"
-import { MoreHorizontal, Camera, Loader2 } from "lucide-react"
+import { MoreHorizontal, Camera, Loader2, Trash2 } from "lucide-react"
 import type { VehicleDisplay } from "@/lib/vehicle-display"
 import {
   getProfitBarColorClass,
   getProfitBarTrackClass,
 } from "@/lib/vehicle-display"
 import type { VehicleStatus } from "@/lib/data"
-import { uploadVehiclePhoto } from "@/app/actions/vehicles"
+import { uploadVehiclePhoto, deleteVehicle } from "@/app/actions/vehicles"
 import { toast } from "sonner"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 
 function getStatusStyle(status: VehicleStatus) {
   switch (status) {
@@ -54,10 +67,31 @@ function formatUSD(value: number) {
 
 const FALLBACK_IMAGE = "/bikes/placeholder.svg"
 
-export function VehicleCard({ vehicle }: { vehicle: VehicleDisplay }) {
+type VehicleCardProps = {
+  vehicle: VehicleDisplay
+  canDelete?: boolean
+  onVehicleDeleted?: (vehicleId: string) => void
+}
+
+export function VehicleCard({ vehicle, canDelete, onVehicleDeleted }: VehicleCardProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [imageSrc, setImageSrc] = useState(vehicle.image?.trim() || FALLBACK_IMAGE)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDelete() {
+    setDeleting(true)
+    const res = await deleteVehicle(vehicle.id)
+    setDeleting(false)
+    setDeleteOpen(false)
+    if (res.success) {
+      toast.success("車両を削除しました")
+      onVehicleDeleted?.(vehicle.id)
+    } else {
+      toast.error(res.error)
+    }
+  }
 
   async function handlePhotoCapture(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -89,6 +123,7 @@ export function VehicleCard({ vehicle }: { vehicle: VehicleDisplay }) {
   }
 
   return (
+    <>
     <Link href={`/vehicle/${vehicle.id}`} className="block">
       <div className="group rounded-xl border border-border bg-card transition-colors hover:border-primary/40">
         <div className="flex gap-3 p-3 sm:gap-4 sm:p-4">
@@ -162,14 +197,45 @@ export function VehicleCard({ vehicle }: { vehicle: VehicleDisplay }) {
                   </button>
                 </>
               )}
-              <button
-                type="button"
-                onClick={(e) => e.preventDefault()}
-                className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-opacity hover:bg-secondary hover:text-foreground focus:opacity-100 group-hover:opacity-100 sm:h-9 sm:w-9"
-                aria-label={`${vehicle.name}のオプション`}
-              >
-                <MoreHorizontal className="h-5 w-5 sm:h-4 sm:w-4" />
-              </button>
+              {canDelete ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-opacity hover:bg-secondary hover:text-foreground focus:opacity-100 sm:h-9 sm:w-9"
+                      aria-label={`${vehicle.name}のオプション（削除）`}
+                    >
+                      <MoreHorizontal className="h-5 w-5 sm:h-4 sm:w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setDeleteOpen(true)
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      削除
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => e.preventDefault()}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-opacity hover:bg-secondary hover:text-foreground focus:opacity-100 group-hover:opacity-100 sm:h-9 sm:w-9"
+                  aria-label={`${vehicle.name}のオプション`}
+                >
+                  <MoreHorizontal className="h-5 w-5 sm:h-4 sm:w-4" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -221,5 +287,43 @@ export function VehicleCard({ vehicle }: { vehicle: VehicleDisplay }) {
         </div>
       </div>
     </Link>
+
+    {canDelete && (
+        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <DialogContent onClick={(e) => e.stopPropagation()}>
+            <DialogHeader>
+              <DialogTitle>車両を削除しますか？</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              {vehicle.name} を削除すると、査定・シナリオ・パーツ・Bad Case もすべて削除され、復元できません。
+            </p>
+            <DialogFooter>
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(false)}
+                className="rounded-lg border border-input px-4 py-2.5 text-sm font-medium touch-manipulation"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="rounded-lg bg-destructive px-4 py-2.5 text-sm font-semibold text-destructive-foreground touch-manipulation disabled:opacity-50"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                    削除中…
+                  </>
+                ) : (
+                  "削除する"
+                )}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+    )}
+    </>
   )
 }

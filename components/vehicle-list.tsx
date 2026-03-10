@@ -36,6 +36,10 @@ const filters: StatusFilter[] = ["すべて", "入札段階", "落札", "在庫�
 type VehicleListProps = {
   /** Supabase / スプレッドシートから取得した車両一覧。未指定時はフォールバックデータを使用 */
   vehicles?: VehicleDisplay[] | null
+  /** データソース（Supabase のときのみ一覧から削除可能） */
+  dataSource?: "supabase" | "sheets" | null
+  /** 車両削除後に呼ぶ（一覧から除外するため） */
+  onVehicleDeleted?: (vehicleId: string) => void
   /** ヘッダー検索と連携する場合に渡す（URL ?q= と同期） */
   externalSearch?: string
   onExternalSearchChange?: (value: string) => void
@@ -43,6 +47,8 @@ type VehicleListProps = {
 
 export function VehicleList({
   vehicles: vehiclesProp,
+  dataSource,
+  onVehicleDeleted,
   externalSearch,
   onExternalSearchChange,
 }: VehicleListProps) {
@@ -119,7 +125,12 @@ export function VehicleList({
 
       <div className="mt-5 flex flex-col gap-4 sm:mt-4 sm:gap-3">
         {filteredVehicles.map((vehicle) => (
-          <VehicleCard key={vehicle.id} vehicle={vehicle} />
+          <VehicleCard
+            key={vehicle.id}
+            vehicle={vehicle}
+            canDelete={dataSource === "supabase"}
+            onVehicleDeleted={onVehicleDeleted}
+          />
         ))}
         {filteredVehicles.length === 0 && (
           <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-border">
