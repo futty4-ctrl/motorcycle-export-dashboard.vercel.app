@@ -18,7 +18,7 @@ export type InventoryItemRow = {
   seller_age: string | null
   seller_address: string | null
   seller_occupation: string | null
-  id_verification: string | null
+  id_verification_method: string | null
   created_at: string
   updated_at: string
 }
@@ -70,7 +70,7 @@ export type InventoryInsertInput = {
   seller_age?: string | null
   seller_address?: string | null
   seller_occupation?: string | null
-  id_verification?: string | null
+  id_verification_method?: string | null
 }
 
 export async function getUniqueManagementCode(): Promise<string> {
@@ -120,7 +120,7 @@ export async function insertInventoryItem(
         seller_age: input.seller_age ?? null,
         seller_address: input.seller_address ?? null,
         seller_occupation: input.seller_occupation ?? null,
-        id_verification: input.id_verification ?? null,
+        id_verification_method: input.id_verification_method ?? null,
       })
       .select()
       .single()
@@ -155,6 +155,27 @@ export async function updateInventoryItemStatus(
   } catch (err) {
     return {
       error: err instanceof Error ? err : new Error("ステータスの更新に失敗しました"),
+    }
+  }
+}
+
+export async function deleteInventoryItem(id: string): Promise<{
+  error: Error | null
+}> {
+  try {
+    const supabase = createSupabaseBrowserClient()
+    const { error } = await supabase
+      .from("inventory_items")
+      .delete()
+      .eq("id", id)
+
+    if (error) {
+      return { error: new Error(error.message) }
+    }
+    return { error: null }
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err : new Error("在庫の削除に失敗しました"),
     }
   }
 }

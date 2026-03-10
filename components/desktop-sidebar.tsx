@@ -15,6 +15,7 @@ import {
   Calculator,
   TrendingUp,
   Target,
+  BookOpen,
 } from "lucide-react"
 
 const navItems = [
@@ -26,6 +27,7 @@ const navItems = [
   { label: "在庫管理", href: "/inventory", icon: Package },
   { label: "予想 vs 実績", href: "/analytics", icon: BarChart3 },
   { label: "eBay出品", href: "/ebay", icon: ShoppingBag },
+  { label: "取扱説明書", href: "/manual", icon: BookOpen },
   { label: "設定", href: "/settings", icon: Settings },
 ]
 

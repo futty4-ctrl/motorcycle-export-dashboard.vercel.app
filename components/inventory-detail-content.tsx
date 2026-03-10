@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { ChevronLeft, Upload, Car, Loader2 } from "lucide-react"
+import { ChevronLeft, Upload, Car, Loader2, Trash2 } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import {
   Carousel,
@@ -13,8 +14,16 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
   fetchInventoryItemByManagementCode,
   updateInventoryItemStatus,
+  deleteInventoryItem,
   type InventoryItemRow,
 } from "@/lib/inventory-supabase"
 import { toast } from "sonner"
@@ -44,9 +53,12 @@ export function InventoryDetailContent({
 }: {
   managementCode: string
 }) {
+  const router = useRouter()
   const [item, setItem] = useState<InventoryItemRow | null>(null)
   const [loading, setLoading] = useState(true)
   const [detailUrl, setDetailUrl] = useState("")
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -77,6 +89,20 @@ export function InventoryDetailContent({
 
   function handleMockUpload() {
     toast.info("画像アップロードは準備中です（Supabase Storage連携予定）")
+  }
+
+  async function handleDelete() {
+    if (!item) return
+    setDeleting(true)
+    const { error } = await deleteInventoryItem(item.id)
+    setDeleting(false)
+    setDeleteOpen(false)
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    toast.success(`${item.management_code} を削除しました`)
+    router.push("/inventory")
   }
 
   if (loading) {
@@ -214,7 +240,7 @@ export function InventoryDetailContent({
         item.seller_age ||
         item.seller_address ||
         item.seller_occupation ||
-        item.id_verification) && (
+        item.id_verification_method) && (
         <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
           <h2 className="text-lg font-semibold text-foreground">
             古物台帳・受入情報
@@ -246,10 +272,10 @@ export function InventoryDetailContent({
                 <dd>{item.seller_occupation}</dd>
               </div>
             )}
-            {item.id_verification && (
+            {item.id_verification_method && (
               <div>
                 <dt className="text-xs text-muted-foreground">本人確認方法</dt>
-                <dd>{item.id_verification}</dd>
+                <dd>{item.id_verification_method}</dd>
               </div>
             )}
           </dl>
@@ -276,6 +302,57 @@ export function InventoryDetailContent({
           </p>
         </div>
       </div>
+
+      {/* 削除 */}
+      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 sm:p-5">
+        <h2 className="text-lg font-semibold text-foreground">危険な操作</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          この在庫を削除すると、データは復元できません。
+        </p>
+        <button
+          type="button"
+          onClick={() => setDeleteOpen(true)}
+          className="mt-4 flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/20 touch-manipulation"
+        >
+          <Trash2 className="h-4 w-4" />
+          この在庫を削除
+        </button>
+      </div>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>在庫を削除しますか？</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {item?.management_code} を削除すると、データは復元できません。よろしいですか？
+          </p>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setDeleteOpen(false)}
+              className="rounded-lg border border-input px-4 py-2.5 text-sm font-medium touch-manipulation"
+            >
+              キャンセル
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="rounded-lg bg-destructive px-4 py-2.5 text-sm font-semibold text-destructive-foreground touch-manipulation disabled:opacity-50"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                  削除中…
+                </>
+              ) : (
+                "削除する"
+              )}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
