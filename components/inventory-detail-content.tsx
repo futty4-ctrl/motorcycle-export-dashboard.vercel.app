@@ -214,7 +214,7 @@ export function InventoryDetailContent({
         item.seller_age ||
         item.seller_address ||
         item.seller_occupation ||
-        item.id_verification_method) && (
+        item.id_verification) && (
         <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
           <h2 className="text-lg font-semibold text-foreground">
             古物台帳・受入情報
@@ -246,10 +246,10 @@ export function InventoryDetailContent({
                 <dd>{item.seller_occupation}</dd>
               </div>
             )}
-            {item.id_verification_method && (
+            {item.id_verification && (
               <div>
                 <dt className="text-xs text-muted-foreground">本人確認方法</dt>
-                <dd>{item.id_verification_method}</dd>
+                <dd>{item.id_verification}</dd>
               </div>
             )}
           </dl>

@@ -18,7 +18,7 @@ export type InventoryItemRow = {
   seller_age: string | null
   seller_address: string | null
   seller_occupation: string | null
-  id_verification_method: string | null
+  id_verification: string | null
   created_at: string
   updated_at: string
 }
@@ -70,7 +70,7 @@ export type InventoryInsertInput = {
   seller_age?: string | null
   seller_address?: string | null
   seller_occupation?: string | null
-  id_verification_method?: string | null
+  id_verification?: string | null
 }
 
 export async function getUniqueManagementCode(): Promise<string> {
@@ -120,7 +120,7 @@ export async function insertInventoryItem(
         seller_age: input.seller_age ?? null,
         seller_address: input.seller_address ?? null,
         seller_occupation: input.seller_occupation ?? null,
-        id_verification_method: input.id_verification_method ?? null,
+        id_verification: input.id_verification ?? null,
       })
       .select()
       .single()

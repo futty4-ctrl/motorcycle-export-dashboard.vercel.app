@@ -117,7 +117,7 @@ export function InventoryContent() {
       seller_age: sellerAge.trim() || null,
       seller_address: sellerAddress.trim() || null,
       seller_occupation: sellerOccupation.trim() || null,
-      id_verification_method: idVerificationMethod.trim() || null,
+      id_verification: idVerificationMethod.trim() || null,
     })
     setSubmitting(false)
 
