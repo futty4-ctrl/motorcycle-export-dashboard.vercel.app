@@ -3,30 +3,32 @@ import { ChevronLeft } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { DesktopSidebar } from "@/components/desktop-sidebar"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
-import { InventoryContent } from "@/components/inventory-content"
+import { BdsSimulatorContent } from "@/components/bds-simulator-content"
 
-export default function InventoryPage() {
+export default function BdsSimulatorPage() {
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
       <DesktopSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <DashboardHeader />
-        <main className="flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-6">
-          <div className="mx-auto max-w-5xl px-4 py-5 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
+        <main className="flex flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-6">
+          <div className="mx-auto min-w-0 max-w-2xl flex-1 px-4 py-5 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
             <Link
               href="/"
-              className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+              className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground touch-manipulation"
             >
               <ChevronLeft className="h-4 w-4" />
               ダッシュボードへ
             </Link>
             <h1 className="text-xl font-bold text-foreground sm:text-2xl">
-              在庫管理
+              BDS入札上限シミュレーター
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              在庫＆古物台帳の統合管理。Supabase連携で車体・パーツと警察対応用受入情報を登録・一覧表示します。
+              ヤフオク相場・整備代・希望利益から入札上限額を計算。現場で片手で入力しやすいモバイル対応です。
             </p>
-            <InventoryContent />
+            <div className="mt-6">
+              <BdsSimulatorContent />
+            </div>
           </div>
         </main>
       </div>

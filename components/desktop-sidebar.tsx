@@ -14,10 +14,12 @@ import {
   BarChart3,
   Calculator,
   TrendingUp,
+  Target,
 } from "lucide-react"
 
 const navItems = [
   { label: "ダッシュボード", href: "/", icon: LayoutDashboard },
+  { label: "BDS入札シミュ", href: "/bds-simulator", icon: Target },
   { label: "BDS過去相場", href: "/market", icon: TrendingUp },
   { label: "見積・請求", href: "/documents", icon: Calculator },
   { label: "オークション・プレビュー", href: "/auction-preview", icon: GanttChartSquare },

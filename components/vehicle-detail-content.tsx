@@ -13,9 +13,6 @@ import {
   AlertTriangle,
   Download,
   Target,
-  CheckCircle2,
-  XCircle,
-  ShieldCheck,
   AlertCircle,
   Upload,
   ClipboardList,
@@ -36,9 +33,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { AiZoomInspection } from "@/components/ai-zoom-inspection"
-import { getConsumablesBreakdown } from "@/lib/consumables"
 import type { VehicleDisplay } from "@/lib/vehicle-display"
-import { getProfitBarColorClass, getProfitBarTrackClass } from "@/lib/vehicle-display"
 import type { VehicleStatus } from "@/lib/data"
 import type { InspectionChecklistItemRow, VehicleInspectionResultRow, InspectionResultStatus } from "@/lib/db/types"
 import {
@@ -46,8 +41,6 @@ import {
   updateVehicleNotes,
   addPart,
   runPhotoAnalysis,
-  runStrictInspection,
-  runFourMiniAnalysis,
   importPhotosFromBdsUrl,
   uploadVehiclePhotosDirect,
   updateEvaluationActuals,
@@ -66,23 +59,15 @@ import {
 } from "@/app/actions/inspections"
 import { toast } from "sonner"
 import {
-  calcYahooBodyScenario,
-  calcEbayPartsScenario,
   calcGamiProfit,
   GAMI_TARGET_PROFIT_JPY,
   type GamiShippingType,
   type GamiListingType,
 } from "@/lib/profit-calc"
-import {
-  calcPremiumPartsBonusJpy,
-  isPremiumPartCategory,
-} from "@/lib/premium-parts-bonus"
 import { getRiskAreaImageUrl } from "@/lib/risk-area-image-url"
 
 const FALLBACK_IMAGE = "/bikes/placeholder.svg"
 const STATUSES: VehicleStatus[] = ["仕入中", "査定中", "落札", "在庫あり", "出品中", "発送中", "売却済"]
-
-const TARGET_PROFIT_JPY = 50000
 
 type IdentifiedBrandPart = {
   partName: string
@@ -230,8 +215,6 @@ export function VehicleDetailContent({
   const [isDragging, setIsDragging] = useState(false)
   const directUploadInputRef = useRef<HTMLInputElement>(null)
   const [usdJpyRate, setUsdJpyRate] = useState(150)
-  const [strictInspectionRunning, setStrictInspectionRunning] = useState(false)
-  const [fourMiniRunning, setFourMiniRunning] = useState(false)
   const [actualRepairCost, setActualRepairCost] = useState<string>("")
   const [actualSalePrice, setActualSalePrice] = useState<string>("")
   const [actualProfit, setActualProfit] = useState<string>("")
@@ -241,8 +224,9 @@ export function VehicleDetailContent({
   const [badCaseFocusPointsInput, setBadCaseFocusPointsInput] = useState("")
   const [savingBadCase, setSavingBadCase] = useState(false)
 
-  // 利益シミュレーター（GAMI専用ルール）
+  // 経費・利益計算（手動入力ベース）
   const [maxBid, setMaxBid] = useState(100000)
+  const [repairCostManual, setRepairCostManual] = useState(0)
   const [domesticShipping, setDomesticShipping] = useState(30000)
   const [yahooExpectedSale, setYahooExpectedSale] = useState(200000)
   const [ebayExpectedSaleUsd, setEbayExpectedSaleUsd] = useState(800)
@@ -255,8 +239,6 @@ export function VehicleDetailContent({
   const [gamiListingType, setGamiListingType] = useState<GamiListingType>("body")
   const [targetProfitJpy, setTargetProfitJpy] = useState(45000)
 
-  const [appraiseLoading, setAppraiseLoading] = useState(false)
-  const appraiseInputRef = useRef<HTMLInputElement>(null)
 
   const [wonDialogOpen, setWonDialogOpen] = useState(false)
   const [wonPriceJpy, setWonPriceJpy] = useState(0)
@@ -513,20 +495,6 @@ export function VehicleDetailContent({
     } else toast.error(res.error)
   }
 
-  async function handleRunStrictInspection() {
-    if (source !== "supabase") {
-      toast.error("高精度鑑定は Supabase 連携車両のみ利用できます")
-      return
-    }
-    setStrictInspectionRunning(true)
-    const res = await runStrictInspection(vehicle.id)
-    setStrictInspectionRunning(false)
-    if (res.success) {
-      toast.success(`高精度鑑定完了。修理コスト +¥${(res.strictRepairCost ?? 0).toLocaleString()} を経費に反映`)
-      window.location.reload()
-    } else toast.error(res.error)
-  }
-
   async function handleRunPhotoAnalysis() {
     if (source !== "supabase") {
       toast.error("オークション写真解析は Supabase 連携車両のみ利用できます")
@@ -537,20 +505,6 @@ export function VehicleDetailContent({
     setPhotoAnalysisRunning(false)
     if (res.success) {
       toast.success("写真を解析し、結果を保存しました")
-      window.location.reload()
-    } else toast.error(res.error)
-  }
-
-  async function handleRunFourMiniAnalysis() {
-    if (source !== "supabase") {
-      toast.error("4mini鑑定は Supabase 連携車両のみ利用できます")
-      return
-    }
-    setFourMiniRunning(true)
-    const res = await runFourMiniAnalysis(vehicle.id, undefined)
-    setFourMiniRunning(false)
-    if (res.success) {
-      toast.success("4mini鑑定を完了し、ブランドパーツ・リスク・オリジナル度を保存しました")
       window.location.reload()
     } else toast.error(res.error)
   }
@@ -644,59 +598,8 @@ export function VehicleDetailContent({
   }
 
   const latestEval = evaluations[0]
-  const yahooScenario = scenarios.find((s) => s.scenario_type === "yahoo_body")
-  const ebayScenario = scenarios.find((s) => s.scenario_type === "ebay_parts")
 
-  const baseRepairCost = latestEval?.repair_cost_estimate ?? 0
-  const strictRepairCost = photoAnalysisResult?.strictRepairCost ?? 0
-  const consumablesItems = getConsumablesBreakdown(
-    photoAnalysisResult?.consumableWear ?? [],
-    photoAnalysisResult?.strictFindings ?? []
-  )
-  const consumablesCost = consumablesItems.reduce((s, i) => s + i.costJpy, 0)
-  const totalRepairCost = baseRepairCost + strictRepairCost + consumablesCost
-
-  // プレミアム4種（ヨシムラキャブ/Gクラフトスイング/武川スーパーヘッド/純正タンク塗装良）は固定eBay加算を優先
-  const premiumPartsBonusJpy = calcPremiumPartsBonusJpy({
-    identifiedBrandParts: photoAnalysisResult?.identifiedBrandParts,
-    highValueEbayParts: photoAnalysisResult?.highValueEbayParts,
-    customParts: photoAnalysisResult?.customParts,
-    carburetor: photoAnalysisResult?.carburetor,
-    engineBoreUp: photoAnalysisResult?.engineBoreUp,
-    muffler: photoAnalysisResult?.muffler,
-  })
-  const brandPartsTotal =
-    (photoAnalysisResult?.identifiedBrandParts ?? []).reduce((s, p) => {
-      if (isPremiumPartCategory(p.partName, p.brand)) return s
-      return s + (p.estimatedUsedValueJpy ?? 0)
-    }, 0)
-  // プレミアム4種は固定加算を優先。それ以外のブランドパーツはAI見積のみ。ebayPartsBonusJpyは重複を避け加算しない
-  const ebayBonusJpy = premiumPartsBonusJpy + brandPartsTotal
-
-  const yahooSim = calcYahooBodyScenario({
-    expectedSalePriceJpy: yahooExpectedSale,
-    winningBidJpy: maxBid,
-    domesticShippingJpy: domesticShipping,
-    repairCostJpy: totalRepairCost,
-    feesJpy: yahooFees,
-    shippingCostJpy: yahooShipping,
-  })
-  const ebaySim = calcEbayPartsScenario(
-    {
-      expectedSalePriceUsd: ebayExpectedSaleUsd,
-      winningBidJpy: maxBid,
-      domesticShippingJpy: domesticShipping,
-      repairCostJpy: totalRepairCost,
-      feesUsd: ebayFeesUsd,
-      shippingCostUsd: ebayShippingUsd,
-      ebayBonusJpy,
-    },
-    usdJpyRate
-  )
-  const maxProfit = Math.max(yahooSim.profitJpy, ebaySim.profitJpy)
-  const isGo = maxProfit >= TARGET_PROFIT_JPY
-  const recommendedScenario =
-    yahooSim.profitJpy >= ebaySim.profitJpy ? "yahoo_body" : "ebay_parts"
+  const totalRepairCost = repairCostManual
 
   const gamiResult = calcGamiProfit({
     expectedSalePriceJpy: yahooExpectedSale,
@@ -707,10 +610,6 @@ export function VehicleDetailContent({
     repairCostJpy: totalRepairCost,
     targetProfitJpy,
   })
-  const profitRate =
-    yahooExpectedSale > 0
-      ? (gamiResult.finalProfitJpy / yahooExpectedSale) * 100
-      : 0
 
   return (
     <div className="space-y-8">
@@ -771,20 +670,6 @@ export function VehicleDetailContent({
                 </span>
               )}
             </div>
-            <div className="mt-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">利益スコア</span>
-                <span className="font-semibold">{vehicle.profitScore}%</span>
-              </div>
-              <div
-                className={`mt-1 h-2 w-full overflow-hidden rounded-full ${getProfitBarTrackClass(vehicle.profitScore)}`}
-              >
-                <div
-                  className={`h-full rounded-full ${getProfitBarColorClass(vehicle.profitScore)}`}
-                  style={{ width: `${vehicle.profitScore}%` }}
-                />
-              </div>
-            </div>
             {vehicle.driveLink && (
               <a
                 href={vehicle.driveLink}
@@ -813,92 +698,23 @@ export function VehicleDetailContent({
               ：下の「BDSテキスト」に査定表の内容をコピペして「査定実行して保存」を押してください。
             </li>
             <li>
-              <strong className="text-foreground">写真解析・高精度鑑定も行う</strong>
+              <strong className="text-foreground">写真解析も行う</strong>
               ：「オークション写真一括解析」で、BDS URL を貼って「写真を取り込む」か、<strong className="text-foreground">スクショをドラッグ＆ドロップ・ファイル選択・Ctrl+V（貼り付け）</strong>でアップロードしてから「写真を一括解析して保存」を実行してください。
             </li>
           </ul>
         </div>
       )}
 
-      {/* BDS仕入れ 利益シミュレーター（GAMI専用ルール） */}
-      <div
-        className={`rounded-xl border-2 bg-card p-4 sm:p-5 ${
-          gamiResult.isPurchasable ? "border-green-500 shadow-[0_0_12px_rgba(34,197,94,0.4)]" : "border-border"
-        }`}
-      >
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-              <Target className="h-5 w-5" />
-              利益シミュレーター
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              GAMI専用ルール：成約料・送料・出品タイプ・目標利益を設定し、最終利益・利益率・「あと○円以内の落札なら目標利益確保」を表示します。
-            </p>
-          </div>
-          <div>
-            <input
-              ref={appraiseInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              className="hidden"
-              onChange={async (e) => {
-                const files = e.target.files
-                if (!files?.length) return
-                setAppraiseLoading(true)
-                try {
-                  const formData = new FormData()
-                  for (let i = 0; i < Math.min(files.length, 10); i++) {
-                    formData.append("image", files[i]!)
-                  }
-                  const res = await fetch("/api/analyze-photo", {
-                    method: "POST",
-                    body: formData,
-                  })
-                  const data = await res.json()
-                  if (!res.ok) throw new Error(data?.error ?? "AI査定に失敗しました")
-                  const purchaseLimit = data.purchaseLimitJpy ?? (data.estimatedDomesticJpy ? Math.round(data.estimatedDomesticJpy * 0.6) : maxBid)
-                  setMaxBid(purchaseLimit)
-                  const salePrice = data.estimatedDomesticSaleJpy ?? data.estimatedDomesticJpy
-                  const SALE_MARGIN = 0.9
-                  if (salePrice != null && salePrice > 0) setYahooExpectedSale(Math.round(salePrice * SALE_MARGIN))
-                  if (data.estimatedExportUsd != null) setEbayExpectedSaleUsd(data.estimatedExportUsd)
-                  const descParts: string[] = []
-                  if (data.modelName) descParts.push(`${data.modelName}${data.modelType ? ` (${data.modelType})` : ""}`)
-                  descParts.push(`外装${data.exteriorCondition}/5`)
-                  if (data.purchaseLimitJpy > 0) {
-                    const pct = data.conditionCoefficient != null ? Math.round(data.conditionCoefficient * 100) : 100
-                    descParts.push(`仕入れ上限 ¥${data.purchaseLimitJpy.toLocaleString()}（${data.pastSampleCount > 0 ? `過去${data.pastSampleCount}件相場の${pct}%` : `査定相場の${pct}%`}）`)
-                  }
-                  toast.success("AI査定で初期値を入力しました", {
-                    description: descParts.join(" · "),
-                  })
-                } catch (err) {
-                  toast.error(err instanceof Error ? err.message : "AI査定に失敗しました")
-                } finally {
-                  setAppraiseLoading(false)
-                  e.target.value = ""
-                }
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => appraiseInputRef.current?.click()}
-              disabled={appraiseLoading}
-              className="inline-flex items-center gap-2 rounded-lg border border-primary/50 bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
-            >
-              {appraiseLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
-              )}
-              {appraiseLoading ? "解析中…" : "AI査定で初期値入力"}
-            </button>
-            <p className="mt-1.5 text-xs text-muted-foreground">
-              BDSの車両詳細にある複数写真（フロント・リア・エンジン・メーター等）を一括選択すると、1台として総合査定し仕入れ上限価格を算出します。
-            </p>
-          </div>
+      {/* BDS仕入れ 利益シミュレーター（経費・手動入力ベース） */}
+      <div className="rounded-xl border-2 border-border bg-card p-4 sm:p-5">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+            <Target className="h-5 w-5" />
+            利益シミュレーター
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            成約料・送料・整備費・販売予想などを手動で入力し、支出内訳と利益を確認します。
+          </p>
         </div>
 
         <div className="mt-4 space-y-4">
@@ -975,13 +791,11 @@ export function VehicleDetailContent({
               <input
                 type="number"
                 inputMode="decimal"
-                value={totalRepairCost}
-                readOnly
-                className="mt-0.5 w-full rounded-lg border border-input bg-muted/50 px-2 py-1.5 text-sm"
+                min={0}
+                value={repairCostManual}
+                onChange={(e) => setRepairCostManual(Number(e.target.value) || 0)}
+                className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-sm"
               />
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {totalRepairCost === 0 ? "査定未実行" : "AI査定・高精度・消耗品"}
-              </p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -1023,194 +837,11 @@ export function VehicleDetailContent({
               落札 {formatJPY(maxBid)} ＋ 成約料 {formatJPY(gamiResult.baseFeeJpy)} ＋ 消費税 {formatJPY(gamiResult.consumptionTaxJpy)} ＋ 送料 {formatJPY(gamiResult.shippingJpy)} ＋ ヤフオク手数料 {formatJPY(gamiResult.yahooFeeJpy)} ＋ 整備費 {formatJPY(gamiResult.repairCostJpy)} ＝ 支出合計 {formatJPY(gamiResult.totalCostJpy)}
             </p>
             <p className="mt-2 text-sm font-semibold">
-              最終利益 ＝ 販売予想 {formatJPY(yahooExpectedSale)} − 支出合計 {formatJPY(gamiResult.totalCostJpy)} ＝ {formatJPY(gamiResult.finalProfitJpy)}
+              販売予想 {formatJPY(yahooExpectedSale)} − 支出合計 {formatJPY(gamiResult.totalCostJpy)} ＝ {formatJPY(gamiResult.finalProfitJpy)}
             </p>
-          </div>
-
-          <div className="flex flex-col gap-3 rounded-lg bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-lg font-bold ${
-                  gamiResult.isPurchasable ? "bg-green-600 text-white" : "bg-amber-600 text-white"
-                }`}
-              >
-                {gamiResult.isPurchasable ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
-                {gamiResult.isPurchasable ? "仕入れ可" : "検討中"}
-              </span>
-              <span className={`text-lg font-bold ${gamiResult.finalProfitJpy >= 0 ? "text-foreground" : "text-destructive"}`}>
-                最終利益 {formatJPY(gamiResult.finalProfitJpy)}
-                {yahooExpectedSale > 0 && (
-                  <span className="ml-2 text-base font-medium text-muted-foreground">
-                    （利益率 {profitRate >= 0 ? "" : "−"}{Math.abs(profitRate).toFixed(1)}%）
-                  </span>
-                )}
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              あと <strong className="text-foreground">{formatJPY(gamiResult.maxBidForTargetProfitJpy)}</strong> 以内の落札なら目標利益 {formatJPY(targetProfitJpy)} 確保
-            </p>
-          </div>
-
-          {ebayBonusJpy > 0 && (
-            <p className="text-xs text-muted-foreground">
-              4mini鑑定で検出したブランドパーツ・社外品の中古相場 +{formatJPY(ebayBonusJpy)} をeBay利益に加算
-            </p>
-          )}
-          <div className="flex flex-wrap gap-6 rounded-lg bg-muted/20 p-3">
-            <div>
-              <p className="text-xs text-muted-foreground">ヤフオク販売 予想利益（従来式）</p>
-              <p className={`text-sm font-bold ${yahooSim.profitJpy >= 0 ? "text-foreground" : "text-destructive"}`}>
-                {formatJPY(yahooSim.profitJpy)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">eBayパーツ 予想利益</p>
-              <p className={`text-sm font-bold ${ebaySim.profitJpy >= 0 ? "text-foreground" : "text-destructive"}`}>
-                {formatJPY(ebaySim.profitJpy)}
-              </p>
-            </div>
           </div>
         </div>
       </div>
-
-      {/* 高精度AI鑑定セクション */}
-      {source === "supabase" && (
-        <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            <ShieldCheck className="h-5 w-5" />
-            高精度AI鑑定
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            4mini・モンキー等の専門査定士として、ネジのサビ・社外品交換などを厳しくチェックし、修理・交換コストを経費に加算します。
-          </p>
-          <button
-            type="button"
-            onClick={handleRunStrictInspection}
-            disabled={strictInspectionRunning}
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {strictInspectionRunning ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ShieldCheck className="h-4 w-4" />
-            )}
-            {strictInspectionRunning ? "鑑定中…" : "高精度鑑定を実行"}
-          </button>
-          {photoAnalysisResult?.strictFindings && photoAnalysisResult.strictFindings.length > 0 && (
-            <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-              <p className="text-sm font-medium text-foreground">
-                追加経費（修理・交換見積）: {formatJPY(photoAnalysisResult.strictRepairCost ?? 0)}
-              </p>
-              <ul className="mt-2 list-inside list-disc space-y-0.5 text-sm text-muted-foreground">
-                {photoAnalysisResult.strictFindings.map((f, i) => (
-                  <li key={i}>{f}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 4mini専門鑑定（武川・キタコ・ヨシムラ・Gクラフト / リスク / オリジナル度） */}
-      {source === "supabase" && (
-        <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            <Sparkles className="h-5 w-5" />
-            4mini専門鑑定
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            武川・キタコ・ヨシムラ・Gクラフトのロゴ・形状からパーツを特定し中古相場を加算。中華コピー・年式不一致はリスクスコアを上げて警告。キャブ・エンジン・マフラーを重点チェックし、BDS書類と写真で型式照合・オリジナル度を算出します。
-          </p>
-          <button
-            type="button"
-            onClick={handleRunFourMiniAnalysis}
-            disabled={fourMiniRunning}
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {fourMiniRunning ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-            {fourMiniRunning ? "鑑定中…" : "4mini鑑定を実行"}
-          </button>
-
-          {photoAnalysisResult?.riskWarnings && photoAnalysisResult.riskWarnings.length > 0 && (
-            <div className="mt-4 rounded-lg border-2 border-red-500/50 bg-red-500/10 p-4">
-              <h3 className="flex items-center gap-2 font-semibold text-red-700 dark:text-red-400">
-                <AlertTriangle className="h-4 w-4" />
-                4mini特有リスク（要確認）
-              </h3>
-              <ul className="mt-2 list-inside list-disc space-y-0.5 text-sm text-foreground">
-                {photoAnalysisResult.riskWarnings.map((w, i) => (
-                  <li key={i}>{w}</li>
-                ))}
-              </ul>
-              {typeof photoAnalysisResult.riskScoreDelta === "number" && photoAnalysisResult.riskScoreDelta > 0 && (
-                <p className="mt-2 text-sm font-medium text-red-700 dark:text-red-400">
-                  リスクスコア加算: +{photoAnalysisResult.riskScoreDelta}
-                </p>
-              )}
-            </div>
-          )}
-
-          {(photoAnalysisResult?.identifiedBrandParts?.length ?? 0) > 0 && (
-            <div className="mt-4 rounded-lg border-2 border-amber-500/50 bg-amber-500/10 p-4">
-              <h3 className="flex items-center gap-2 font-semibold text-amber-700 dark:text-amber-400">
-                <Package className="h-4 w-4" />
-                検出したブランドパーツ（利益に加算）
-              </h3>
-              <ul className="mt-2 space-y-2">
-                {photoAnalysisResult!.identifiedBrandParts!.map((p, i) => (
-                  <li key={i} className="flex justify-between text-sm">
-                    <span className="font-medium text-foreground">{p.partName}</span>
-                    <span className="text-muted-foreground">{p.brand} 約{formatJPY(p.estimatedUsedValueJpy)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {(photoAnalysisResult?.originalityPercent != null || photoAnalysisResult?.typeFromPhoto != null) && (
-            <div className="mt-4 rounded-lg bg-muted/50 p-3">
-              <h3 className="text-sm font-semibold text-foreground">型式照合・オリジナル度</h3>
-              {photoAnalysisResult.typeFromPhoto != null && (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  写真から判読: {photoAnalysisResult.typeFromPhoto}
-                  {photoAnalysisResult.typeMatch === true && (
-                    <span className="ml-2 text-green-600 dark:text-green-400">BDSと一致</span>
-                  )}
-                  {photoAnalysisResult.typeMatch === false && (
-                    <span className="ml-2 text-red-600 dark:text-red-400">BDSと不一致</span>
-                  )}
-                </p>
-              )}
-              {photoAnalysisResult.originalityPercent != null && (
-                <p className="mt-1 text-sm font-medium text-foreground">
-                  オリジナル度（純正維持率）: {photoAnalysisResult.originalityPercent}%
-                </p>
-              )}
-            </div>
-          )}
-
-          {(photoAnalysisResult?.carburetor || photoAnalysisResult?.engineBoreUp || photoAnalysisResult?.muffler) && (
-            <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
-              <h3 className="text-sm font-semibold text-foreground">重点チェック（キャブ・エンジン・マフラー）</h3>
-              <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                {photoAnalysisResult.carburetor && (
-                  <li><span className="text-foreground">キャブ:</span> {photoAnalysisResult.carburetor}</li>
-                )}
-                {photoAnalysisResult.engineBoreUp && (
-                  <li><span className="text-foreground">エンジン:</span> {photoAnalysisResult.engineBoreUp}</li>
-                )}
-                {photoAnalysisResult.muffler && (
-                  <li><span className="text-foreground">マフラー:</span> {photoAnalysisResult.muffler}</li>
-                )}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* オークション写真一括解析 */}
       {source === "supabase" && (
@@ -1544,34 +1175,15 @@ export function VehicleDetailContent({
           <Calculator className="h-5 w-5" />
           査定・利益比較
         </h2>
-        {latestEval && (
+        {latestEval?.negative_items?.length ? (
           <div className="mt-4 rounded-lg bg-muted/50 p-3 text-sm">
-            <p className="font-medium text-foreground">
-              修理費予測: {formatJPY(latestEval.repair_cost_estimate ?? 0)}
-            </p>
-            {latestEval.negative_items?.length ? (
-              <ul className="mt-2 list-inside list-disc text-muted-foreground">
-                {latestEval.negative_items.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            ) : null}
+            <ul className="list-inside list-disc text-muted-foreground">
+              {latestEval.negative_items.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
           </div>
-        )}
-        {(yahooScenario || ebayScenario) && (
-          <div className="mt-2 flex gap-4 text-sm">
-            {yahooScenario && (
-              <span className="text-muted-foreground">
-                ヤフオク車体: {formatJPY(yahooScenario.profit ?? 0)}
-              </span>
-            )}
-            {ebayScenario && (
-              <span className="text-muted-foreground">
-                eBayパーツ: {formatJPY(ebayScenario.profit ?? 0)}
-              </span>
-            )}
-          </div>
-        )}
+        ) : null}
 
         <div className="mt-4 space-y-3">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
