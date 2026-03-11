@@ -3,7 +3,7 @@ import { ChevronLeft } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { DesktopSidebar } from "@/components/desktop-sidebar"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
-import { BdsMarketCharts } from "@/components/bds-market-charts"
+import { MarketPricesContent } from "@/components/market-prices-content"
 
 export default function MarketPage() {
   return (
@@ -21,12 +21,12 @@ export default function MarketPage() {
               ダッシュボードへ
             </Link>
             <h1 className="text-xl font-bold text-foreground sm:text-2xl">
-              BDS 過去相場
+              BDS・ヤフオク 相場比較
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              ブックマークレットで登録した車両の落札価格を車種ごとに集計。仕入れ判断の参考にしてください。
+              車種・型式ごとに BDS とヤフオクの落札相場を手入力して比較。仕入れ判断の参考にしてください。
             </p>
-            <BdsMarketCharts />
+            <MarketPricesContent />
           </div>
         </main>
       </div>

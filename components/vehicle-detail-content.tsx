@@ -12,7 +12,6 @@ import {
   Images,
   Sparkles,
   AlertTriangle,
-  Download,
   Target,
   AlertCircle,
   Upload,
@@ -43,7 +42,6 @@ import {
   updateVehicleNotes,
   addPart,
   runPhotoAnalysis,
-  importPhotosFromBdsUrl,
   uploadVehiclePhotosDirect,
   updateEvaluationActuals,
   deleteVehicle,
@@ -213,8 +211,6 @@ export function VehicleDetailContent({
   const [photoAnalysisResult, setPhotoAnalysisResult] = useState<PhotoAnalysisData | null>(
     () => evaluations.find((e) => e.photo_analysis && Object.keys(e.photo_analysis).length > 0)?.photo_analysis ?? null
   )
-  const [bdsUrl, setBdsUrl] = useState("")
-  const [bdsImporting, setBdsImporting] = useState(false)
   const [directUploading, setDirectUploading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const directUploadInputRef = useRef<HTMLInputElement>(null)
@@ -358,31 +354,6 @@ export function VehicleDetailContent({
       setPartQty("1")
       toast.success("パーツを追加しました")
     } else toast.error(res.error)
-  }
-
-  async function handleImportFromBds() {
-    const url = bdsUrl.trim()
-    if (!url) {
-      toast.error("BDS車両ページのURLを入力してください")
-      return
-    }
-    if (source !== "supabase") {
-      toast.error("BDS取り込みは Supabase 連携車両のみ利用できます")
-      return
-    }
-    setBdsImporting(true)
-    const res = await importPhotosFromBdsUrl(vehicle.id, url)
-    setBdsImporting(false)
-    if (res.success) {
-      toast.success(`${res.count}枚の写真を Drive に保存しました`)
-      setBdsUrl("")
-      window.location.reload()
-    } else {
-      toast.error(res.error ?? "取り込みに失敗しました", {
-        description: "下の「ファイルを選択」またはドラッグ＆ドロップで写真をアップロードできます。",
-        duration: 8000,
-      })
-    }
   }
 
   const readFilesAsBase64 = (files: FileList | null): Promise<{ base64: string; mimeType: string }[]> => {
@@ -720,7 +691,7 @@ export function VehicleDetailContent({
             </li>
             <li>
               <strong className="text-foreground">写真解析も行う</strong>
-              ：「オークション写真一括解析」で、BDS URL を貼って「写真を取り込む」か、<strong className="text-foreground">スクショをドラッグ＆ドロップ・ファイル選択・Ctrl+V（貼り付け）</strong>でアップロードしてから「写真を一括解析して保存」を実行してください。
+              ：「オークション写真一括解析」で、<strong className="text-foreground">スクショをドラッグ＆ドロップ・ファイル選択・Ctrl+V（貼り付け）</strong>でアップロードしてから「写真を一括解析して保存」を実行してください。
             </li>
           </ul>
         </div>
@@ -872,30 +843,8 @@ export function VehicleDetailContent({
             オークション写真一括解析
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            BDS車両ページURLから写真を取り込むか、PCから写真をドラッグ＆ドロップ／ファイル選択でアップロードできます。Drive に保存した写真を Gemini で解析し、外装・フレーム・エンジン評価（A〜E）・リスク箇所・eBay高値パーツをリスト化します。
+            写真をドラッグ＆ドロップ／ファイル選択／貼り付けでアップロードできます。Drive に保存し、Gemini で外装・フレーム・エンジン評価（A〜E）・リスク箇所・eBay高値パーツを解析します。
           </p>
-          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-            URL 取り込みができない場合（BDS のログイン必須・外部制限など）は、下のドラッグ＆ドロップまたは「ファイルを選択」で写真をアップロードしてください。
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <input
-              type="url"
-              placeholder="BDS車両ページのURL"
-              value={bdsUrl}
-              onChange={(e) => setBdsUrl(e.target.value)}
-              className="min-w-[200px] flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
-            />
-            <button
-              type="button"
-              onClick={handleImportFromBds}
-              disabled={bdsImporting}
-              className="inline-flex items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
-            >
-              {bdsImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              {bdsImporting ? "取り込み中…" : "写真を取り込む"}
-            </button>
-          </div>
-
           <input
             ref={directUploadInputRef}
             type="file"

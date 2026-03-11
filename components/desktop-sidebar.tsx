@@ -10,20 +10,20 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  GanttChartSquare,
   BarChart3,
   Calculator,
   TrendingUp,
   Target,
   BookOpen,
+  FileCheck,
 } from "lucide-react"
 
 const navItems = [
   { label: "ダッシュボード", href: "/", icon: LayoutDashboard },
+  { label: "BDS個票査定", href: "/assess", icon: FileCheck },
   { label: "BDS入札シミュ", href: "/bds-simulator", icon: Target },
-  { label: "BDS過去相場", href: "/market", icon: TrendingUp },
+  { label: "相場比較", href: "/market", icon: TrendingUp },
   { label: "見積・請求", href: "/documents", icon: Calculator },
-  { label: "オークション・プレビュー", href: "/auction-preview", icon: GanttChartSquare },
   { label: "在庫管理", href: "/inventory", icon: Package },
   { label: "予想 vs 実績", href: "/analytics", icon: BarChart3 },
   { label: "eBay出品", href: "/ebay", icon: ShoppingBag },

@@ -19,8 +19,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { addVehicleWithInitialData } from "@/app/actions/vehicles"
 import type { BdsScreenshotExtract } from "@/lib/ai/bds-screenshot-analyzer"
 
-const MAX_FILES = 3
-const ACCEPT = "image/*,application/pdf"
+const MAX_FILES = 1
+const ACCEPT = "image/*"
 
 function emptyStr(s: string | null | undefined): string {
   return s ?? ""
@@ -94,7 +94,7 @@ export function ScreenshotUploader() {
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     const items = Array.from(e.dataTransfer.files).filter(
-      (f) => f.type.startsWith("image/") || f.type === "application/pdf"
+      (f) => f.type.startsWith("image/")
     )
     if (items.length) setSelectedFiles(items.slice(0, MAX_FILES))
   }, [])
@@ -103,7 +103,7 @@ export function ScreenshotUploader() {
     const files = e.target.files
     if (files?.length) {
       const list = Array.from(files).filter(
-        (f) => f.type.startsWith("image/") || f.type === "application/pdf"
+        (f) => f.type.startsWith("image/")
       )
       if (list.length) setSelectedFiles(list.slice(0, MAX_FILES))
     }
@@ -127,7 +127,11 @@ export function ScreenshotUploader() {
       if (result.success) {
         toast.success("車両を登録しました", { description: result.message })
         setModalOpen(false)
-        router.refresh()
+        if (result.vehicleId) {
+          router.push(`/vehicle/${result.vehicleId}`)
+        } else {
+          router.refresh()
+        }
       } else {
         toast.error(result.error ?? "登録に失敗しました")
       }
@@ -152,13 +156,13 @@ export function ScreenshotUploader() {
           className="absolute h-0 w-0 opacity-0"
           id="screenshot-upload"
           disabled={analyzing}
-          aria-label="BDSスクショまたはPDFを選択"
+          aria-label="車両スクショを選択"
         />
         {analyzing ? (
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
             <p className="text-center text-sm font-medium text-muted-foreground">
-              複数枚の画像を統合解析中...（10〜15秒ほどかかります）
+              解析中…（10〜15秒ほどかかります）
             </p>
           </div>
         ) : selectedFiles.length > 0 ? (
@@ -216,10 +220,10 @@ export function ScreenshotUploader() {
               ファイルをアップロード
             </span>
             <span className="text-xs text-muted-foreground">
-              写真を撮る / アルバムから選択 / PDF も可
+              写真を撮る / アルバムから選択
             </span>
             <span className="text-xs text-muted-foreground">
-              1枚〜3枚まで（複数枚は1台分として統合解析）
+              スクショ1枚で車両を登録
             </span>
           </label>
         )}
@@ -231,9 +235,9 @@ export function ScreenshotUploader() {
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>新規車両登録（BDS解析結果）</DialogTitle>
+            <DialogTitle>新規車両登録（スクショ解析結果）</DialogTitle>
             <DialogDescription>
-              内容を確認・修正して「登録」で車両を追加します。
+              読み取った内容を確認・修正して「登録」で車両を追加します。
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">

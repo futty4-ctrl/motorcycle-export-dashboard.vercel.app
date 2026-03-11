@@ -8,14 +8,13 @@ import {
   getVehiclesFromSheet,
   getSummaryFromSheet,
   getConnectionStatus,
-  createVehicleAndImportFromBdsUrl,
   type SummaryData,
 } from "@/app/actions/vehicles"
 import type { VehicleDisplay } from "@/lib/vehicle-display"
 import { SummaryCards } from "@/components/summary-cards"
 import { VehicleList } from "@/components/vehicle-list"
 import { ScreenshotUploader } from "@/components/screenshot-uploader"
-import { Loader2, Link2, Search } from "lucide-react"
+import { Loader2, Search, Upload } from "lucide-react"
 import { toast } from "sonner"
 
 export function DashboardContent() {
@@ -31,9 +30,6 @@ export function DashboardContent() {
     supabaseMessage?: string
     sheetsConfigured: boolean
   } | null>(null)
-
-  const [bdsUrl, setBdsUrl] = useState("")
-  const [bdsUrlSubmitting, setBdsUrlSubmitting] = useState(false)
 
   const [yahooKeyword, setYahooKeyword] = useState("")
   const [yahooKeywordError, setYahooKeywordError] = useState(false)
@@ -57,30 +53,6 @@ export function DashboardContent() {
     const encoded = encodeURIComponent(kw)
     const url = `https://auctions.yahoo.co.jp/closedsearch/closedsearch?p=${encoded}&auccat=26316&ei=UTF-8`
     window.open(url, "_blank", "noopener,noreferrer")
-  }
-
-  const handleBdsUrlSubmit = async () => {
-    const url = bdsUrl.trim()
-    if (!url) {
-      toast.error("BDS車両ページのURLを入力してください")
-      return
-    }
-    setBdsUrlSubmitting(true)
-    const res = await createVehicleAndImportFromBdsUrl(url)
-    setBdsUrlSubmitting(false)
-    if (res.vehicleId) {
-      setBdsUrl("")
-      if (res.success) {
-        toast.success(res.count ? `${res.count}枚の写真を取り込みました` : "車両を登録しました", {
-          description: "車両詳細を開きます",
-        })
-      } else if (res.error) {
-        toast.error(res.error, { description: "車両詳細で写真を追加できます。" })
-      }
-      router.push(`/vehicle/${res.vehicleId}`)
-    } else {
-      toast.error(res.error ?? "登録・取り込みに失敗しました")
-    }
   }
 
   useEffect(() => {
@@ -279,57 +251,17 @@ export function DashboardContent() {
           )}
         </div>
       )}
-      {connectionStatus?.supabase === "ok" && (
-        <div className="mb-4 rounded-xl border border-border bg-card p-4">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <Link2 className="h-4 w-4" />
-            BDS URL から車両を追加
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            URLを貼ると車両を1件登録し、ページから写真を自動で取り込みます。既に同じURLの車両がある場合は写真のみ追加します。
-          </p>
-          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-2">
-            <input
-              type="url"
-              placeholder="https://..."
-              value={bdsUrl}
-              onChange={(e) => setBdsUrl(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleBdsUrlSubmit()}
-              className="min-h-[44px] w-full rounded-lg border border-input bg-background px-3 py-3 text-base sm:min-h-0 sm:min-w-[200px] sm:flex-1 sm:py-2 sm:text-sm"
-            />
-            <button
-              type="button"
-              onClick={handleBdsUrlSubmit}
-              disabled={bdsUrlSubmitting}
-              className="inline-flex min-h-[44px] touch-manipulation items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-base font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 sm:min-h-0 sm:py-2 sm:text-sm"
-            >
-              {bdsUrlSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-              {bdsUrlSubmitting ? "取り込み中…" : "登録して写真を取り込む"}
-            </button>
-          </div>
-          <div className="mt-4 rounded-lg border border-border/60 bg-muted/30 p-3 text-sm">
-            <p className="font-medium text-foreground">ブックマークレット</p>
-            <p className="mt-1 text-muted-foreground">
-              BDS車両ページで実行すると車両を登録します。
-              <a
-                href="/api/vehicles/bookmarklet"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-2 text-primary hover:underline"
-              >
-                API疎通確認
-              </a>
-              （新しいタブで開き「ok: true」が表示されればOK）
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              ブックマークレットの URL は <code className="rounded bg-muted px-1">YOUR_APP_URL</code> を
-              <strong className="text-foreground"> {typeof window !== "undefined" ? window.location.origin : "このアプリのURL"}</strong>
-              に置き換えてください。APIキーは未設定なら既定値を使用。詳細は public/bds-vehicles-bookmarklet.txt を参照。
-            </p>
-          </div>
-        </div>
-      )}
+      {/* 車両登録：スクショ1枚でAI解析 → 登録（主導線） */}
       <div className="mb-4">
+        <div className="mb-2 flex items-center gap-2">
+          <Upload className="h-5 w-5 text-primary" />
+          <h2 className="text-base font-semibold text-foreground">
+            車両を登録（スクショ1枚）
+          </h2>
+        </div>
+        <p className="mb-3 text-sm text-muted-foreground">
+          オークションの車両スクショを1枚アップロードすると、AIが車種・年式・評価などを読み取り、車両を登録します。
+        </p>
         <ScreenshotUploader />
       </div>
       <Link
