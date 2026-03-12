@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
+import type { CSSProperties } from "react"
 
 type AssessmentResult = {
   bike_name: string
@@ -25,6 +25,37 @@ type AssessmentResult = {
   bid_limit: number
 }
 
+const C = {
+  surface: "#111113",
+  border: "#1e1e22",
+  orange: "#f5720a",
+  text: "#e8e8ec",
+  textMuted: "#6b6b74",
+  textSub: "#9999a8",
+  green: "#22c55e",
+  red: "#ef4444",
+  blue: "#3b82f6",
+  yellow: "#eab308",
+}
+
+const card: CSSProperties = {
+  background: C.surface,
+  border: `1px solid ${C.border}`,
+  borderRadius: 8,
+  padding: 20,
+  marginBottom: 16,
+}
+const label: CSSProperties = {
+  fontSize: 11,
+  color: C.textMuted,
+  letterSpacing: 1.5,
+  textTransform: "uppercase",
+  marginBottom: 8,
+}
+
+const VC = { GO: C.green, NG: C.red, CAUTION: C.yellow }
+const fmt = (n: number) => `¥${Number(n).toLocaleString()}`
+
 export function AssessContent() {
   const [image, setImage] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
@@ -47,7 +78,6 @@ export function AssessContent() {
     if (!image) return
     setLoading(true)
     setError(null)
-
     const reader = new FileReader()
     reader.onload = async () => {
       const base64 = (reader.result as string).split(",")[1]
@@ -84,157 +114,314 @@ export function AssessContent() {
     }
   }
 
-  const verdictColor = {
-    GO: "text-emerald-400 border-emerald-400",
-    NG: "text-red-400 border-red-400",
-    CAUTION: "text-amber-400 border-amber-400",
-  }
-
-  const verdictBg = {
-    GO: "bg-emerald-400/10",
-    NG: "bg-red-400/10",
-    CAUTION: "bg-amber-400/10",
-  }
-
   return (
-    <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
-      {/* LEFT: Upload */}
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">
-            BDS個票スクショをアップロード
-          </h2>
-          <p className="text-muted-foreground text-sm mt-1">
-            画像を選択して「査定する」を押すと、AIが解析します。
-          </p>
-        </div>
-
-        <label className="block cursor-pointer group">
-          <div
-            className={`relative border-2 border-dashed rounded-xl transition-all duration-200 overflow-hidden min-h-[320px] ${
-              preview ? "border-primary/40" : "border-border hover:border-primary/30"
-            }`}
-          >
-            {preview ? (
-              <img
-                src={preview}
-                alt="preview"
-                className="w-full h-full object-contain"
-                style={{ maxHeight: "480px" }}
-              />
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground group-hover:text-foreground/70 transition-colors">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-                <span className="text-sm">BDS個票スクショをここにドロップ</span>
-                <span className="text-xs text-muted-foreground">PNG / JPG</span>
-              </div>
-            )}
-          </div>
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleImageChange}
-          />
-        </label>
-
-        {image && (
-          <button
-            onClick={handleAssess}
-            disabled={loading}
-            className="w-full py-3 bg-primary text-primary-foreground font-bold text-sm rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all touch-manipulation"
-          >
-            {loading ? "査定中..." : "査定する"}
-          </button>
-        )}
-
-        {error && (
-          <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive text-sm">
-            {error}
-          </div>
-        )}
+    <div
+      style={{
+        fontFamily: "'JetBrains Mono','Courier New',monospace",
+        color: C.text,
+        padding: "32px 40px",
+        maxWidth: 900,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 22,
+          fontWeight: "bold",
+          marginBottom: 4,
+        }}
+      >
+        査定
+      </div>
+      <div
+        style={{
+          fontSize: 12,
+          color: C.textSub,
+          marginBottom: 28,
+        }}
+      >
+        BDS個票スクショ → AI解析 → GO/NG/CAUTION判定
       </div>
 
-      {/* RIGHT: Result */}
-      <div className="space-y-4">
-        {loading && (
-          <div className="h-full flex items-center justify-center text-muted-foreground text-sm min-h-[320px]">
-            <div className="text-center space-y-2">
-              <div className="animate-pulse text-4xl">⚙</div>
-              <div>画像を解析中...</div>
-            </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 24,
+        }}
+      >
+        {/* LEFT: アップロード */}
+        <div>
+          <div style={card}>
+            <div style={label}>BDS個票スクショ</div>
+            <label style={{ cursor: "pointer", display: "block" }}>
+              <div
+                style={{
+                  border: `2px dashed ${preview ? C.orange : C.border}`,
+                  borderRadius: 8,
+                  padding: 24,
+                  textAlign: "center",
+                  background: preview ? `${C.orange}08` : "#0e0e10",
+                  transition: "all 0.2s",
+                }}
+              >
+                {preview ? (
+                  <img
+                    src={preview}
+                    alt="preview"
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: 300,
+                      borderRadius: 6,
+                      objectFit: "contain",
+                    }}
+                  />
+                ) : (
+                  <div>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>↑</div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: C.textSub,
+                        marginBottom: 4,
+                      }}
+                    >
+                      ファイルをドロップ or クリック
+                    </div>
+                    <div
+                      style={{ fontSize: 11, color: C.textMuted }}
+                    >
+                      PNG / JPG / WebP / PDF
+                    </div>
+                  </div>
+                )}
+              </div>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={handleImageChange}
+                style={{ display: "none" }}
+              />
+            </label>
           </div>
-        )}
 
-        {result && !loading && (
-          <>
-            <div className={`border rounded-xl p-4 ${verdictColor[result.verdict]} ${verdictBg[result.verdict]}`}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-2xl font-black tracking-widest">
-                  {result.verdict === "GO" ? "✓ GO" : result.verdict === "NG" ? "✗ NG" : "⚠ CAUTION"}
-                </span>
-                <span className="text-sm opacity-70">{result.verdict_reason}</span>
-              </div>
-            </div>
-
-            <div className="border border-border rounded-xl p-4 space-y-2 bg-card">
-              <div className="text-muted-foreground text-xs uppercase tracking-widest mb-3">車両情報</div>
-              {[
-                ["車種", result.bike_name],
-                ["車台番号", result.chassis_number],
-                ["走行距離", result.mileage],
-                ["色", result.color],
-                ["排気量", result.displacement],
-                ["落札価格", `¥${result.auction_price?.toLocaleString()}`],
-              ].map(([label, value]) => (
-                <div key={String(label)} className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{label}</span>
-                  <span className="text-foreground font-medium">{value || "—"}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="border border-border rounded-xl p-4 bg-card">
-              <div className="text-muted-foreground text-xs uppercase tracking-widest mb-3">状態サマリー</div>
-              <p className="text-sm text-foreground/90 leading-relaxed">{result.damage_summary}</p>
-              <div className="mt-2 text-sm text-amber-600 dark:text-amber-400">{result.engine_status}</div>
-            </div>
-
-            <div className="border border-border rounded-xl p-4 space-y-2 bg-card">
-              <div className="text-muted-foreground text-xs uppercase tracking-widest mb-3">収支シミュレーション</div>
-              {[
-                ["総コスト（仕入＋修理）", `¥${result.total_cost_min?.toLocaleString()} 〜 ¥${result.total_cost_max?.toLocaleString()}`],
-                ["想定売値", `¥${result.sell_price_min?.toLocaleString()} 〜 ¥${result.sell_price_max?.toLocaleString()}`],
-                ["粗利見込み", `¥${result.profit_min?.toLocaleString()} 〜 ¥${result.profit_max?.toLocaleString()}`],
-              ].map(([label, value]) => (
-                <div key={String(label)} className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{label}</span>
-                  <span className="text-foreground">{value}</span>
-                </div>
-              ))}
-              <div className="border-t border-border pt-2 mt-2 flex justify-between text-sm font-bold">
-                <span className="text-muted-foreground">入札上限</span>
-                <span className="text-primary text-lg">¥{result.bid_limit?.toLocaleString()}</span>
-              </div>
-            </div>
-
+          {image && (
             <button
-              onClick={handleSave}
-              disabled={saved}
-              className={`w-full py-3 rounded-xl font-bold text-sm transition-all touch-manipulation ${
-                saved
-                  ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 cursor-default"
-                  : "bg-primary text-primary-foreground hover:bg-primary/90 border border-primary"
-              }`}
+              onClick={handleAssess}
+              disabled={loading}
+              style={{
+                width: "100%",
+                padding: "14px 0",
+                background: loading ? C.border : C.orange,
+                color: "#fff",
+                fontWeight: "bold",
+                fontSize: 14,
+                borderRadius: 8,
+                border: "none",
+                cursor: loading ? "not-allowed" : "pointer",
+                fontFamily: "inherit",
+                letterSpacing: 0.5,
+                marginBottom: 12,
+              }}
             >
-              {saved ? "✓ Supabaseに保存済み" : "Supabaseに保存する"}
+              {loading ? "解析中..." : "査定する"}
             </button>
-          </>
-        )}
+          )}
+
+          {error && (
+            <div
+              style={{
+                padding: 12,
+                background: `${C.red}10`,
+                border: `1px solid ${C.red}40`,
+                borderRadius: 8,
+                color: C.red,
+                fontSize: 13,
+              }}
+            >
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT: 結果 */}
+        <div>
+          {loading && (
+            <div
+              style={{
+                ...card,
+                minHeight: 300,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: C.textMuted,
+                fontSize: 13,
+              }}
+            >
+              AIが解析中...
+            </div>
+          )}
+
+          {result && !loading && (
+            <>
+              {/* GO/NG/CAUTION */}
+              <div
+                style={{
+                  ...card,
+                  borderLeft: `4px solid ${VC[result.verdict]}`,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <div>
+                  <div style={label}>判定</div>
+                  <div
+                    style={{
+                      fontSize: 36,
+                      fontWeight: "bold",
+                      color: VC[result.verdict],
+                    }}
+                  >
+                    {result.verdict}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: C.textSub,
+                    maxWidth: 200,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {result.verdict_reason}
+                </div>
+              </div>
+
+              {/* 入札上限 */}
+              <div
+                style={{
+                  ...card,
+                  borderLeft: `4px solid ${C.orange}`,
+                  textAlign: "center",
+                }}
+              >
+                <div style={label}>BDS 入札上限</div>
+                <div
+                  style={{
+                    fontSize: 36,
+                    fontWeight: "bold",
+                    color: C.orange,
+                  }}
+                >
+                  {fmt(result.bid_limit)}
+                </div>
+              </div>
+
+              {/* 車両情報 */}
+              <div style={card}>
+                <div style={label}>車両情報</div>
+                {[
+                  { k: "車種", v: result.bike_name },
+                  { k: "年式", v: result.year },
+                  { k: "走行距離", v: result.mileage },
+                  { k: "排気量", v: result.displacement },
+                  { k: "エンジン", v: result.engine_status },
+                ].map(({ k, v }) => (
+                  <div
+                    key={k}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      padding: "6px 0",
+                      borderBottom: `1px solid ${C.border}50`,
+                      fontSize: 13,
+                    }}
+                  >
+                    <span style={{ color: C.textMuted }}>{k}</span>
+                    <span>{v || "—"}</span>
+                  </div>
+                ))}
+                {result.damage_summary && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      padding: 10,
+                      background: "#0e0e10",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      color: C.textSub,
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    {result.damage_summary}
+                  </div>
+                )}
+              </div>
+
+              {/* 収支 */}
+              <div style={card}>
+                <div style={label}>収支シミュレーション</div>
+                {[
+                  {
+                    k: "仕入価格",
+                    v: fmt(result.auction_price),
+                    color: C.text,
+                  },
+                  {
+                    k: "総コスト",
+                    v: `${fmt(result.total_cost_min)} 〜 ${fmt(result.total_cost_max)}`,
+                    color: C.yellow,
+                  },
+                  {
+                    k: "想定売却",
+                    v: `${fmt(result.sell_price_min)} 〜 ${fmt(result.sell_price_max)}`,
+                    color: C.blue,
+                  },
+                  {
+                    k: "粗利",
+                    v: `${fmt(result.profit_min)} 〜 ${fmt(result.profit_max)}`,
+                    color:
+                      result.profit_min > 0 ? C.green : C.red,
+                  },
+                ].map(({ k, v, color }) => (
+                  <div
+                    key={k}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      padding: "6px 0",
+                      borderBottom: `1px solid ${C.border}50`,
+                      fontSize: 13,
+                    }}
+                  >
+                    <span style={{ color: C.textMuted }}>{k}</span>
+                    <span style={{ color, fontWeight: "bold" }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* 保存ボタン */}
+              <button
+                onClick={handleSave}
+                disabled={saved}
+                style={{
+                  width: "100%",
+                  padding: "12px 0",
+                  background: saved ? `${C.green}20` : "transparent",
+                  color: saved ? C.green : C.textSub,
+                  border: `1px solid ${saved ? C.green : C.border}`,
+                  borderRadius: 8,
+                  cursor: saved ? "default" : "pointer",
+                  fontWeight: "bold",
+                  fontSize: 13,
+                  fontFamily: "inherit",
+                }}
+              >
+                {saved ? "✓ Supabaseに保存済み" : "Supabaseに保存する"}
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
