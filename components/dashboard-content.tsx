@@ -105,7 +105,9 @@ export function DashboardContent() {
         style={{
           padding: 40,
           color: C.textMuted,
-          fontFamily: "monospace",
+          fontFamily: '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
+          WebkitFontSmoothing: "antialiased",
+          MozOsxFontSmoothing: "grayscale",
         }}
       >
         読み込み中...
@@ -115,7 +117,9 @@ export function DashboardContent() {
   return (
     <div
       style={{
-        fontFamily: "'JetBrains Mono','Courier New',monospace",
+        fontFamily: '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
+        WebkitFontSmoothing: "antialiased",
+        MozOsxFontSmoothing: "grayscale",
         color: C.text,
         padding: "32px 40px",
         maxWidth: 900,

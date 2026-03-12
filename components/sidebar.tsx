@@ -62,7 +62,9 @@ export default function Sidebar() {
         top: 0,
         height: "100vh",
         overflowY: "auto",
-        fontFamily: "'JetBrains Mono','Courier New',monospace",
+        fontFamily: '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
+        WebkitFontSmoothing: "antialiased",
+        MozOsxFontSmoothing: "grayscale",
       }}
     >
       <div

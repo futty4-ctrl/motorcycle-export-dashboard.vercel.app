@@ -117,7 +117,9 @@ export function AssessContent() {
   return (
     <div
       style={{
-        fontFamily: "'JetBrains Mono','Courier New',monospace",
+        fontFamily: '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
+        WebkitFontSmoothing: "antialiased",
+        MozOsxFontSmoothing: "grayscale",
         color: C.text,
         padding: "32px 40px",
         maxWidth: 900,
