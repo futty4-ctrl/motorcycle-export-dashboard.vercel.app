@@ -4,7 +4,6 @@ import { ChevronLeft } from "lucide-react"
 import { getVehicleById, getEvaluationsByVehicleId, getScenariosByVehicleId, getPartsByVehicleId } from "@/app/actions/vehicles"
 import { VehicleDetailContent } from "@/components/vehicle-detail-content"
 import { DashboardHeader } from "@/components/dashboard-header"
-import { DesktopSidebar } from "@/components/desktop-sidebar"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
 
 export default async function VehicleDetailPage({
@@ -31,7 +30,6 @@ export default async function VehicleDetailPage({
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
-      <DesktopSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <DashboardHeader />
         <main className="flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-6">

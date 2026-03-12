@@ -1,14 +1,12 @@
 import Link from "next/link"
 import { ChevronLeft } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard-header"
-import { DesktopSidebar } from "@/components/desktop-sidebar"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
 import { MarketPricesContent } from "@/components/market-prices-content"
 
 export default function MarketPage() {
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
-      <DesktopSidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <DashboardHeader />
         <main className="flex-1 overflow-y-auto pb-20 lg:pb-6">

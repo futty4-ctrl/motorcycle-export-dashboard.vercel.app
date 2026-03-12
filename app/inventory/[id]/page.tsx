@@ -1,7 +1,6 @@
 import Link from "next/link"
 import { ChevronLeft } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard-header"
-import { DesktopSidebar } from "@/components/desktop-sidebar"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
 import { InventoryDetailContent } from "@/components/inventory-detail-content"
 
@@ -14,7 +13,6 @@ export default async function InventoryDetailPage({
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
-      <DesktopSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <DashboardHeader />
         <main className="flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-6">
