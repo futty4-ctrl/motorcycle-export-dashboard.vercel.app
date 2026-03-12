@@ -13,11 +13,37 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { getAnalyticsData, type AnalyticsRow } from "@/app/actions/vehicles"
-import { Loader2 } from "lucide-react"
+import type { CSSProperties } from "react"
 
-function formatJPY(n: number) {
-  return `¥${(n / 10_000).toFixed(1)}万`
+const C = {
+  surface: "#111113",
+  border: "#1e1e22",
+  orange: "#f5720a",
+  text: "#e8e8ec",
+  textMuted: "#6b6b74",
+  textSub: "#9999a8",
+  green: "#22c55e",
+  red: "#ef4444",
+  blue: "#3b82f6",
+  yellow: "#eab308",
 }
+const card: CSSProperties = {
+  background: C.surface,
+  border: `1px solid ${C.border}`,
+  borderRadius: 8,
+  padding: 20,
+  marginBottom: 16,
+}
+const lbl: CSSProperties = {
+  fontSize: 11,
+  color: C.textMuted,
+  letterSpacing: 1.5,
+  textTransform: "uppercase",
+  marginBottom: 12,
+}
+const GOAL = 1000000
+const fmt = (n: number) => `¥${n.toLocaleString()}`
+const fmtMan = (n: number) => `${(n / 10000).toFixed(1)}万`
 
 export function AnalyticsCharts() {
   const [rows, setRows] = useState<AnalyticsRow[] | null>(null)
@@ -32,156 +58,406 @@ export function AnalyticsCharts() {
       else setError(res.error ?? null)
       setLoading(false)
     })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  if (loading) {
+  if (loading)
     return (
-      <div className="mt-8 flex items-center justify-center gap-2 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <span>読み込み中…</span>
+      <div
+        style={{
+          padding: 40,
+          color: C.textMuted,
+          fontFamily:
+            '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
+          WebkitFontSmoothing: "antialiased",
+          MozOsxFontSmoothing: "grayscale",
+        }}
+      >
+        読み込み中...
       </div>
     )
-  }
 
-  if (error) {
+  if (error)
     return (
-      <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+      <div
+        style={{
+          padding: 12,
+          background: `${C.red}10`,
+          border: `1px solid ${C.red}40`,
+          borderRadius: 8,
+          color: C.red,
+          fontSize: 13,
+        }}
+      >
         {error}
       </div>
     )
-  }
 
-  if (!rows?.length) {
+  if (!rows || rows.length === 0)
     return (
-      <div className="mt-8 rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
-        <p>実績データがまだありません。</p>
-        <p className="mt-2 text-sm">
-          車両詳細ページで査定結果の「実際の修理費」「実際の売却額」「実際の利益」を入力すると、ここにグラフが表示されます。
-        </p>
-        <Link href="/" className="mt-4 inline-block text-primary hover:underline">
-          ダッシュボードへ
+      <div style={{ ...card, textAlign: "center", padding: 60 }}>
+        <div
+          style={{
+            fontSize: 13,
+            color: C.textMuted,
+            marginBottom: 12,
+          }}
+        >
+          実績データがまだありません
+        </div>
+        <Link href="/" style={{ color: C.orange, fontSize: 13 }}>
+          ダッシュボードへ →
         </Link>
       </div>
     )
-  }
+
+  const totalActualProfit = rows.reduce(
+    (a, r) => a + (r.actualProfitJpy ?? 0),
+    0
+  )
+  const totalForecastProfit = rows.reduce(
+    (a, r) => a + r.predictedProfitJpy,
+    0
+  )
+  const achieveRate =
+    GOAL > 0 ? Math.min(Math.round((totalActualProfit / GOAL) * 100), 100) : 0
 
   const repairData = rows.map((r) => ({
-    name: r.vehicleName.length > 10 ? r.vehicleName.slice(0, 10) + "…" : r.vehicleName,
-    fullName: r.vehicleName,
-    vehicleId: r.vehicleId,
+    name:
+      (r.vehicleName?.slice(0, 8) ?? r.vehicleId.slice(0, 6)) || "—",
     予想修理費: r.predictedRepairJpy,
     実際の修理費: r.actualRepairJpy ?? 0,
   }))
 
   const profitData = rows.map((r) => ({
-    name: r.vehicleName.length > 10 ? r.vehicleName.slice(0, 10) + "…" : r.vehicleName,
-    fullName: r.vehicleName,
-    vehicleId: r.vehicleId,
+    name:
+      (r.vehicleName?.slice(0, 8) ?? r.vehicleId.slice(0, 6)) || "—",
     予想利益: r.predictedProfitJpy,
     実際の利益: r.actualProfitJpy ?? 0,
-    ズレ: (r.actualProfitJpy ?? 0) - r.predictedProfitJpy,
   }))
 
   return (
-    <div className="mt-6 space-y-8">
-      <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-        <h2 className="text-lg font-semibold text-foreground">修理費：予想 vs 実際</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          AI 査定＋高精度鑑定の予想修理費と、実際にかかった修理費の比較
-        </p>
-        <div className="mt-4 h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={repairData}
-              margin={{ top: 8, right: 8, left: 8, bottom: 24 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 12 }}
-                angle={-25}
-                textAnchor="end"
-                height={48}
-              />
-              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => formatJPY(v)} />
-              <Tooltip
-                formatter={(value: number) => [formatJPY(value), ""]}
-                labelFormatter={(_, payload) => payload[0]?.payload?.fullName ?? ""}
-              />
-              <Legend />
-              <Bar dataKey="予想修理費" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="実際の修理費" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+    <div
+      style={{
+        fontFamily:
+          '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
+        WebkitFontSmoothing: "antialiased",
+        MozOsxFontSmoothing: "grayscale",
+        color: C.text,
+        padding: "32px 40px",
+        maxWidth: 900,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 22,
+          fontWeight: "bold",
+          marginBottom: 4,
+        }}
+      >
+        収支
+      </div>
+      <div
+        style={{
+          fontSize: 12,
+          color: C.textSub,
+          marginBottom: 28,
+        }}
+      >
+        月別グラフ・目標進捗・仕入れ余力
+      </div>
+
+      {/* KPI */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr",
+          gap: 16,
+          marginBottom: 16,
+        }}
+      >
+        <div
+          style={{
+            ...card,
+            marginBottom: 0,
+            borderLeft: `3px solid ${C.orange}`,
+          }}
+        >
+          <div style={lbl}>累計実績粗利</div>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: "bold",
+              color: C.orange,
+            }}
+          >
+            {fmt(totalActualProfit)}
+          </div>
+        </div>
+        <div
+          style={{
+            ...card,
+            marginBottom: 0,
+            borderLeft: `3px solid ${C.blue}`,
+          }}
+        >
+          <div style={lbl}>累計予想粗利</div>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: "bold",
+              color: C.blue,
+            }}
+          >
+            {fmt(totalForecastProfit)}
+          </div>
+        </div>
+        <div
+          style={{
+            ...card,
+            marginBottom: 0,
+            borderLeft: `3px solid ${achieveRate >= 100 ? C.green : C.yellow}`,
+          }}
+        >
+          <div style={lbl}>月利目標達成率</div>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: "bold",
+              color: achieveRate >= 100 ? C.green : C.yellow,
+            }}
+          >
+            {achieveRate}%
+          </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-        <h2 className="text-lg font-semibold text-foreground">利益のズレ（予想 vs 実際）</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          シナリオ予想利益と実際の利益。ズレが大きい車両は査定精度の改善ポイントです。
-        </p>
-        <div className="mt-4 h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={profitData}
-              margin={{ top: 8, right: 8, left: 8, bottom: 24 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 12 }}
-                angle={-25}
-                textAnchor="end"
-                height={48}
-              />
-              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => formatJPY(v)} />
-              <Tooltip
-                formatter={(value: number) => [formatJPY(value), ""]}
-                labelFormatter={(_, payload) => payload[0]?.payload?.fullName ?? ""}
-              />
-              <Legend />
-              <Bar dataKey="予想利益" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="実際の利益" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+      {/* 月利目標進捗バー */}
+      <div
+        style={{
+          ...card,
+          borderLeft: `3px solid ${C.orange}`,
+        }}
+      >
+        <div style={lbl}>月利目標進捗</div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginBottom: 10,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 24,
+              fontWeight: "bold",
+              color: C.orange,
+            }}
+          >
+            {fmt(totalActualProfit)}
+          </span>
+          <span style={{ fontSize: 12, color: C.textSub }}>
+            目標 {fmt(GOAL)}
+          </span>
+        </div>
+        <div
+          style={{
+            height: 6,
+            background: "#1e1e22",
+            borderRadius: 3,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              width: `${achieveRate}%`,
+              background: `linear-gradient(to right, ${C.orange}, ${C.green})`,
+              borderRadius: 3,
+              transition: "width 0.8s ease",
+            }}
+          />
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginTop: 6,
+          }}
+        >
+          <span style={{ fontSize: 11, color: C.textSub }}>
+            {achieveRate}% 達成
+          </span>
+          <span style={{ fontSize: 11, color: C.textSub }}>
+            あと {fmt(Math.max(GOAL - totalActualProfit, 0))} 分
+          </span>
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-        <h2 className="text-lg font-semibold text-foreground">誤差一覧（実際の利益 − 予想利益）</h2>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="pb-2 pr-4 font-medium">車両</th>
-                <th className="pb-2 pr-4 font-medium text-right">予想利益</th>
-                <th className="pb-2 pr-4 font-medium text-right">実際の利益</th>
-                <th className="pb-2 font-medium text-right">ズレ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {profitData.map((r, i) => (
-                <tr key={i} className="border-b border-border/70">
-                  <td className="py-2 pr-4">
+      {/* 修理費グラフ */}
+      <div style={card}>
+        <div style={lbl}>修理費：予想 vs 実際</div>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={repairData} barGap={4}>
+            <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
+            <XAxis
+              dataKey="name"
+              stroke={C.textMuted}
+              tick={{ fontSize: 11, fill: C.textMuted }}
+            />
+            <YAxis
+              stroke={C.textMuted}
+              tick={{ fontSize: 11, fill: C.textMuted }}
+              tickFormatter={fmtMan}
+            />
+            <Tooltip
+              formatter={(v: number) => fmt(v)}
+              contentStyle={{
+                background: C.surface,
+                border: `1px solid ${C.border}`,
+                fontSize: 12,
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: 12, color: C.textSub }} />
+            <Bar
+              dataKey="予想修理費"
+              fill={`${C.blue}80`}
+              radius={[3, 3, 0, 0]}
+            />
+            <Bar
+              dataKey="実際の修理費"
+              fill={C.orange}
+              radius={[3, 3, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* 利益グラフ */}
+      <div style={card}>
+        <div style={lbl}>利益：予想 vs 実際</div>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={profitData} barGap={4}>
+            <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
+            <XAxis
+              dataKey="name"
+              stroke={C.textMuted}
+              tick={{ fontSize: 11, fill: C.textMuted }}
+            />
+            <YAxis
+              stroke={C.textMuted}
+              tick={{ fontSize: 11, fill: C.textMuted }}
+              tickFormatter={fmtMan}
+            />
+            <Tooltip
+              formatter={(v: number) => fmt(v)}
+              contentStyle={{
+                background: C.surface,
+                border: `1px solid ${C.border}`,
+                fontSize: 12,
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: 12, color: C.textSub }} />
+            <Bar
+              dataKey="予想利益"
+              fill={`${C.blue}80`}
+              radius={[3, 3, 0, 0]}
+            />
+            <Bar
+              dataKey="実際の利益"
+              fill={C.green}
+              radius={[3, 3, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* 誤差一覧テーブル */}
+      <div style={card}>
+        <div style={lbl}>誤差一覧</div>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: 13,
+          }}
+        >
+          <thead>
+            <tr>
+              {["車両名", "予想利益", "実際の利益", "ズレ"].map((h) => (
+                <th
+                  key={h}
+                  style={{
+                    textAlign: "left",
+                    padding: "10px 12px",
+                    fontSize: 11,
+                    color: C.textMuted,
+                    borderBottom: `1px solid ${C.border}`,
+                    letterSpacing: 1,
+                  }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const diff = (r.actualProfitJpy ?? 0) - r.predictedProfitJpy
+              return (
+                <tr key={r.vehicleId}>
+                  <td
+                    style={{
+                      padding: "11px 12px",
+                      borderBottom: `1px solid ${C.border}50`,
+                    }}
+                  >
                     <Link
                       href={`/vehicle/${r.vehicleId}`}
-                      className="text-primary hover:underline"
+                      style={{
+                        color: C.orange,
+                        textDecoration: "none",
+                      }}
                     >
-                      {r.fullName}
+                      {r.vehicleName ?? r.vehicleId.slice(0, 8)}
                     </Link>
                   </td>
-                  <td className="py-2 pr-4 text-right tabular-nums">{formatJPY(r.予想利益)}</td>
-                  <td className="py-2 pr-4 text-right tabular-nums">{formatJPY(r.実際の利益)}</td>
-                  <td className={`py-2 text-right tabular-nums ${r.ズレ >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                    {r.ズレ >= 0 ? "+" : ""}{formatJPY(r.ズレ)}
+                  <td
+                    style={{
+                      padding: "11px 12px",
+                      borderBottom: `1px solid ${C.border}50`,
+                      color: C.blue,
+                    }}
+                  >
+                    {fmt(r.predictedProfitJpy)}
+                  </td>
+                  <td
+                    style={{
+                      padding: "11px 12px",
+                      borderBottom: `1px solid ${C.border}50`,
+                      color: C.green,
+                    }}
+                  >
+                    {fmt(r.actualProfitJpy ?? 0)}
+                  </td>
+                  <td
+                    style={{
+                      padding: "11px 12px",
+                      borderBottom: `1px solid ${C.border}50`,
+                      color: diff >= 0 ? C.green : C.red,
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {diff >= 0 ? "+" : ""}
+                    {fmt(diff)}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   )
