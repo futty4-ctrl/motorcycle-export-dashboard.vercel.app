@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 
 import { Toaster } from "@/components/ui/sonner"
+import Sidebar from '@/components/sidebar'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
@@ -46,7 +47,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <div style={{ display: "flex", background: "#0a0a0b", minHeight: "100vh" }}>
+            <Sidebar />
+            <main style={{ flex: 1, overflowY: "auto" }}>
+              {children}
+            </main>
+          </div>
           <Toaster />
         </ThemeProvider>
       </body>
