@@ -223,10 +223,10 @@ export function DashboardContent() {
             <div
               style={{
                 position: "absolute",
-                top: 0,
-                right: 0,
-                width: 80,
-                height: 80,
+                top: -20,
+                right: -20,
+                width: 60,
+                height: 60,
                 background: `radial-gradient(circle, ${k.glow} 0%, transparent 70%)`,
                 pointerEvents: "none",
               }}

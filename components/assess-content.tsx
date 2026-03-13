@@ -1,7 +1,18 @@
 "use client"
 
 import { useState } from "react"
-import type { CSSProperties } from "react"
+import {
+  C,
+  font,
+  pageWrapper,
+  pageTitle,
+  pageSub,
+  card,
+  lbl,
+  inp,
+  btn,
+  badge,
+} from "@/components/ui-system"
 
 type AssessmentResult = {
   bike_name: string
@@ -25,36 +36,9 @@ type AssessmentResult = {
   bid_limit: number
 }
 
-const C = {
-  surface: "#111113",
-  border: "#1e1e22",
-  orange: "#f5720a",
-  text: "#e8e8ec",
-  textMuted: "#6b6b74",
-  textSub: "#9999a8",
-  green: "#22c55e",
-  red: "#ef4444",
-  blue: "#3b82f6",
-  yellow: "#eab308",
-}
-
-const card: CSSProperties = {
-  background: C.surface,
-  border: `1px solid ${C.border}`,
-  borderRadius: 8,
-  padding: 20,
-  marginBottom: 16,
-}
-const label: CSSProperties = {
-  fontSize: 11,
-  color: C.textMuted,
-  letterSpacing: 1.5,
-  textTransform: "uppercase",
-  marginBottom: 8,
-}
-
-const VC = { GO: C.green, NG: C.red, CAUTION: C.yellow }
 const fmt = (n: number) => `¥${Number(n).toLocaleString()}`
+const VC = { GO: C.green, NG: C.red, CAUTION: C.yellow }
+const VG = { GO: C.greenGlow, NG: C.redGlow, CAUTION: C.yellowGlow }
 
 export function AssessContent() {
   const [image, setImage] = useState<File | null>(null)
@@ -91,7 +75,9 @@ export function AssessContent() {
         if (data.error) throw new Error(data.error)
         setResult(data)
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "査定に失敗しました")
+        setError(
+          err instanceof Error ? err.message : "査定に失敗しました"
+        )
       } finally {
         setLoading(false)
       }
@@ -115,33 +101,21 @@ export function AssessContent() {
   }
 
   return (
-    <div
-      style={{
-        fontFamily: '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
-        WebkitFontSmoothing: "antialiased",
-        MozOsxFontSmoothing: "grayscale",
-        color: C.text,
-        padding: "32px 40px",
-        maxWidth: 900,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 22,
-          fontWeight: "bold",
-          marginBottom: 4,
-        }}
-      >
-        査定
-      </div>
-      <div
-        style={{
-          fontSize: 12,
-          color: C.textSub,
-          marginBottom: 28,
-        }}
-      >
-        BDS個票スクショ → AI解析 → GO/NG/CAUTION判定
+    <div style={pageWrapper}>
+      <div style={{ marginBottom: 32 }}>
+        <div
+          style={{
+            ...pageTitle,
+            background: `linear-gradient(135deg, ${C.text} 60%, ${C.orange})`,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          査定
+        </div>
+        <div style={pageSub}>
+          BDS個票スクショ → AI解析 → GO / NG / CAUTION 判定
+        </div>
       </div>
 
       <div
@@ -151,19 +125,21 @@ export function AssessContent() {
           gap: 24,
         }}
       >
-        {/* LEFT: アップロード */}
         <div>
-          <div style={card}>
-            <div style={label}>BDS個票スクショ</div>
+          <div style={card()}>
+            <div style={lbl}>BDS個票スクショ</div>
             <label style={{ cursor: "pointer", display: "block" }}>
               <div
                 style={{
                   border: `2px dashed ${preview ? C.orange : C.border}`,
                   borderRadius: 8,
-                  padding: 24,
+                  padding: 32,
                   textAlign: "center",
-                  background: preview ? `${C.orange}08` : "#0e0e10",
+                  background: preview ? `${C.orange}06` : "#0a0a0b",
                   transition: "all 0.2s",
+                  boxShadow: preview
+                    ? `inset 0 0 20px ${C.orangeGlow}`
+                    : "none",
                 }}
               >
                 {preview ? (
@@ -172,14 +148,22 @@ export function AssessContent() {
                     alt="preview"
                     style={{
                       maxWidth: "100%",
-                      maxHeight: 300,
+                      maxHeight: 280,
                       borderRadius: 6,
                       objectFit: "contain",
                     }}
                   />
                 ) : (
                   <div>
-                    <div style={{ fontSize: 32, marginBottom: 12 }}>↑</div>
+                    <div
+                      style={{
+                        fontSize: 40,
+                        marginBottom: 12,
+                        color: C.border,
+                      }}
+                    >
+                      ↑
+                    </div>
                     <div
                       style={{
                         fontSize: 13,
@@ -190,7 +174,10 @@ export function AssessContent() {
                       ファイルをドロップ or クリック
                     </div>
                     <div
-                      style={{ fontSize: 11, color: C.textMuted }}
+                      style={{
+                        fontSize: 11,
+                        color: C.textMuted,
+                      }}
                     >
                       PNG / JPG / WebP / PDF
                     </div>
@@ -211,77 +198,82 @@ export function AssessContent() {
               onClick={handleAssess}
               disabled={loading}
               style={{
+                ...btn("primary"),
                 width: "100%",
                 padding: "14px 0",
-                background: loading ? C.border : C.orange,
-                color: "#fff",
-                fontWeight: "bold",
                 fontSize: 14,
-                borderRadius: 8,
-                border: "none",
-                cursor: loading ? "not-allowed" : "pointer",
-                fontFamily: "inherit",
-                letterSpacing: 0.5,
                 marginBottom: 12,
+                opacity: loading ? 0.6 : 1,
+                boxShadow: loading ? "none" : `0 0 20px ${C.orangeGlow}`,
               }}
             >
-              {loading ? "解析中..." : "査定する"}
+              {loading ? "AIが解析中..." : "査定する"}
             </button>
           )}
 
           {error && (
             <div
               style={{
-                padding: 12,
-                background: `${C.red}10`,
+                padding: 14,
+                background: C.redGlow,
                 border: `1px solid ${C.red}40`,
                 borderRadius: 8,
                 color: C.red,
                 fontSize: 13,
+                lineHeight: 1.6,
               }}
             >
-              {error}
+              ⚠ {error}
             </div>
           )}
         </div>
 
-        {/* RIGHT: 結果 */}
         <div>
           {loading && (
             <div
               style={{
-                ...card,
-                minHeight: 300,
+                ...card(),
+                minHeight: 320,
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                color: C.textMuted,
-                fontSize: 13,
+                gap: 12,
               }}
             >
-              AIが解析中...
+              <div style={{ fontSize: 32 }}>◎</div>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: C.textMuted,
+                }}
+              >
+                AIが解析中...
+              </div>
             </div>
           )}
 
           {result && !loading && (
             <>
-              {/* GO/NG/CAUTION */}
               <div
                 style={{
-                  ...card,
+                  ...card(VG[result.verdict]),
                   borderLeft: `4px solid ${VC[result.verdict]}`,
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  background: `linear-gradient(135deg, ${C.surface} 60%, ${VG[result.verdict]})`,
                 }}
               >
                 <div>
-                  <div style={label}>判定</div>
+                  <div style={lbl}>判定</div>
                   <div
                     style={{
-                      fontSize: 36,
+                      fontSize: 48,
                       fontWeight: "bold",
                       color: VC[result.verdict],
+                      letterSpacing: -2,
+                      lineHeight: 1,
                     }}
                   >
                     {result.verdict}
@@ -289,39 +281,39 @@ export function AssessContent() {
                 </div>
                 <div
                   style={{
-                    fontSize: 13,
+                    fontSize: 12,
                     color: C.textSub,
-                    maxWidth: 200,
-                    lineHeight: 1.6,
+                    maxWidth: 180,
+                    lineHeight: 1.7,
+                    textAlign: "right",
                   }}
                 >
                   {result.verdict_reason}
                 </div>
               </div>
 
-              {/* 入札上限 */}
               <div
                 style={{
-                  ...card,
+                  ...card(C.orangeGlow),
                   borderLeft: `4px solid ${C.orange}`,
                   textAlign: "center",
                 }}
               >
-                <div style={label}>BDS 入札上限</div>
+                <div style={lbl}>BDS 入札上限額</div>
                 <div
                   style={{
-                    fontSize: 36,
+                    fontSize: 40,
                     fontWeight: "bold",
                     color: C.orange,
+                    letterSpacing: -1,
                   }}
                 >
                   {fmt(result.bid_limit)}
                 </div>
               </div>
 
-              {/* 車両情報 */}
-              <div style={card}>
-                <div style={label}>車両情報</div>
+              <div style={card()}>
+                <div style={lbl}>車両情報</div>
                 {[
                   { k: "車種", v: result.bike_name },
                   { k: "年式", v: result.year },
@@ -334,25 +326,26 @@ export function AssessContent() {
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
-                      padding: "6px 0",
-                      borderBottom: `1px solid ${C.border}50`,
+                      padding: "8px 0",
+                      borderBottom: `1px solid ${C.border}40`,
                       fontSize: 13,
                     }}
                   >
                     <span style={{ color: C.textMuted }}>{k}</span>
-                    <span>{v || "—"}</span>
+                    <span style={{ color: C.text }}>{v || "—"}</span>
                   </div>
                 ))}
                 {result.damage_summary && (
                   <div
                     style={{
-                      marginTop: 10,
-                      padding: 10,
-                      background: "#0e0e10",
+                      marginTop: 12,
+                      padding: 12,
+                      background: "#0a0a0b",
                       borderRadius: 6,
                       fontSize: 12,
                       color: C.textSub,
-                      lineHeight: 1.7,
+                      lineHeight: 1.8,
+                      border: `1px solid ${C.border}`,
                     }}
                   >
                     {result.damage_summary}
@@ -360,9 +353,8 @@ export function AssessContent() {
                 )}
               </div>
 
-              {/* 収支 */}
-              <div style={card}>
-                <div style={label}>収支シミュレーション</div>
+              <div style={card()}>
+                <div style={lbl}>収支シミュレーション</div>
                 {[
                   {
                     k: "仕入価格",
@@ -391,35 +383,37 @@ export function AssessContent() {
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
-                      padding: "6px 0",
-                      borderBottom: `1px solid ${C.border}50`,
+                      padding: "8px 0",
+                      borderBottom: `1px solid ${C.border}40`,
                       fontSize: 13,
                     }}
                   >
                     <span style={{ color: C.textMuted }}>{k}</span>
-                    <span style={{ color, fontWeight: "bold" }}>{v}</span>
+                    <span style={{ color, fontWeight: "bold" }}>
+                      {v}
+                    </span>
                   </div>
                 ))}
               </div>
 
-              {/* 保存ボタン */}
               <button
                 onClick={handleSave}
                 disabled={saved}
                 style={{
+                  ...btn("ghost"),
                   width: "100%",
                   padding: "12px 0",
-                  background: saved ? `${C.green}20` : "transparent",
+                  background: saved ? C.greenGlow : "transparent",
                   color: saved ? C.green : C.textSub,
                   border: `1px solid ${saved ? C.green : C.border}`,
-                  borderRadius: 8,
-                  cursor: saved ? "default" : "pointer",
-                  fontWeight: "bold",
-                  fontSize: 13,
-                  fontFamily: "inherit",
+                  boxShadow: saved
+                    ? `0 0 16px ${C.greenGlow}`
+                    : "none",
                 }}
               >
-                {saved ? "✓ Supabaseに保存済み" : "Supabaseに保存する"}
+                {saved
+                  ? "✓ Supabaseに保存済み"
+                  : "Supabaseに保存する"}
               </button>
             </>
           )}
