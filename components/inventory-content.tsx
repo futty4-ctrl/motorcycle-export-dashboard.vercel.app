@@ -10,61 +10,34 @@ import {
   type InventoryItemRow,
 } from "@/lib/inventory-supabase"
 import { toast } from "sonner"
-import type { CSSProperties } from "react"
+import {
+  C,
+  font,
+  pageWrapper,
+  pageTitle,
+  pageSub,
+  card,
+  kpiCard,
+  lbl,
+  inp,
+  btn,
+  badge,
+  table,
+  th,
+  td,
+} from "@/components/ui-system"
 
 const STATUSES = ["未処理", "出品準備中", "ヤフオク出品中", "売約済み"] as const
 const CATEGORIES = ["車体", "パーツ"] as const
-
-const C = {
-  surface: "#111113",
-  border: "#1e1e22",
-  orange: "#f5720a",
-  text: "#e8e8ec",
-  textMuted: "#6b6b74",
-  textSub: "#9999a8",
-  green: "#22c55e",
-  red: "#ef4444",
-  blue: "#3b82f6",
-  yellow: "#eab308",
-}
-
-const card: CSSProperties = {
-  background: C.surface,
-  border: `1px solid ${C.border}`,
-  borderRadius: 8,
-  padding: 20,
-  marginBottom: 16,
-}
-const lbl: CSSProperties = {
-  fontSize: 11,
-  color: C.textMuted,
-  letterSpacing: 1.5,
-  textTransform: "uppercase",
-  marginBottom: 8,
-}
-const inp: CSSProperties = {
-  background: "#0e0e10",
-  border: `1px solid ${C.border}`,
-  borderRadius: 6,
-  color: C.text,
-  padding: "9px 12px",
-  fontSize: 13,
-  width: "100%",
-  boxSizing: "border-box",
-  outline: "none",
-  fontFamily: "inherit",
-}
 const SC: Record<string, string> = {
   未処理: C.yellow,
   出品準備中: C.blue,
   "ヤフオク出品中": C.orange,
   売約済み: C.green,
 }
-
 const fmt = (n: number | null) =>
   n != null ? `¥${n.toLocaleString()}` : "—"
-
-function getDisplayName(item: InventoryItemRow) {
+const getDisplayName = (item: InventoryItemRow) => {
   const parts = [item.maker, item.model_name, item.model_type].filter(Boolean)
   return parts.length > 0 ? parts.join(" ") : "（未入力）"
 }
@@ -212,57 +185,41 @@ export function InventoryContent() {
       ? `${window.location.origin}/inventory/${createdItem.management_code}`
       : ""
 
-  if (loading && items.length === 0) {
+  const counts = STATUSES.reduce(
+    (a, s) => ({ ...a, [s]: items.filter((i) => i.status === s).length }),
+    {} as Record<string, number>
+  )
+
+  if (loading && items.length === 0)
     return (
-      <div
-        style={{
-          padding: 40,
-          color: C.textMuted,
-          fontFamily: '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
-          WebkitFontSmoothing: "antialiased",
-          MozOsxFontSmoothing: "grayscale",
-        }}
-      >
+      <div style={{ ...pageWrapper, color: C.textMuted }}>
         読み込み中...
       </div>
     )
-  }
 
   return (
-    <div
-      style={{
-        fontFamily: '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
-        WebkitFontSmoothing: "antialiased",
-        MozOsxFontSmoothing: "grayscale",
-        color: C.text,
-        padding: "32px 40px",
-        maxWidth: 900,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 22,
-          fontWeight: "bold",
-          marginBottom: 4,
-        }}
-      >
-        在庫カルテ
-      </div>
-      <div
-        style={{
-          fontSize: 12,
-          color: C.textSub,
-          marginBottom: 28,
-        }}
-      >
-        在庫 & 古物台帳の統合管理
+    <div style={pageWrapper}>
+      <div style={{ marginBottom: 32 }}>
+        <div
+          style={{
+            ...pageTitle,
+            background: `linear-gradient(135deg, ${C.text} 60%, ${C.orange})`,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          在庫カルテ
+        </div>
+        <div style={pageSub}>
+          在庫 & 古物台帳の統合管理 · {items.length}件
+        </div>
       </div>
 
       {error && (
         <div
           style={{
-            padding: 12,
-            background: `${C.red}10`,
+            padding: 14,
+            background: C.redGlow,
             border: `1px solid ${C.red}40`,
             borderRadius: 8,
             color: C.red,
@@ -270,11 +227,50 @@ export function InventoryContent() {
             marginBottom: 16,
           }}
         >
-          {error}
+          ⚠ {error}
         </div>
       )}
 
-      {/* フィルター + 登録ボタン */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: 12,
+          marginBottom: 24,
+        }}
+      >
+        {STATUSES.map((s) => (
+          <div
+            key={s}
+            style={{ ...kpiCard(SC[s]), cursor: "pointer" }}
+            onClick={() => setStatusFilter(s)}
+          >
+            <div
+              style={{
+                position: "absolute",
+                top: -10,
+                right: -10,
+                width: 50,
+                height: 50,
+                background: `radial-gradient(circle, ${SC[s]}20 0%, transparent 70%)`,
+                pointerEvents: "none",
+              }}
+            />
+            <div style={{ ...lbl, color: SC[s] }}>{s}</div>
+            <div
+              style={{
+                fontSize: 28,
+                fontWeight: "bold",
+                color: SC[s],
+              }}
+            >
+              {counts[s] ?? 0}
+            </div>
+            <div style={{ fontSize: 10, color: C.textMuted }}>台</div>
+          </div>
+        ))}
+      </div>
+
       <div
         style={{
           display: "flex",
@@ -284,7 +280,7 @@ export function InventoryContent() {
           gap: 8,
         }}
       >
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {["すべて", ...STATUSES].map((st) => (
             <button
               key={st}
@@ -292,13 +288,16 @@ export function InventoryContent() {
               style={{
                 padding: "6px 14px",
                 borderRadius: 6,
-                border: `1px solid ${statusFilter === st ? C.orange : C.border}`,
+                border: `1px solid ${statusFilter === st ? (SC[st] ?? C.orange) : C.border}`,
                 background:
-                  statusFilter === st ? `${C.orange}15` : "transparent",
-                color: statusFilter === st ? C.orange : C.textSub,
+                  statusFilter === st
+                    ? `${SC[st] ?? C.orange}15`
+                    : "transparent",
+                color:
+                  statusFilter === st ? (SC[st] ?? C.orange) : C.textSub,
                 cursor: "pointer",
                 fontSize: 12,
-                fontFamily: "inherit",
+                fontFamily: font,
               }}
             >
               {st}
@@ -311,24 +310,21 @@ export function InventoryContent() {
             setFormOpen(true)
           }}
           style={{
-            padding: "10px 20px",
-            background: C.orange,
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-            fontSize: 13,
-            fontFamily: "inherit",
+            ...btn("primary"),
+            boxShadow: `0 0 16px ${C.orangeGlow}`,
           }}
         >
           + 新規登録
         </button>
       </div>
 
-      {/* 登録フォーム */}
       {formOpen && !createdItem && (
-        <div style={card}>
+        <div
+          style={{
+            ...card(C.orangeGlow),
+            borderLeft: `3px solid ${C.orange}`,
+          }}
+        >
           <div style={lbl}>新規車両登録</div>
           <form onSubmit={handleSubmit}>
             <div
@@ -339,85 +335,106 @@ export function InventoryContent() {
                 marginBottom: 16,
               }}
             >
-              <div>
-                <label style={{ ...lbl, marginBottom: 4 }}>カテゴリ</label>
-                <select
-                  style={inp}
-                  value={category}
-                  onChange={(e) =>
-                    setCategory(e.target.value as "車体" | "パーツ")
-                  }
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={{ ...lbl, marginBottom: 4 }}>仕入日</label>
-                <input
-                  style={inp}
-                  type="date"
-                  value={purchaseDate}
-                  onChange={(e) => setPurchaseDate(e.target.value)}
-                />
-              </div>
-              <div>
-                <label style={{ ...lbl, marginBottom: 4 }}>メーカー</label>
-                <input
-                  style={inp}
-                  value={maker}
-                  onChange={(e) => setMaker(e.target.value)}
-                  placeholder="例: Honda"
-                />
-              </div>
-              <div>
-                <label style={{ ...lbl, marginBottom: 4 }}>車種</label>
-                <input
-                  style={inp}
-                  value={modelName}
-                  onChange={(e) => setModelName(e.target.value)}
-                  placeholder="例: スーパーカブ"
-                />
-              </div>
-              <div>
-                <label style={{ ...lbl, marginBottom: 4 }}>型式</label>
-                <input
-                  style={inp}
-                  value={modelType}
-                  onChange={(e) => setModelType(e.target.value)}
-                  placeholder="例: AA09"
-                />
-              </div>
-              <div>
-                <label style={{ ...lbl, marginBottom: 4 }}>車台番号</label>
-                <input
-                  style={inp}
-                  value={chassisNumber}
-                  onChange={(e) => setChassisNumber(e.target.value)}
-                />
-              </div>
-              <div>
-                <label style={{ ...lbl, marginBottom: 4 }}>
-                  仕入価格（円）
-                </label>
-                <input
-                  style={inp}
-                  type="number"
-                  value={purchasePrice}
-                  onChange={(e) => setPurchasePrice(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label style={{ ...lbl, marginBottom: 4 }}>状態メモ</label>
-                <input
-                  style={inp}
-                  value={conditionMemo}
-                  onChange={(e) => setConditionMemo(e.target.value)}
-                  placeholder="例: エンジン実働・外装キズあり"
-                />
-              </div>
+              {[
+                {
+                  label: "カテゴリ",
+                  el: (
+                    <select
+                      style={inp}
+                      value={category}
+                      onChange={(e) =>
+                        setCategory(e.target.value as "車体" | "パーツ")
+                      }
+                    >
+                      {CATEGORIES.map((c) => (
+                        <option key={c}>{c}</option>
+                      ))}
+                    </select>
+                  ),
+                },
+                {
+                  label: "仕入日",
+                  el: (
+                    <input
+                      style={inp}
+                      type="date"
+                      value={purchaseDate}
+                      onChange={(e) => setPurchaseDate(e.target.value)}
+                    />
+                  ),
+                },
+                {
+                  label: "メーカー",
+                  el: (
+                    <input
+                      style={inp}
+                      value={maker}
+                      onChange={(e) => setMaker(e.target.value)}
+                      placeholder="例: Honda"
+                    />
+                  ),
+                },
+                {
+                  label: "車種",
+                  el: (
+                    <input
+                      style={inp}
+                      value={modelName}
+                      onChange={(e) => setModelName(e.target.value)}
+                      placeholder="例: スーパーカブ"
+                    />
+                  ),
+                },
+                {
+                  label: "型式",
+                  el: (
+                    <input
+                      style={inp}
+                      value={modelType}
+                      onChange={(e) => setModelType(e.target.value)}
+                      placeholder="例: AA09"
+                    />
+                  ),
+                },
+                {
+                  label: "車台番号",
+                  el: (
+                    <input
+                      style={inp}
+                      value={chassisNumber}
+                      onChange={(e) => setChassisNumber(e.target.value)}
+                    />
+                  ),
+                },
+                {
+                  label: "仕入価格（円）",
+                  el: (
+                    <input
+                      style={inp}
+                      type="number"
+                      value={purchasePrice}
+                      onChange={(e) => setPurchasePrice(e.target.value)}
+                      placeholder="0"
+                    />
+                  ),
+                },
+                {
+                  label: "状態メモ",
+                  el: (
+                    <input
+                      style={inp}
+                      value={conditionMemo}
+                      onChange={(e) => setConditionMemo(e.target.value)}
+                      placeholder="例: 実働・外装キズあり"
+                    />
+                  ),
+                },
+              ].map(({ label, el }) => (
+                <div key={label}>
+                  <label style={{ ...lbl, marginBottom: 4 }}>{label}</label>
+                  {el}
+                </div>
+              ))}
             </div>
 
             <div
@@ -470,7 +487,9 @@ export function InventoryContent() {
                   },
                 ].map(({ label, val, set, ph }) => (
                   <div key={label}>
-                    <label style={{ ...lbl, marginBottom: 4 }}>{label}</label>
+                    <label style={{ ...lbl, marginBottom: 4 }}>
+                      {label}
+                    </label>
                     <input
                       style={inp}
                       value={val}
@@ -487,15 +506,8 @@ export function InventoryContent() {
                 type="submit"
                 disabled={submitting}
                 style={{
-                  padding: "10px 24px",
-                  background: C.orange,
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 6,
-                  cursor: submitting ? "not-allowed" : "pointer",
-                  fontWeight: "bold",
-                  fontSize: 13,
-                  fontFamily: "inherit",
+                  ...btn("primary"),
+                  opacity: submitting ? 0.6 : 1,
                 }}
               >
                 {submitting ? "登録中..." : "登録する"}
@@ -506,16 +518,7 @@ export function InventoryContent() {
                   resetForm()
                   setFormOpen(false)
                 }}
-                style={{
-                  padding: "10px 24px",
-                  background: "transparent",
-                  color: C.textSub,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  fontSize: 13,
-                  fontFamily: "inherit",
-                }}
+                style={btn("ghost")}
               >
                 キャンセル
               </button>
@@ -524,56 +527,42 @@ export function InventoryContent() {
         </div>
       )}
 
-      {/* 登録完了 */}
       {createdItem && (
         <div
           style={{
-            ...card,
+            ...card(C.greenGlow),
             borderLeft: `4px solid ${C.green}`,
+            marginBottom: 16,
           }}
         >
-          <div style={{ ...lbl, color: C.green }}>登録完了</div>
+          <div style={{ ...lbl, color: C.green }}>✓ 登録完了</div>
           <div
             style={{
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: "bold",
-              marginBottom: 12,
+              marginBottom: 16,
+              color: C.green,
             }}
           >
             {createdItem.management_code}
           </div>
-          <div ref={qrContainerRef} style={{ marginBottom: 12 }}>
-            <QRCodeSVG value={detailUrl} size={120} />
+          <div
+            ref={qrContainerRef}
+            style={{
+              marginBottom: 16,
+              padding: 12,
+              background: "#fff",
+              display: "inline-block",
+              borderRadius: 6,
+            }}
+          >
+            <QRCodeSVG value={detailUrl} size={100} />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={handleCopyUrl}
-              style={{
-                padding: "8px 16px",
-                background: "transparent",
-                color: C.textSub,
-                border: `1px solid ${C.border}`,
-                borderRadius: 6,
-                cursor: "pointer",
-                fontSize: 12,
-                fontFamily: "inherit",
-              }}
-            >
+            <button onClick={handleCopyUrl} style={btn("ghost")}>
               URLコピー
             </button>
-            <button
-              onClick={handleDownloadQrImage}
-              style={{
-                padding: "8px 16px",
-                background: "transparent",
-                color: C.textSub,
-                border: `1px solid ${C.border}`,
-                borderRadius: 6,
-                cursor: "pointer",
-                fontSize: 12,
-                fontFamily: "inherit",
-              }}
-            >
+            <button onClick={handleDownloadQrImage} style={btn("ghost")}>
               QR保存
             </button>
             <button
@@ -581,16 +570,7 @@ export function InventoryContent() {
                 resetForm()
                 setFormOpen(false)
               }}
-              style={{
-                padding: "8px 16px",
-                background: C.orange,
-                color: "#fff",
-                border: "none",
-                borderRadius: 6,
-                cursor: "pointer",
-                fontSize: 12,
-                fontFamily: "inherit",
-              }}
+              style={btn("primary")}
             >
               閉じる
             </button>
@@ -598,9 +578,8 @@ export function InventoryContent() {
         </div>
       )}
 
-      {/* 在庫一覧 */}
-      <div style={card}>
-        <div style={{ ...lbl, marginBottom: 12 }}>
+      <div style={card()}>
+        <div style={{ ...lbl, marginBottom: 16 }}>
           在庫一覧（{filtered.length}件）
         </div>
         {filtered.length === 0 ? (
@@ -608,98 +587,86 @@ export function InventoryContent() {
             style={{
               fontSize: 13,
               color: C.textMuted,
-              padding: "12px 0",
+              padding: "24px 0",
+              textAlign: "center",
             }}
           >
             データなし
           </div>
         ) : (
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: 13,
-            }}
-          >
+          <table style={table}>
             <thead>
               <tr>
-                {["管理番号", "車名", "仕入価格", "ステータス"].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      textAlign: "left",
-                      padding: "10px 12px",
-                      fontSize: 11,
-                      color: C.textMuted,
-                      borderBottom: `1px solid ${C.border}`,
-                      letterSpacing: 1,
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
+                {["管理番号", "車名", "仕入価格", "状態", "ステータス"].map(
+                  (h) => (
+                    <th key={h} style={th}>
+                      {h}
+                    </th>
+                  )
+                )}
               </tr>
             </thead>
             <tbody>
               {filtered.map((item) => (
-                <tr key={item.id}>
-                  <td
-                    style={{
-                      padding: "11px 12px",
-                      borderBottom: `1px solid ${C.border}50`,
-                    }}
-                  >
+                <tr
+                  key={item.id}
+                  style={{ transition: "background 0.15s" }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background = C.surfaceHover)
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = "transparent")
+                  }
+                >
+                  <td style={td}>
                     <Link
                       href={`/inventory/${item.management_code}`}
                       style={{
                         color: C.orange,
                         textDecoration: "none",
+                        fontWeight: "bold",
                       }}
                     >
                       {item.management_code}
                     </Link>
                   </td>
-                  <td
-                    style={{
-                      padding: "11px 12px",
-                      borderBottom: `1px solid ${C.border}50`,
-                    }}
-                  >
+                  <td style={{ ...td, fontWeight: "bold" }}>
                     {getDisplayName(item)}
                   </td>
-                  <td
-                    style={{
-                      padding: "11px 12px",
-                      borderBottom: `1px solid ${C.border}50`,
-                      color: C.textSub,
-                    }}
-                  >
+                  <td style={{ ...td, color: C.textSub }}>
                     {fmt(item.purchase_price)}
                   </td>
-                  <td
-                    style={{
-                      padding: "11px 12px",
-                      borderBottom: `1px solid ${C.border}50`,
-                    }}
-                  >
+                  <td style={td}>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: C.textMuted,
+                      }}
+                    >
+                      {item.condition_memo?.slice(0, 12) ?? "—"}
+                    </span>
+                  </td>
+                  <td style={td}>
                     <select
                       value={item.status}
                       onChange={(e) =>
                         handleStatusChange(item.id, e.target.value)
                       }
                       style={{
-                        ...inp,
-                        width: "auto",
+                        background: `${SC[item.status] ?? C.border}15`,
+                        border: `1px solid ${SC[item.status] ?? C.border}40`,
+                        borderRadius: 4,
+                        color: SC[item.status] ?? C.textSub,
                         padding: "4px 8px",
                         fontSize: 12,
-                        color: SC[item.status] || C.textSub,
-                        background: `${SC[item.status] || C.border}15`,
-                        border: `1px solid ${SC[item.status] || C.border}40`,
+                        cursor: "pointer",
+                        fontFamily: font,
+                        outline: "none",
                       }}
                     >
-                      {STATUSES.map((st) => (
-                        <option key={st} value={st}>
-                          {st}
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
                         </option>
                       ))}
                     </select>
