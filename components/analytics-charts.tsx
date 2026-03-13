@@ -13,34 +13,19 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { getAnalyticsData, type AnalyticsRow } from "@/app/actions/vehicles"
-import type { CSSProperties } from "react"
+import {
+  C,
+  pageWrapper,
+  pageTitle,
+  pageSub,
+  card,
+  kpiCard,
+  lbl,
+  table,
+  th,
+  td,
+} from "@/components/ui-system"
 
-const C = {
-  surface: "#111113",
-  border: "#1e1e22",
-  orange: "#f5720a",
-  text: "#e8e8ec",
-  textMuted: "#6b6b74",
-  textSub: "#9999a8",
-  green: "#22c55e",
-  red: "#ef4444",
-  blue: "#3b82f6",
-  yellow: "#eab308",
-}
-const card: CSSProperties = {
-  background: C.surface,
-  border: `1px solid ${C.border}`,
-  borderRadius: 8,
-  padding: 20,
-  marginBottom: 16,
-}
-const lbl: CSSProperties = {
-  fontSize: 11,
-  color: C.textMuted,
-  letterSpacing: 1.5,
-  textTransform: "uppercase",
-  marginBottom: 12,
-}
 const GOAL = 1000000
 const fmt = (n: number) => `¥${n.toLocaleString()}`
 const fmtMan = (n: number) => `${(n / 10000).toFixed(1)}万`
@@ -63,66 +48,65 @@ export function AnalyticsCharts() {
     }
   }, [])
 
-  if (loading)
-    return (
-      <div
-        style={{
-          padding: 40,
-          color: C.textMuted,
-          fontFamily:
-            '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
-          WebkitFontSmoothing: "antialiased",
-          MozOsxFontSmoothing: "grayscale",
-        }}
-      >
-        読み込み中...
-      </div>
-    )
+  if (loading) {
+    return <div style={{ ...pageWrapper, color: C.textMuted }}>読み込み中...</div>
+  }
 
-  if (error)
+  if (error) {
     return (
-      <div
-        style={{
-          padding: 12,
-          background: `${C.red}10`,
-          border: `1px solid ${C.red}40`,
-          borderRadius: 8,
-          color: C.red,
-          fontSize: 13,
-        }}
-      >
-        {error}
-      </div>
-    )
-
-  if (!rows || rows.length === 0)
-    return (
-      <div style={{ ...card, textAlign: "center", padding: 60 }}>
+      <div style={pageWrapper}>
         <div
           style={{
+            padding: 14,
+            background: C.redGlow,
+            border: `1px solid ${C.red}40`,
+            borderRadius: 8,
+            color: C.red,
             fontSize: 13,
-            color: C.textMuted,
-            marginBottom: 12,
           }}
         >
-          実績データがまだありません
+          ⚠ {error}
         </div>
-        <Link href="/" style={{ color: C.orange, fontSize: 13 }}>
-          ダッシュボードへ →
-        </Link>
       </div>
     )
+  }
 
-  const totalActualProfit = rows.reduce(
+  if (!rows || rows.length === 0) {
+    return (
+      <div style={pageWrapper}>
+        <div style={{ ...pageTitle, marginBottom: 8 }}>収支</div>
+        <div style={pageSub}>月別グラフ・目標進捗・仕入れ余力</div>
+        <div style={{ ...card(), textAlign: "center", padding: 60 }}>
+          <div
+            style={{
+              fontSize: 13,
+              color: C.textMuted,
+              marginBottom: 12,
+            }}
+          >
+            実績データがまだありません
+          </div>
+          <Link href="/" style={{ color: C.orange, fontSize: 13 }}>
+            ダッシュボードへ →
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const totalActual = rows.reduce(
     (a, r) => a + (r.actualProfitJpy ?? 0),
     0
   )
-  const totalForecastProfit = rows.reduce(
+  const totalForecast = rows.reduce(
     (a, r) => a + r.predictedProfitJpy,
     0
   )
-  const achieveRate =
-    GOAL > 0 ? Math.min(Math.round((totalActualProfit / GOAL) * 100), 100) : 0
+  const achieveRate = Math.min(
+    Math.round((totalActual / GOAL) * 100),
+    100
+  )
+  const pct = achieveRate
 
   const repairData = rows.map((r) => ({
     name:
@@ -130,7 +114,6 @@ export function AnalyticsCharts() {
     予想修理費: r.predictedRepairJpy,
     実際の修理費: r.actualRepairJpy ?? 0,
   }))
-
   const profitData = rows.map((r) => ({
     name:
       (r.vehicleName?.slice(0, 8) ?? r.vehicleId.slice(0, 6)) || "—",
@@ -139,34 +122,20 @@ export function AnalyticsCharts() {
   }))
 
   return (
-    <div
-      style={{
-        fontFamily:
-          '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
-        WebkitFontSmoothing: "antialiased",
-        MozOsxFontSmoothing: "grayscale",
-        color: C.text,
-        padding: "32px 40px",
-        maxWidth: 900,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 22,
-          fontWeight: "bold",
-          marginBottom: 4,
-        }}
-      >
-        収支
-      </div>
-      <div
-        style={{
-          fontSize: 12,
-          color: C.textSub,
-          marginBottom: 28,
-        }}
-      >
-        月別グラフ・目標進捗・仕入れ余力
+    <div style={pageWrapper}>
+      {/* ヘッダー */}
+      <div style={{ marginBottom: 32 }}>
+        <div
+          style={{
+            ...pageTitle,
+            background: `linear-gradient(135deg, ${C.text} 60%, ${C.orange})`,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          収支
+        </div>
+        <div style={pageSub}>月別グラフ・目標進捗・仕入れ余力</div>
       </div>
 
       {/* KPI */}
@@ -175,70 +144,63 @@ export function AnalyticsCharts() {
           display: "grid",
           gridTemplateColumns: "1fr 1fr 1fr",
           gap: 16,
-          marginBottom: 16,
+          marginBottom: 24,
         }}
       >
-        <div
-          style={{
-            ...card,
-            marginBottom: 0,
-            borderLeft: `3px solid ${C.orange}`,
-          }}
-        >
-          <div style={lbl}>累計実績粗利</div>
-          <div
-            style={{
-              fontSize: 24,
-              fontWeight: "bold",
-              color: C.orange,
-            }}
-          >
-            {fmt(totalActualProfit)}
+        {[
+          {
+            label: "累計実績粗利",
+            value: fmt(totalActual),
+            color: C.orange,
+            glow: C.orangeGlow,
+          },
+          {
+            label: "累計予想粗利",
+            value: fmt(totalForecast),
+            color: C.blue,
+            glow: C.blueGlow,
+          },
+          {
+            label: "月利目標達成率",
+            value: `${achieveRate}%`,
+            color: achieveRate >= 100 ? C.green : C.yellow,
+            glow:
+              achieveRate >= 100 ? C.greenGlow : C.yellowGlow,
+          },
+        ].map((k, i) => (
+          <div key={i} style={kpiCard(k.color)}>
+            <div
+              style={{
+                position: "absolute",
+                top: -10,
+                right: -10,
+                width: 60,
+                height: 60,
+                background: `radial-gradient(circle, ${k.glow} 0%, transparent 70%)`,
+                pointerEvents: "none",
+              }}
+            />
+            <div style={lbl}>{k.label}</div>
+            <div
+              style={{
+                fontSize: 28,
+                fontWeight: "bold",
+                color: k.color,
+                letterSpacing: -1,
+              }}
+            >
+              {k.value}
+            </div>
           </div>
-        </div>
-        <div
-          style={{
-            ...card,
-            marginBottom: 0,
-            borderLeft: `3px solid ${C.blue}`,
-          }}
-        >
-          <div style={lbl}>累計予想粗利</div>
-          <div
-            style={{
-              fontSize: 24,
-              fontWeight: "bold",
-              color: C.blue,
-            }}
-          >
-            {fmt(totalForecastProfit)}
-          </div>
-        </div>
-        <div
-          style={{
-            ...card,
-            marginBottom: 0,
-            borderLeft: `3px solid ${achieveRate >= 100 ? C.green : C.yellow}`,
-          }}
-        >
-          <div style={lbl}>月利目標達成率</div>
-          <div
-            style={{
-              fontSize: 24,
-              fontWeight: "bold",
-              color: achieveRate >= 100 ? C.green : C.yellow,
-            }}
-          >
-            {achieveRate}%
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* 月利目標進捗バー */}
       <div
         style={{
-          ...card,
+          ...card(C.orangeGlow),
           borderLeft: `3px solid ${C.orange}`,
+          marginBottom: 24,
         }}
       >
         <div style={lbl}>月利目標進捗</div>
@@ -246,37 +208,62 @@ export function AnalyticsCharts() {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            marginBottom: 10,
+            alignItems: "flex-end",
+            marginBottom: 12,
           }}
         >
-          <span
-            style={{
-              fontSize: 24,
-              fontWeight: "bold",
-              color: C.orange,
-            }}
-          >
-            {fmt(totalActualProfit)}
-          </span>
-          <span style={{ fontSize: 12, color: C.textSub }}>
-            目標 {fmt(GOAL)}
-          </span>
+          <div>
+            <span
+              style={{
+                fontSize: 36,
+                fontWeight: "bold",
+                color: C.orange,
+                letterSpacing: -1,
+              }}
+            >
+              {fmt(totalActual)}
+            </span>
+            <span
+              style={{
+                fontSize: 13,
+                color: C.textMuted,
+                marginLeft: 8,
+              }}
+            >
+              / {fmt(GOAL)}
+            </span>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 11, color: C.textSub }}>
+              仕入れ余力
+            </div>
+            <div
+              style={{
+                fontSize: 18,
+                fontWeight: "bold",
+                color: C.green,
+              }}
+            >
+              {fmt(Math.max(GOAL - totalActual, 0))}
+            </div>
+          </div>
         </div>
         <div
           style={{
-            height: 6,
-            background: "#1e1e22",
-            borderRadius: 3,
+            height: 8,
+            background: "#1a1a1e",
+            borderRadius: 4,
             overflow: "hidden",
           }}
         >
           <div
             style={{
               height: "100%",
-              width: `${achieveRate}%`,
+              width: `${pct}%`,
               background: `linear-gradient(to right, ${C.orange}, ${C.green})`,
-              borderRadius: 3,
-              transition: "width 0.8s ease",
+              borderRadius: 4,
+              transition: "width 1s ease",
+              boxShadow: `0 0 12px ${C.orange}60`,
             }}
           />
         </div>
@@ -284,20 +271,28 @@ export function AnalyticsCharts() {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            marginTop: 6,
+            marginTop: 8,
           }}
         >
-          <span style={{ fontSize: 11, color: C.textSub }}>
-            {achieveRate}% 達成
+          <span
+            style={{
+              fontSize: 11,
+              color: pct >= 50 ? C.green : C.textMuted,
+              fontWeight: "bold",
+            }}
+          >
+            {pct}% 達成
           </span>
-          <span style={{ fontSize: 11, color: C.textSub }}>
-            あと {fmt(Math.max(GOAL - totalActualProfit, 0))} 分
+          <span
+            style={{ fontSize: 11, color: C.textMuted }}
+          >
+            目標 {fmt(GOAL)}
           </span>
         </div>
       </div>
 
       {/* 修理費グラフ */}
-      <div style={card}>
+      <div style={card()}>
         <div style={lbl}>修理費：予想 vs 実際</div>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={repairData} barGap={4}>
@@ -318,25 +313,26 @@ export function AnalyticsCharts() {
                 background: C.surface,
                 border: `1px solid ${C.border}`,
                 fontSize: 12,
+                borderRadius: 6,
               }}
             />
             <Legend wrapperStyle={{ fontSize: 12, color: C.textSub }} />
             <Bar
               dataKey="予想修理費"
               fill={`${C.blue}80`}
-              radius={[3, 3, 0, 0]}
+              radius={[4, 4, 0, 0]}
             />
             <Bar
               dataKey="実際の修理費"
               fill={C.orange}
-              radius={[3, 3, 0, 0]}
+              radius={[4, 4, 0, 0]}
             />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
       {/* 利益グラフ */}
-      <div style={card}>
+      <div style={card()}>
         <div style={lbl}>利益：予想 vs 実際</div>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={profitData} barGap={4}>
@@ -357,95 +353,77 @@ export function AnalyticsCharts() {
                 background: C.surface,
                 border: `1px solid ${C.border}`,
                 fontSize: 12,
+                borderRadius: 6,
               }}
             />
             <Legend wrapperStyle={{ fontSize: 12, color: C.textSub }} />
             <Bar
               dataKey="予想利益"
               fill={`${C.blue}80`}
-              radius={[3, 3, 0, 0]}
+              radius={[4, 4, 0, 0]}
             />
             <Bar
               dataKey="実際の利益"
               fill={C.green}
-              radius={[3, 3, 0, 0]}
+              radius={[4, 4, 0, 0]}
             />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* 誤差一覧テーブル */}
-      <div style={card}>
+      {/* 誤差一覧 */}
+      <div style={card()}>
         <div style={lbl}>誤差一覧</div>
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            fontSize: 13,
-          }}
-        >
+        <table style={table}>
           <thead>
             <tr>
-              {["車両名", "予想利益", "実際の利益", "ズレ"].map((h) => (
-                <th
-                  key={h}
-                  style={{
-                    textAlign: "left",
-                    padding: "10px 12px",
-                    fontSize: 11,
-                    color: C.textMuted,
-                    borderBottom: `1px solid ${C.border}`,
-                    letterSpacing: 1,
-                  }}
-                >
-                  {h}
-                </th>
-              ))}
+              {["車両名", "予想利益", "実際の利益", "ズレ"].map(
+                (h) => (
+                  <th key={h} style={th}>
+                    {h}
+                  </th>
+                )
+              )}
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => {
-              const diff = (r.actualProfitJpy ?? 0) - r.predictedProfitJpy
+              const diff =
+                (r.actualProfitJpy ?? 0) - r.predictedProfitJpy
               return (
-                <tr key={r.vehicleId}>
-                  <td
-                    style={{
-                      padding: "11px 12px",
-                      borderBottom: `1px solid ${C.border}50`,
-                    }}
-                  >
+                <tr
+                  key={r.vehicleId}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background =
+                      C.surfaceHover)
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background =
+                      "transparent")
+                  }
+                  style={{ transition: "background 0.15s" }}
+                >
+                  <td style={td}>
                     <Link
                       href={`/vehicle/${r.vehicleId}`}
                       style={{
                         color: C.orange,
                         textDecoration: "none",
+                        fontWeight: "bold",
                       }}
                     >
                       {r.vehicleName ?? r.vehicleId.slice(0, 8)}
                     </Link>
                   </td>
-                  <td
-                    style={{
-                      padding: "11px 12px",
-                      borderBottom: `1px solid ${C.border}50`,
-                      color: C.blue,
-                    }}
-                  >
+                  <td style={{ ...td, color: C.blue }}>
                     {fmt(r.predictedProfitJpy)}
                   </td>
-                  <td
-                    style={{
-                      padding: "11px 12px",
-                      borderBottom: `1px solid ${C.border}50`,
-                      color: C.green,
-                    }}
-                  >
+                  <td style={{ ...td, color: C.green }}>
                     {fmt(r.actualProfitJpy ?? 0)}
                   </td>
                   <td
                     style={{
-                      padding: "11px 12px",
-                      borderBottom: `1px solid ${C.border}50`,
+                      ...td,
                       color: diff >= 0 ? C.green : C.red,
                       fontWeight: "bold",
                     }}
@@ -462,3 +440,4 @@ export function AnalyticsCharts() {
     </div>
   )
 }
+
