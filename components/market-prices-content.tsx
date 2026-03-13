@@ -1,382 +1,1066 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts"
-import {
-  getMarketPrices,
-  upsertMarketPrice,
-  deleteMarketPrice,
-  type MarketPriceRow,
-} from "@/app/actions/market-prices"
-import { Loader2, Plus, Trash2, Search, Pencil } from "lucide-react"
-import { toast } from "sonner"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
+import { useState, useMemo } from "react"
+import type { CSSProperties } from "react"
 
-function formatJPY(n: number) {
-  return `¥${(n / 10_000).toFixed(1)}万`
+const C = {
+  bg: "#0a0a0a",
+  surface: "#111111",
+  surfaceHigh: "#1a1a1a",
+  surfaceHover: "#222222",
+  border: "#2a2a2a",
+  borderLight: "#333333",
+  orange: "#f97316",
+  orangeDim: "#7c3a10",
+  orangeGlow: "rgba(249,115,22,0.15)",
+  green: "#22c55e",
+  greenDim: "#14532d",
+  red: "#ef4444",
+  redDim: "#7f1d1d",
+  yellow: "#eab308",
+  blue: "#3b82f6",
+  text: "#f5f5f5",
+  textSub: "#a3a3a3",
+  textMuted: "#525252",
+  font: "'DM Mono', 'Courier New', monospace",
+  fontSans: "'DM Sans', 'Helvetica Neue', sans-serif",
+}
+
+type Source = "ヤフオク" | "BDS" | "カチオク" | "JBA" | "手動"
+type Trend = "up" | "down" | "flat"
+
+interface PriceEntry {
+  id: string
+  maker: string
+  model: string
+  year: string
+  condition: "A" | "B" | "C" | "D"
+  source: Source
+  avgPrice: number
+  minPrice: number
+  maxPrice: number
+  sampleCount: number
+  trend: Trend
+  trendPct: number
+  updatedAt: string
+  memo?: string
+}
+
+const MOCK: PriceEntry[] = [
+  { id: "1", maker: "Honda", model: "モンキー Z50M", year: "1970-1979", condition: "A", source: "ヤフオク", avgPrice: 280000, minPrice: 180000, maxPrice: 420000, sampleCount: 23, trend: "up", trendPct: 8.2, updatedAt: "2026-03-13", memo: "復刻版と混在注意" },
+  { id: "2", maker: "Honda", model: "モンキー Z50M", year: "1970-1979", condition: "B", source: "ヤフオク", avgPrice: 185000, minPrice: 90000, maxPrice: 260000, sampleCount: 41, trend: "up", trendPct: 5.1, updatedAt: "2026-03-13" },
+  { id: "3", maker: "Honda", model: "モンキー Z50M", year: "1970-1979", condition: "C", source: "BDS", avgPrice: 95000, minPrice: 45000, maxPrice: 140000, sampleCount: 18, trend: "flat", trendPct: 0.3, updatedAt: "2026-03-12" },
+  { id: "4", maker: "Honda", model: "ゴリラ Z50J", year: "1978-1988", condition: "A", source: "ヤフオク", avgPrice: 320000, minPrice: 240000, maxPrice: 480000, sampleCount: 9, trend: "up", trendPct: 12.4, updatedAt: "2026-03-11" },
+  { id: "5", maker: "Honda", model: "ゴリラ Z50J", year: "1978-1988", condition: "B", source: "ヤフオク", avgPrice: 210000, minPrice: 130000, maxPrice: 280000, sampleCount: 14, trend: "up", trendPct: 6.8, updatedAt: "2026-03-11" },
+  { id: "6", maker: "Honda", model: "ダックス ST70", year: "1969-1980", condition: "A", source: "カチオク", avgPrice: 250000, minPrice: 180000, maxPrice: 390000, sampleCount: 7, trend: "flat", trendPct: 1.2, updatedAt: "2026-03-10" },
+  { id: "7", maker: "Honda", model: "シャリー CF50", year: "1973-1983", condition: "B", source: "ヤフオク", avgPrice: 88000, minPrice: 55000, maxPrice: 125000, sampleCount: 22, trend: "down", trendPct: -3.1, updatedAt: "2026-03-13" },
+  { id: "8", maker: "Yamaha", model: "ミニトレ GT80", year: "1972-1980", condition: "B", source: "BDS", avgPrice: 72000, minPrice: 40000, maxPrice: 110000, sampleCount: 12, trend: "down", trendPct: -1.8, updatedAt: "2026-03-09" },
+  { id: "9", maker: "Honda", model: "カブ C50", year: "1966-1979", condition: "A", source: "JBA", avgPrice: 145000, minPrice: 90000, maxPrice: 210000, sampleCount: 31, trend: "up", trendPct: 3.9, updatedAt: "2026-03-13" },
+  { id: "10", maker: "Honda", model: "カブ C50", year: "1966-1979", condition: "B", source: "ヤフオク", avgPrice: 78000, minPrice: 35000, maxPrice: 125000, sampleCount: 58, trend: "flat", trendPct: 0.8, updatedAt: "2026-03-13" },
+]
+
+const MAKERS = ["全メーカー", "Honda", "Yamaha", "Suzuki", "Kawasaki"]
+const SOURCES: Source[] = ["ヤフオク", "BDS", "カチオク", "JBA", "手動"]
+const CONDITIONS = ["A", "B", "C", "D"] as const
+
+const fmt = (n: number) =>
+  n >= 10000 ? `¥${(n / 10000).toFixed(1)}万` : `¥${n.toLocaleString()}`
+
+const condColor: Record<string, string> = {
+  A: C.green,
+  B: C.blue,
+  C: C.yellow,
+  D: C.red,
+}
+const trendIcon = (t: Trend, pct: number) => {
+  if (t === "up") return { icon: "▲", color: C.green, label: `+${pct}%` }
+  if (t === "down") return { icon: "▼", color: C.red, label: `${pct}%` }
+  return { icon: "─", color: C.textMuted, label: `±${pct}%` }
+}
+const sourceColor: Record<Source, string> = {
+  ヤフオク: C.orange,
+  BDS: C.blue,
+  カチオク: C.yellow,
+  JBA: C.green,
+  手動: C.textSub,
+}
+
+function PriceModal({
+  open,
+  onClose,
+  initial,
+}: {
+  open: boolean
+  onClose: () => void
+  initial?: Partial<PriceEntry>
+}) {
+  if (!open) return null
+  const title = initial?.id ? "価格データ編集" : "価格データ追加"
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 50,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: C.surface,
+          border: `1px solid ${C.borderLight}`,
+          borderRadius: 12,
+          padding: 32,
+          width: 520,
+          maxWidth: "90vw",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 24,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: C.fontSans,
+              fontWeight: 700,
+              fontSize: 16,
+              color: C.text,
+            }}
+          >
+            {title}
+          </span>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              color: C.textMuted,
+              cursor: "pointer",
+              fontSize: 20,
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {(["maker", "model", "year"] as const).map((field) => (
+          <div key={field} style={{ marginBottom: 16 }}>
+            <label
+              style={{
+                display: "block",
+                fontFamily: C.font,
+                fontSize: 11,
+                color: C.textMuted,
+                marginBottom: 6,
+                letterSpacing: "0.08em",
+              }}
+            >
+              {field === "maker"
+                ? "メーカー"
+                : field === "model"
+                  ? "車種名"
+                  : "年式"}
+            </label>
+            <input
+              defaultValue={(initial as Record<string, unknown>)?.[field] ?? ""}
+              style={{
+                width: "100%",
+                background: C.surfaceHigh,
+                border: `1px solid ${C.border}`,
+                borderRadius: 6,
+                padding: "10px 14px",
+                color: C.text,
+                fontFamily: C.font,
+                fontSize: 13,
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+              placeholder={
+                field === "maker"
+                  ? "Honda"
+                  : field === "model"
+                    ? "モンキー Z50M"
+                    : "1970-1979"
+              }
+            />
+          </div>
+        ))}
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 16,
+            marginBottom: 16,
+          }}
+        >
+          {(
+            [
+              "avgPrice",
+              "minPrice",
+              "maxPrice",
+              "sampleCount",
+            ] as const
+          ).map((f) => (
+            <div key={f}>
+              <label
+                style={{
+                  display: "block",
+                  fontFamily: C.font,
+                  fontSize: 11,
+                  color: C.textMuted,
+                  marginBottom: 6,
+                  letterSpacing: "0.08em",
+                }}
+              >
+                {f === "avgPrice"
+                  ? "平均価格"
+                  : f === "minPrice"
+                    ? "最低価格"
+                    : f === "maxPrice"
+                      ? "最高価格"
+                      : "サンプル数"}
+              </label>
+              <input
+                type="number"
+                defaultValue={(initial as Record<string, unknown>)?.[f] ?? ""}
+                style={{
+                  width: "100%",
+                  background: C.surfaceHigh,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  padding: "10px 14px",
+                  color: C.text,
+                  fontFamily: C.font,
+                  fontSize: 13,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 16,
+            marginBottom: 16,
+          }}
+        >
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontFamily: C.font,
+                fontSize: 11,
+                color: C.textMuted,
+                marginBottom: 6,
+                letterSpacing: "0.08em",
+              }}
+            >
+              コンディション
+            </label>
+            <select
+              style={{
+                width: "100%",
+                background: C.surfaceHigh,
+                border: `1px solid ${C.border}`,
+                borderRadius: 6,
+                padding: "10px 14px",
+                color: C.text,
+                fontFamily: C.font,
+                fontSize: 13,
+                outline: "none",
+              }}
+            >
+              {CONDITIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}ランク
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontFamily: C.font,
+                fontSize: 11,
+                color: C.textMuted,
+                marginBottom: 6,
+                letterSpacing: "0.08em",
+              }}
+            >
+              データソース
+            </label>
+            <select
+              style={{
+                width: "100%",
+                background: C.surfaceHigh,
+                border: `1px solid ${C.border}`,
+                borderRadius: 6,
+                padding: "10px 14px",
+                color: C.text,
+                fontFamily: C.font,
+                fontSize: 13,
+                outline: "none",
+              }}
+            >
+              {SOURCES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 24 }}>
+          <label
+            style={{
+              display: "block",
+              fontFamily: C.font,
+              fontSize: 11,
+              color: C.textMuted,
+              marginBottom: 6,
+              letterSpacing: "0.08em",
+            }}
+          >
+            メモ（任意）
+          </label>
+          <textarea
+            defaultValue={initial?.memo ?? ""}
+            rows={2}
+            style={{
+              width: "100%",
+              background: C.surfaceHigh,
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              padding: "10px 14px",
+              color: C.text,
+              fontFamily: C.font,
+              fontSize: 13,
+              outline: "none",
+              resize: "none",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            justifyContent: "flex-end",
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={{
+              padding: "10px 24px",
+              background: "none",
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              color: C.textSub,
+              fontFamily: C.fontSans,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            キャンセル
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "10px 24px",
+              background: C.orange,
+              border: "none",
+              borderRadius: 6,
+              color: "#fff",
+              fontFamily: C.fontSans,
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            保存
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function MarketPricesContent() {
-  const [rows, setRows] = useState<MarketPriceRow[] | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [formOpen, setFormOpen] = useState(false)
-  const [editing, setEditing] = useState<MarketPriceRow | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
+  const [makerFilter, setMakerFilter] = useState("全メーカー")
+  const [condFilter, setCondFilter] = useState<string>("all")
+  const [srcFilter, setSrcFilter] = useState<string>("all")
+  const [sortKey, setSortKey] = useState<keyof PriceEntry>("avgPrice")
+  const [sortAsc, setSortAsc] = useState(false)
+  const [modal, setModal] = useState<{
+    open: boolean
+    entry?: PriceEntry
+  }>({ open: false })
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  const [formModel, setFormModel] = useState("")
-  const [formBds, setFormBds] = useState("")
-  const [formYahoo, setFormYahoo] = useState("")
-
-  const load = async () => {
-    setLoading(true)
-    const res = await getMarketPrices()
-    setLoading(false)
-    if (res.success && res.rows) setRows(res.rows)
-    else setError(res.error ?? null)
-  }
-
-  useEffect(() => {
-    load()
-  }, [])
-
-  const openAdd = () => {
-    setEditing(null)
-    setFormModel("")
-    setFormBds("")
-    setFormYahoo("")
-    setFormOpen(true)
-  }
-
-  const openEdit = (row: MarketPriceRow) => {
-    setEditing(row)
-    setFormModel(row.model_name)
-    setFormBds(row.bds_avg_jpy != null ? String(row.bds_avg_jpy) : "")
-    setFormYahoo(row.yahoo_avg_jpy != null ? String(row.yahoo_avg_jpy) : "")
-    setFormOpen(true)
-  }
-
-  const handleSubmit = async () => {
-    const model = formModel.trim()
-    if (!model) {
-      toast.error("車種・型式を入力してください")
-      return
-    }
-    setSubmitting(true)
-    const res = await upsertMarketPrice({
-      model_name: model,
-      bds_avg_jpy: formBds ? Number(formBds) || null : null,
-      yahoo_avg_jpy: formYahoo ? Number(formYahoo) || null : null,
+  const filtered = useMemo(() => {
+    let d = MOCK
+    if (search) d = d.filter((r) => `${r.maker}${r.model}`.includes(search))
+    if (makerFilter !== "全メーカー")
+      d = d.filter((r) => r.maker === makerFilter)
+    if (condFilter !== "all")
+      d = d.filter((r) => r.condition === condFilter)
+    if (srcFilter !== "all") d = d.filter((r) => r.source === srcFilter)
+    return [...d].sort((a, b) => {
+      const av = a[sortKey] as string | number
+      const bv = b[sortKey] as string | number
+      return sortAsc ? (av > bv ? 1 : -1) : av < bv ? 1 : -1
     })
-    setSubmitting(false)
-    if (res.success) {
-      toast.success("相場を保存しました")
-      setFormOpen(false)
-      load()
-    } else {
-      toast.error(res.error)
+  }, [search, makerFilter, condFilter, srcFilter, sortKey, sortAsc])
+
+  const toggleSort = (k: keyof PriceEntry) => {
+    if (sortKey === k) setSortAsc(!sortAsc)
+    else {
+      setSortKey(k)
+      setSortAsc(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("この相場を削除しますか？")) return
-    setDeletingId(id)
-    const res = await deleteMarketPrice(id)
-    setDeletingId(null)
-    if (res.success) {
-      toast.success("削除しました")
-      load()
-    } else {
-      toast.error(res.error)
-    }
-  }
+  const avgAll = Math.round(
+    filtered.reduce((s, r) => s + r.avgPrice, 0) / (filtered.length || 1)
+  )
 
-  const openYahooSearch = (model: string) => {
-    const url = `https://auctions.yahoo.co.jp/closedsearch/closedsearch?p=${encodeURIComponent(model)}&auccat=26316&ei=UTF-8`
-    window.open(url, "_blank", "noopener,noreferrer")
-  }
+  const stats = [
+    { label: "登録車種", value: `${filtered.length}件` },
+    { label: "平均単価", value: fmt(avgAll) },
+    {
+      label: "上昇傾向",
+      value: `${filtered.filter((r) => r.trend === "up").length}件`,
+      color: C.green,
+    },
+    {
+      label: "下降傾向",
+      value: `${filtered.filter((r) => r.trend === "down").length}件`,
+      color: C.red,
+    },
+  ]
 
-  const filtered = rows?.filter(
-    (r) =>
-      !search.trim() ||
-      r.model_name.toLowerCase().includes(search.trim().toLowerCase())
-  ) ?? []
-
-  const chartData = filtered.slice(0, 20).map((r) => ({
-    name: r.model_name.length > 10 ? r.model_name.slice(0, 10) + "…" : r.model_name,
-    fullName: r.model_name,
-    BDS: r.bds_avg_jpy ?? 0,
-    ヤフオク: r.yahoo_avg_jpy ?? 0,
-  }))
-
-  if (loading) {
-    return (
-      <div className="mt-8 flex items-center justify-center gap-2 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <span>読み込み中…</span>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-        {error}
-        <p className="mt-2 text-xs">
-          Supabase で market_prices テーブルを作成してください。docs のマイグレーションを実行するか、SQL Editor で
-          <code className="mx-1 rounded bg-muted px-1">20260228000000_market_prices.sql</code>
-          の内容を実行してください。
-        </p>
-      </div>
-    )
+  const thStyle = (k: keyof PriceEntry): CSSProperties => ({
+    padding: "10px 14px",
+    textAlign: "left",
+    fontFamily: C.font,
+    fontSize: 10,
+    color: sortKey === k ? C.orange : C.textMuted,
+    letterSpacing: "0.1em",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    borderBottom: `1px solid ${C.border}`,
+    userSelect: "none",
+  })
+  const tdStyle: CSSProperties = {
+    padding: "12px 14px",
+    borderBottom: `1px solid ${C.border}20`,
+    verticalAlign: "middle",
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
-            placeholder="車種・型式で検索"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-input bg-background pl-9 pr-3 py-2 text-sm"
-          />
+    <div
+      style={{
+        fontFamily: C.font,
+        color: C.text,
+        minHeight: "100vh",
+      }}
+    >
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+          <h1
+            style={{
+              margin: 0,
+              fontFamily: C.fontSans,
+              fontWeight: 800,
+              fontSize: 22,
+              color: C.text,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            市場価格マスター
+          </h1>
+          <span
+            style={{
+              fontFamily: C.font,
+              fontSize: 11,
+              color: C.textMuted,
+              letterSpacing: "0.1em",
+            }}
+          >
+            MARKET_PRICES
+          </span>
         </div>
-        <button
-          type="button"
-          onClick={openAdd}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 touch-manipulation"
+        <p
+          style={{
+            margin: "6px 0 0",
+            fontFamily: C.fontSans,
+            fontSize: 13,
+            color: C.textSub,
+          }}
         >
-          <Plus className="h-4 w-4" />
-          相場を追加
-        </button>
+          車種ごとの相場データを管理・参照。査定・入札上限算出のベースに使用します。
+        </p>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-12 text-center">
-          <p className="text-muted-foreground">相場データがありません</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            「相場を追加」から車種・型式ごとに BDS とヤフオクの落札相場を手入力してください。
-          </p>
-          <button
-            type="button"
-            onClick={openAdd}
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4,1fr)",
+          gap: 12,
+          marginBottom: 24,
+        }}
+      >
+        {stats.map((s) => (
+          <div
+            key={s.label}
+            style={{
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: 8,
+              padding: "14px 18px",
+            }}
           >
-            <Plus className="h-4 w-4" />
-            最初の相場を追加
+            <div
+              style={{
+                fontFamily: C.font,
+                fontSize: 10,
+                color: C.textMuted,
+                letterSpacing: "0.1em",
+                marginBottom: 6,
+              }}
+            >
+              {s.label}
+            </div>
+            <div
+              style={{
+                fontFamily: C.fontSans,
+                fontWeight: 700,
+                fontSize: 20,
+                color: "color" in s ? (s as { color: string }).color : C.text,
+              }}
+            >
+              {s.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div
+        style={{
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          borderRadius: 10,
+          padding: "16px 20px",
+          marginBottom: 16,
+          display: "flex",
+          gap: 12,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <div
+          style={{
+            position: "relative",
+            flex: "1 1 200px",
+            minWidth: 180,
+          }}
+        >
+          <span
+            style={{
+              position: "absolute",
+              left: 12,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: C.textMuted,
+              fontSize: 14,
+            }}
+          >
+            🔍
+          </span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="車種・メーカーで検索..."
+            style={{
+              width: "100%",
+              background: C.surfaceHigh,
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              padding: "9px 12px 9px 36px",
+              color: C.text,
+              fontFamily: C.font,
+              fontSize: 13,
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+
+        {[
+          {
+            value: makerFilter,
+            onChange: setMakerFilter,
+            options: MAKERS.map((m) => ({ label: m, value: m })),
+            placeholder: "全メーカー",
+          },
+        ].map((sel, i) => (
+          <select
+            key={i}
+            value={sel.value}
+            onChange={(e) => sel.onChange(e.target.value)}
+            style={{
+              background: C.surfaceHigh,
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              padding: "9px 14px",
+              color: C.text,
+              fontFamily: C.font,
+              fontSize: 12,
+              outline: "none",
+            }}
+          >
+            {sel.options.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        ))}
+
+        <select
+          value={condFilter}
+          onChange={(e) => setCondFilter(e.target.value)}
+          style={{
+            background: C.surfaceHigh,
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            padding: "9px 14px",
+            color: C.text,
+            fontFamily: C.font,
+            fontSize: 12,
+            outline: "none",
+          }}
+        >
+          <option value="all">全コンディション</option>
+          {CONDITIONS.map((c) => (
+            <option key={c} value={c}>
+              {c}ランク
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={srcFilter}
+          onChange={(e) => setSrcFilter(e.target.value)}
+          style={{
+            background: C.surfaceHigh,
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            padding: "9px 14px",
+            color: C.text,
+            fontFamily: C.font,
+            fontSize: 12,
+            outline: "none",
+          }}
+        >
+          <option value="all">全ソース</option>
+          {SOURCES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setModal({ open: true })}
+            style={{
+              padding: "9px 18px",
+              background: C.orange,
+              border: "none",
+              borderRadius: 6,
+              color: "#fff",
+              fontFamily: C.fontSans,
+              fontWeight: 600,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            ＋ 追加
+          </button>
+          <button
+            style={{
+              padding: "9px 14px",
+              background: "none",
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              color: C.textSub,
+              fontFamily: C.fontSans,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            CSV書出
           </button>
         </div>
-      ) : (
-        <>
-          <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-            <h2 className="text-lg font-semibold text-foreground">
-              車種別 相場比較（BDS vs ヤフオク）
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              BDS とヤフオクの落札相場を車種ごとに比較。ヤフオクは検索リンクで落札相場を確認できます。
-            </p>
-            <div className="mt-4 h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 8, right: 8, left: 8, bottom: 24 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 11 }}
-                    angle={-25}
-                    textAnchor="end"
-                    height={56}
-                  />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => formatJPY(v)} />
-                  <Tooltip
-                    formatter={(value: number) => [formatJPY(value), ""]}
-                    labelFormatter={(_, payload) => {
-                      const p = payload[0]?.payload
-                      return p?.fullName ?? ""
-                    }}
-                  />
-                  <Legend />
-                  <Bar dataKey="BDS" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="ヤフオク" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+      </div>
 
-          <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-            <h2 className="text-lg font-semibold text-foreground">相場一覧</h2>
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="pb-2 pr-4 font-medium">車種・型式</th>
-                    <th className="pb-2 pr-4 font-medium text-right">BDS 平均</th>
-                    <th className="pb-2 pr-4 font-medium text-right">ヤフオク 平均</th>
-                    <th className="pb-2 font-medium text-right">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((r) => (
-                    <tr key={r.id} className="border-b border-border/70 hover:bg-muted/30">
-                      <td className="py-2 pr-4 font-medium text-foreground">{r.model_name}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums">
-                        {r.bds_avg_jpy != null ? formatJPY(r.bds_avg_jpy) : "—"}
-                      </td>
-                      <td className="py-2 pr-4 text-right tabular-nums">
-                        {r.yahoo_avg_jpy != null ? formatJPY(r.yahoo_avg_jpy) : "—"}
-                      </td>
-                      <td className="py-2 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => openYahooSearch(r.model_name)}
-                            className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                            title="ヤフオク落札相場を検索"
-                          >
-                            <Search className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openEdit(r)}
-                            className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                            title="編集"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(r.id)}
-                            disabled={deletingId === r.id}
-                            className="rounded p-1.5 text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                            title="削除"
-                          >
-                            {deletingId === r.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
-
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editing ? "相場を編集" : "相場を追加"}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                車種・型式 <span className="text-destructive">*</span>
-              </label>
-              <input
-                type="text"
-                value={formModel}
-                onChange={(e) => setFormModel(e.target.value)}
-                placeholder="例: モンキー Z50J"
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                disabled={!!editing}
-              />
-              {!editing && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  ヤフオク落札相場は
-                  <a
-                    href={`https://auctions.yahoo.co.jp/closedsearch/closedsearch?p=${encodeURIComponent(formModel || "バイク")}&auccat=26316&ei=UTF-8`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ml-1 text-primary hover:underline"
+      <div
+        style={{
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          borderRadius: 10,
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ overflowX: "auto" }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              minWidth: 860,
+            }}
+          >
+            <thead>
+              <tr style={{ background: C.surfaceHigh }}>
+                <th style={{ ...thStyle("maker"), width: 32 }}>
+                  <input type="checkbox" style={{ accentColor: C.orange }} />
+                </th>
+                {(
+                  [
+                    ["maker", "メーカー"],
+                    ["model", "車種"],
+                    ["year", "年式"],
+                    ["condition", "状態"],
+                    ["source", "ソース"],
+                    ["avgPrice", "平均相場"],
+                    ["minPrice", "最低"],
+                    ["maxPrice", "最高"],
+                    ["sampleCount", "件数"],
+                    ["trend", "トレンド"],
+                    ["updatedAt", "更新日"],
+                  ] as [keyof PriceEntry, string][]
+                ).map(([k, label]) => (
+                  <th
+                    key={k}
+                    style={thStyle(k)}
+                    onClick={() => toggleSort(k)}
                   >
-                    ヤフオク車体カテゴリ
-                  </a>
-                  で検索して確認できます。
-                </p>
+                    {label} {sortKey === k ? (sortAsc ? "▲" : "▼") : ""}
+                  </th>
+                ))}
+                <th style={{ ...thStyle("id"), width: 80 }}>
+                  操作
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r, i) => {
+                const tr = trendIcon(r.trend, r.trendPct)
+                return (
+                  <tr
+                    key={r.id}
+                    style={{
+                      background:
+                        i % 2 === 0 ? "transparent" : `${C.surfaceHigh}44`,
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = C.surfaceHover)
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background =
+                        i % 2 === 0 ? "transparent" : `${C.surfaceHigh}44`)
+                    }
+                  >
+                    <td style={tdStyle}>
+                      <input
+                        type="checkbox"
+                        style={{ accentColor: C.orange }}
+                        checked={selectedIds.has(r.id)}
+                        onChange={() => {
+                          const n = new Set(selectedIds)
+                          n.has(r.id) ? n.delete(r.id) : n.add(r.id)
+                          setSelectedIds(n)
+                        }}
+                      />
+                    </td>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        color: C.textSub,
+                        fontSize: 12,
+                      }}
+                    >
+                      {r.maker}
+                    </td>
+                    <td style={tdStyle}>
+                      <div
+                        style={{
+                          fontFamily: C.fontSans,
+                          fontWeight: 600,
+                          fontSize: 13,
+                        }}
+                      >
+                        {r.model}
+                      </div>
+                      {r.memo && (
+                        <div
+                          style={{
+                            fontFamily: C.font,
+                            fontSize: 10,
+                            color: C.textMuted,
+                            marginTop: 2,
+                          }}
+                        >
+                          {r.memo}
+                        </div>
+                      )}
+                    </td>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        color: C.textSub,
+                        fontSize: 12,
+                      }}
+                    >
+                      {r.year}
+                    </td>
+                    <td style={tdStyle}>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          background: `${condColor[r.condition]}22`,
+                          color: condColor[r.condition],
+                          fontFamily: C.font,
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {r.condition}
+                      </span>
+                    </td>
+                    <td style={tdStyle}>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          background: `${sourceColor[r.source]}18`,
+                          color: sourceColor[r.source],
+                          fontFamily: C.font,
+                          fontSize: 10,
+                        }}
+                      >
+                        {r.source}
+                      </span>
+                    </td>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        fontFamily: C.fontSans,
+                        fontWeight: 700,
+                        fontSize: 14,
+                        color: C.orange,
+                      }}
+                    >
+                      {fmt(r.avgPrice)}
+                    </td>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        fontFamily: C.font,
+                        fontSize: 12,
+                        color: C.textSub,
+                      }}
+                    >
+                      {fmt(r.minPrice)}
+                    </td>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        fontFamily: C.font,
+                        fontSize: 12,
+                        color: C.textSub,
+                      }}
+                    >
+                      {fmt(r.maxPrice)}
+                    </td>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        fontFamily: C.font,
+                        fontSize: 12,
+                        color: C.textMuted,
+                        textAlign: "center",
+                      }}
+                    >
+                      {r.sampleCount}
+                    </td>
+                    <td style={tdStyle}>
+                      <span
+                        style={{
+                          color: tr.color,
+                          fontFamily: C.font,
+                          fontSize: 12,
+                        }}
+                      >
+                        {tr.icon} {tr.label}
+                      </span>
+                    </td>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        fontFamily: C.font,
+                        fontSize: 11,
+                        color: C.textMuted,
+                      }}
+                    >
+                      {r.updatedAt}
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          onClick={() =>
+                            setModal({ open: true, entry: r })
+                          }
+                          style={{
+                            padding: "4px 10px",
+                            background: "none",
+                            border: `1px solid ${C.border}`,
+                            borderRadius: 4,
+                            color: C.textSub,
+                            fontFamily: C.font,
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                        >
+                          編集
+                        </button>
+                        <button
+                          style={{
+                            padding: "4px 10px",
+                            background: "none",
+                            border: `1px solid ${C.redDim}`,
+                            borderRadius: 4,
+                            color: C.red,
+                            fontFamily: C.font,
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={13}
+                    style={{
+                      padding: 48,
+                      textAlign: "center",
+                      color: C.textMuted,
+                      fontFamily: C.font,
+                      fontSize: 13,
+                    }}
+                  >
+                    データが見つかりません
+                  </td>
+                </tr>
               )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                BDS 平均落札額（円）
-              </label>
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                value={formBds}
-                onChange={(e) => setFormBds(e.target.value)}
-                placeholder="例: 85000"
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                ヤフオク 平均落札額（円）
-              </label>
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                value={formYahoo}
-                onChange={(e) => setFormYahoo(e.target.value)}
-                placeholder="例: 120000"
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-              />
-            </div>
+            </tbody>
+          </table>
+        </div>
+
+        <div
+          style={{
+            padding: "12px 20px",
+            borderTop: `1px solid ${C.border}`,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: C.font,
+              fontSize: 11,
+              color: C.textMuted,
+            }}
+          >
+            {filtered.length} 件表示 / 全{MOCK.length}件
+            {selectedIds.size > 0 && ` · ${selectedIds.size}件選択中`}
+          </span>
+          <div style={{ display: "flex", gap: 8 }}>
+            {selectedIds.size > 0 && (
+              <button
+                style={{
+                  padding: "6px 14px",
+                  background: C.redDim,
+                  border: `1px solid ${C.red}`,
+                  borderRadius: 6,
+                  color: C.red,
+                  fontFamily: C.font,
+                  fontSize: 11,
+                  cursor: "pointer",
+                }}
+              >
+                選択削除
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setSelectedIds(new Set())
+                setSearch("")
+                setMakerFilter("全メーカー")
+                setCondFilter("all")
+                setSrcFilter("all")
+              }}
+              style={{
+                padding: "6px 14px",
+                background: "none",
+                border: `1px solid ${C.border}`,
+                borderRadius: 6,
+                color: C.textSub,
+                fontFamily: C.font,
+                fontSize: 11,
+                cursor: "pointer",
+              }}
+            >
+              リセット
+            </button>
           </div>
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={() => setFormOpen(false)}
-              className="rounded-lg border border-input px-4 py-2.5 text-sm font-medium"
-            >
-              キャンセル
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={submitting || !formModel.trim()}
-              className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-                  保存中…
-                </>
-              ) : (
-                "保存"
-              )}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </div>
+
+      <PriceModal
+        open={modal.open}
+        onClose={() => setModal({ open: false })}
+        initial={modal.entry}
+      />
     </div>
   )
 }
