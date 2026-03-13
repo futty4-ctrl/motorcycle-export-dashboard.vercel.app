@@ -2,52 +2,22 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import {
-  getVehiclesFromSupabase,
-  getConnectionStatus,
-  type SummaryData,
-} from "@/app/actions/vehicles"
+import { getVehiclesFromSupabase, getConnectionStatus } from "@/app/actions/vehicles"
 import type { VehicleDisplay } from "@/lib/vehicle-display"
-import type { CSSProperties } from "react"
-
-const C = {
-  surface: "#111113",
-  border: "#1e1e22",
-  orange: "#f5720a",
-  text: "#e8e8ec",
-  textMuted: "#6b6b74",
-  textSub: "#9999a8",
-  green: "#22c55e",
-  red: "#ef4444",
-  blue: "#3b82f6",
-  yellow: "#eab308",
-}
+import {
+  C,
+  font,
+  pageWrapper,
+  pageTitle,
+  pageSub,
+  card,
+  kpiCard,
+  lbl,
+  badge,
+} from "@/components/ui-system"
 
 const GOAL = 1000000
-
-const card: CSSProperties = {
-  background: C.surface,
-  border: `1px solid ${C.border}`,
-  borderRadius: 8,
-  padding: 20,
-  marginBottom: 16,
-}
-const label: CSSProperties = {
-  fontSize: 11,
-  color: C.textMuted,
-  letterSpacing: 1.5,
-  textTransform: "uppercase",
-  marginBottom: 8,
-}
-const badge = (color: string): CSSProperties => ({
-  display: "inline-block",
-  padding: "3px 8px",
-  borderRadius: 4,
-  fontSize: 11,
-  background: `${color}20`,
-  color,
-  fontWeight: "bold",
-})
+const fmt = (n: number) => `¥${n.toLocaleString()}`
 
 export function DashboardContent() {
   const router = useRouter()
@@ -63,122 +33,125 @@ export function DashboardContent() {
       setConnectionStatus(status)
       if (status.supabase === "ok") {
         const result = await getVehiclesFromSupabase()
-        if (result.data) setVehicles(result.data)
+        if (result.vehicles) setVehicles(result.vehicles)
       }
       setLoading(false)
     }
     load()
   }, [])
 
-  // 粗利計算
-  const soldVehicles = vehicles?.filter((v) => v.status === "売却済") ?? []
-  const thisMonth = new Date().getMonth()
-  const thisYear = new Date().getFullYear()
-  const monthlyProfit = soldVehicles
-    .filter((v) => {
-      const d = new Date(v.created_at ?? "")
-      return d.getMonth() === thisMonth && d.getFullYear() === thisYear
-    })
-    .reduce((a, v) => a + (v.profit ?? 0), 0)
-
+  const now = new Date()
+  const soldThisMonth = (vehicles ?? []).filter((v) => {
+    const d = new Date(v.createdAt ?? "")
+    return (
+      v.status === "売却済" &&
+      d.getMonth() === now.getMonth() &&
+      d.getFullYear() === now.getFullYear()
+    )
+  })
+  const monthlyProfit = soldThisMonth.reduce(
+    (a, v) => a + (v.expectedProfitJPY ?? 0),
+    0
+  )
   const pct = Math.min(Math.round((monthlyProfit / GOAL) * 100), 100)
-
-  // 直近査定（最新5件）
-  const recentAssessments = [...(vehicles ?? [])]
+  const inStock = (vehicles ?? []).filter(
+    (v) => v.status === "在庫あり" || v.status === "出品中"
+  ).length
+  const recent = [...(vehicles ?? [])]
     .sort(
       (a, b) =>
-        new Date(b.created_at ?? "").getTime() -
-        new Date(a.created_at ?? "").getTime()
+        new Date(b.createdAt ?? "").getTime() -
+        new Date(a.createdAt ?? "").getTime()
     )
     .slice(0, 5)
 
-  // ステータス別カウント
-  const inStock =
-    vehicles?.filter(
-      (v) => v.status === "在庫あり" || v.status === "出品中"
-    ).length ?? 0
-  const totalVehicles = vehicles?.length ?? 0
-
   if (loading)
     return (
-      <div
-        style={{
-          padding: 40,
-          color: C.textMuted,
-          fontFamily: '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
-          WebkitFontSmoothing: "antialiased",
-          MozOsxFontSmoothing: "grayscale",
-        }}
-      >
+      <div style={{ ...pageWrapper, color: C.textMuted }}>
         読み込み中...
       </div>
     )
 
   return (
-    <div
-      style={{
-        fontFamily: '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif',
-        WebkitFontSmoothing: "antialiased",
-        MozOsxFontSmoothing: "grayscale",
-        color: C.text,
-        padding: "32px 40px",
-        maxWidth: 900,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 22,
-          fontWeight: "bold",
-          marginBottom: 4,
-        }}
-      >
-        ダッシュボード
-      </div>
-      <div
-        style={{
-          fontSize: 12,
-          color: C.textSub,
-          marginBottom: 28,
-        }}
-      >
-        {new Date().toLocaleDateString("ja-JP")} · バイク輸出事業 管理システム
+    <div style={pageWrapper}>
+      <div style={{ marginBottom: 32 }}>
+        <div
+          style={{
+            ...pageTitle,
+            background: `linear-gradient(135deg, ${C.text} 60%, ${C.orange})`,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          ダッシュボード
+        </div>
+        <div style={pageSub}>
+          {now.toLocaleDateString("ja-JP")} · バイク輸出事業 管理システム ·{" "}
+          <span
+            style={{
+              color:
+                connectionStatus.supabase === "ok" ? C.green : C.red,
+            }}
+          >
+            Supabase {connectionStatus.supabase === "ok" ? "●" : "○"}
+          </span>
+        </div>
       </div>
 
-      {/* 月利目標進捗バー */}
       <div
         style={{
-          ...card,
+          ...card(C.orangeGlow),
           borderLeft: `3px solid ${C.orange}`,
+          marginBottom: 24,
         }}
+        className="card-glow-orange"
       >
-        <div style={label}>月利目標進捗</div>
+        <div style={lbl}>月利目標進捗</div>
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
-            marginBottom: 10,
             alignItems: "flex-end",
+            marginBottom: 12,
           }}
         >
-          <span
-            style={{
-              fontSize: 28,
-              fontWeight: "bold",
-              color: C.orange,
-            }}
-          >
-            ¥{monthlyProfit.toLocaleString()}
-          </span>
-          <span style={{ fontSize: 12, color: C.textSub }}>
-            目標 ¥{GOAL.toLocaleString()}
-          </span>
+          <div>
+            <span
+              style={{
+                fontSize: 36,
+                fontWeight: "bold",
+                color: C.orange,
+                letterSpacing: -1,
+              }}
+            >
+              {fmt(monthlyProfit)}
+            </span>
+            <span
+              style={{ fontSize: 13, color: C.textMuted, marginLeft: 8 }}
+            >
+              / {fmt(GOAL)}
+            </span>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 11, color: C.textSub }}>あと</div>
+            <div
+              style={{
+                fontSize: 18,
+                fontWeight: "bold",
+                color: C.textSub,
+              }}
+            >
+              {fmt(Math.max(GOAL - monthlyProfit, 0))}
+            </div>
+          </div>
         </div>
         <div
           style={{
-            height: 6,
-            background: "#1e1e22",
-            borderRadius: 3,
+            height: 8,
+            background: "#1a1a1e",
+            borderRadius: 4,
             overflow: "hidden",
+            position: "relative",
           }}
         >
           <div
@@ -186,8 +159,9 @@ export function DashboardContent() {
               height: "100%",
               width: `${pct}%`,
               background: `linear-gradient(to right, ${C.orange}, ${C.green})`,
-              borderRadius: 3,
-              transition: "width 0.8s ease",
+              borderRadius: 4,
+              transition: "width 1s ease",
+              boxShadow: `0 0 12px ${C.orange}60`,
             }}
           />
         </div>
@@ -195,53 +169,75 @@ export function DashboardContent() {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            marginTop: 6,
+            marginTop: 8,
           }}
         >
-          <span style={{ fontSize: 11, color: C.textSub }}>
+          <span
+            style={{
+              fontSize: 11,
+              color: pct >= 50 ? C.green : C.textMuted,
+              fontWeight: "bold",
+            }}
+          >
             {pct}% 達成
           </span>
-          <span style={{ fontSize: 11, color: C.textSub }}>
-            あと ¥{Math.max(GOAL - monthlyProfit, 0).toLocaleString()} 分
+          <span style={{ fontSize: 11, color: C.textMuted }}>
+            {soldThisMonth.length}台 売却済み
           </span>
         </div>
       </div>
 
-      {/* KPIカード */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr 1fr",
           gap: 16,
-          marginBottom: 16,
+          marginBottom: 24,
         }}
       >
         {[
-          { label: "総車両数", value: `${totalVehicles}台`, color: C.orange },
-          { label: "在庫・出品中", value: `${inStock}台`, color: C.blue },
           {
-            label: "今月売却済",
-            value: `${soldVehicles.filter((v) => {
-              const d = new Date(v.created_at ?? "")
-              return d.getMonth() === thisMonth
-            }).length}台`,
+            label: "総車両数",
+            value: `${(vehicles ?? []).length}台`,
+            color: C.orange,
+            glow: C.orangeGlow,
+          },
+          {
+            label: "在庫・出品中",
+            value: `${inStock}台`,
+            color: C.blue,
+            glow: C.blueGlow,
+          },
+          {
+            label: "今月売却",
+            value: `${soldThisMonth.length}台`,
             color: C.green,
+            glow: C.greenGlow,
           },
         ].map((k, i) => (
           <div
             key={i}
-            style={{
-              ...card,
-              marginBottom: 0,
-              borderLeft: `3px solid ${k.color}`,
-            }}
+            style={kpiCard(k.color)}
+            className="card-glow-orange"
           >
-            <div style={label}>{k.label}</div>
             <div
               style={{
-                fontSize: 28,
+                position: "absolute",
+                top: 0,
+                right: 0,
+                width: 80,
+                height: 80,
+                background: `radial-gradient(circle, ${k.glow} 0%, transparent 70%)`,
+                pointerEvents: "none",
+              }}
+            />
+            <div style={lbl}>{k.label}</div>
+            <div
+              style={{
+                fontSize: 32,
                 fontWeight: "bold",
                 color: k.color,
+                letterSpacing: -1,
               }}
             >
               {k.value}
@@ -250,174 +246,207 @@ export function DashboardContent() {
         ))}
       </div>
 
-      {/* 直近の査定履歴 */}
-      <div style={card}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 12,
-          }}
-        >
-          <div style={label}>直近の査定履歴</div>
-          <button
-            onClick={() => router.push("/assess")}
-            style={{
-              fontSize: 11,
-              color: C.orange,
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
-            査定ページへ →
-          </button>
-        </div>
-        {recentAssessments.length === 0 ? (
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 16,
+          marginBottom: 16,
+        }}
+      >
+        <div style={card()}>
           <div
             style={{
-              fontSize: 13,
-              color: C.textMuted,
-              padding: "12px 0",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 16,
             }}
           >
-            査定データなし
-          </div>
-        ) : (
-          recentAssessments.map((v, i) => (
-            <div
-              key={v.id}
-              onClick={() => router.push(`/vehicle/${v.id}`)}
+            <div style={lbl}>直近の査定履歴</div>
+            <button
+              onClick={() => router.push("/assess")}
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "10px 0",
-                borderBottom:
-                  i < recentAssessments.length - 1
-                    ? `1px solid ${C.border}50`
-                    : "none",
+                fontSize: 11,
+                color: C.orange,
+                background: "none",
+                border: "none",
                 cursor: "pointer",
+                fontFamily: font,
               }}
             >
-              <div>
-                <div style={{ fontSize: 13, marginBottom: 3 }}>
-                  {v.vehicle_name ?? "（車種未入力）"}
-                </div>
-                <div style={{ fontSize: 11, color: C.textMuted }}>
-                  {v.created_at?.slice(0, 10)} · {v.bds_rating ?? "—"}
-                </div>
-              </div>
-              <div
-                style={{
-                  textAlign: "right",
-                  display: "flex",
-                  gap: 10,
-                  alignItems: "center",
-                }}
-              >
-                {v.purchase_price && (
-                  <span style={{ fontSize: 12, color: C.textSub }}>
-                    ¥{v.purchase_price.toLocaleString()}
-                  </span>
-                )}
-                <span
-                  style={badge(
-                    v.status === "売却済"
-                      ? C.green
-                      : v.status === "出品中"
-                        ? C.blue
-                        : v.status === "在庫あり"
-                          ? C.orange
-                          : C.textMuted
-                  )}
-                >
-                  {v.status}
-                </span>
-              </div>
+              査定ページへ →
+            </button>
+          </div>
+          {recent.length === 0 ? (
+            <div
+              style={{
+                fontSize: 13,
+                color: C.textMuted,
+                padding: "20px 0",
+                textAlign: "center",
+              }}
+            >
+              査定データなし
             </div>
-          ))
-        )}
-      </div>
+          ) : (
+            recent.map((v, i) => {
+              const statusColor =
+                v.status === "売却済"
+                  ? C.green
+                  : v.status === "出品中"
+                    ? C.blue
+                    : v.status === "在庫あり"
+                      ? C.orange
+                      : C.textMuted
+              return (
+                <div
+                  key={v.id}
+                  onClick={() => router.push(`/vehicle/${v.id}`)}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "10px 0",
+                    borderBottom:
+                      i < recent.length - 1
+                        ? `1px solid ${C.border}50`
+                        : "none",
+                    cursor: "pointer",
+                    transition: "opacity 0.15s",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.opacity = "0.7")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.opacity = "1")
+                  }
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        marginBottom: 3,
+                        color: C.text,
+                      }}
+                    >
+                      {v.name ?? "（車種未入力）"}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.textMuted }}>
+                      {v.createdAt?.slice(0, 10)}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "center",
+                    }}
+                  >
+                    {v.expectedProfitJPY != null && v.expectedProfitJPY > 0 && (
+                      <span
+                        style={{ fontSize: 12, color: C.textSub }}
+                      >
+                        {fmt(v.expectedProfitJPY)}
+                      </span>
+                    )}
+                    <span style={badge(statusColor)}>{v.status}</span>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
 
-      {/* 相場トレンド一言サマリー */}
-      <div style={card}>
-        <div style={label}>相場トレンド</div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <div style={card()}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 16,
+            }}
+          >
+            <div style={lbl}>相場トレンド</div>
+            <button
+              onClick={() => router.push("/market")}
+              style={{
+                fontSize: 11,
+                color: C.orange,
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: font,
+              }}
+            >
+              相場DBへ →
+            </button>
+          </div>
           {[
             {
               model: "カブ系",
               trend: "↑",
               note: "輸出需要高・BDS競争激化",
+              color: C.green,
             },
-            { model: "シグナス125", trend: "→", note: "台湾向け安定相場" },
-            { model: "モンキー系", trend: "↑", note: "国内プレミアム継続中" },
+            {
+              model: "シグナス125",
+              trend: "→",
+              note: "台湾向け安定相場",
+              color: C.yellow,
+            },
+            {
+              model: "モンキー系",
+              trend: "↑",
+              note: "国内プレミアム継続中",
+              color: C.green,
+            },
+            {
+              model: "CB400SF",
+              trend: "↓",
+              note: "在庫過多・価格調整局面",
+              color: C.red,
+            },
           ].map((t, i) => (
             <div
               key={i}
               style={{
-                flex: 1,
-                minWidth: 160,
-                background: "#0e0e10",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "10px 12px",
+                background: "#0d0d0f",
                 borderRadius: 6,
-                padding: 12,
+                marginBottom: 8,
+                border: `1px solid ${C.border}`,
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: 6,
-                }}
-              >
-                <span style={{ fontSize: 13, fontWeight: "bold" }}>
-                  {t.model}
-                </span>
-                <span
+              <div>
+                <div
                   style={{
-                    fontSize: 18,
-                    color:
-                      t.trend === "↑"
-                        ? C.green
-                        : t.trend === "↓"
-                          ? C.red
-                          : C.yellow,
+                    fontSize: 13,
+                    fontWeight: "bold",
+                    marginBottom: 2,
                   }}
                 >
-                  {t.trend}
-                </span>
+                  {t.model}
+                </div>
+                <div style={{ fontSize: 11, color: C.textSub }}>
+                  {t.note}
+                </div>
               </div>
-              <div style={{ fontSize: 11, color: C.textSub }}>{t.note}</div>
+              <span
+                style={{
+                  fontSize: 22,
+                  color: t.color,
+                  fontWeight: "bold",
+                }}
+              >
+                {t.trend}
+              </span>
             </div>
           ))}
         </div>
-        <button
-          onClick={() => router.push("/market")}
-          style={{
-            marginTop: 12,
-            fontSize: 11,
-            color: C.orange,
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          相場DBを見る →
-        </button>
-      </div>
-
-      {/* 接続状態 */}
-      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 8 }}>
-        Supabase:{" "}
-        <span
-          style={{
-            color:
-              connectionStatus.supabase === "ok" ? C.green : C.red,
-          }}
-        >
-          {connectionStatus.supabase === "ok" ? "接続OK" : "未接続"}
-        </span>
       </div>
     </div>
   )
