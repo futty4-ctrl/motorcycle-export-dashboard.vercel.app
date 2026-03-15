@@ -1,7 +1,9 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import type { CSSProperties } from "react"
+import { getMarketPrices } from "@/lib/queries"
+import type { MarketPrice, Source, Trend } from "@/lib/types"
 
 const C = {
   bg: "#0a0a0a",
@@ -25,39 +27,6 @@ const C = {
   font: "'DM Mono', 'Courier New', monospace",
   fontSans: "'DM Sans', 'Helvetica Neue', sans-serif",
 }
-
-type Source = "ヤフオク" | "BDS" | "カチオク" | "JBA" | "手動"
-type Trend = "up" | "down" | "flat"
-
-interface PriceEntry {
-  id: string
-  maker: string
-  model: string
-  year: string
-  condition: "A" | "B" | "C" | "D"
-  source: Source
-  avgPrice: number
-  minPrice: number
-  maxPrice: number
-  sampleCount: number
-  trend: Trend
-  trendPct: number
-  updatedAt: string
-  memo?: string
-}
-
-const MOCK: PriceEntry[] = [
-  { id: "1", maker: "Honda", model: "モンキー Z50M", year: "1970-1979", condition: "A", source: "ヤフオク", avgPrice: 280000, minPrice: 180000, maxPrice: 420000, sampleCount: 23, trend: "up", trendPct: 8.2, updatedAt: "2026-03-13", memo: "復刻版と混在注意" },
-  { id: "2", maker: "Honda", model: "モンキー Z50M", year: "1970-1979", condition: "B", source: "ヤフオク", avgPrice: 185000, minPrice: 90000, maxPrice: 260000, sampleCount: 41, trend: "up", trendPct: 5.1, updatedAt: "2026-03-13" },
-  { id: "3", maker: "Honda", model: "モンキー Z50M", year: "1970-1979", condition: "C", source: "BDS", avgPrice: 95000, minPrice: 45000, maxPrice: 140000, sampleCount: 18, trend: "flat", trendPct: 0.3, updatedAt: "2026-03-12" },
-  { id: "4", maker: "Honda", model: "ゴリラ Z50J", year: "1978-1988", condition: "A", source: "ヤフオク", avgPrice: 320000, minPrice: 240000, maxPrice: 480000, sampleCount: 9, trend: "up", trendPct: 12.4, updatedAt: "2026-03-11" },
-  { id: "5", maker: "Honda", model: "ゴリラ Z50J", year: "1978-1988", condition: "B", source: "ヤフオク", avgPrice: 210000, minPrice: 130000, maxPrice: 280000, sampleCount: 14, trend: "up", trendPct: 6.8, updatedAt: "2026-03-11" },
-  { id: "6", maker: "Honda", model: "ダックス ST70", year: "1969-1980", condition: "A", source: "カチオク", avgPrice: 250000, minPrice: 180000, maxPrice: 390000, sampleCount: 7, trend: "flat", trendPct: 1.2, updatedAt: "2026-03-10" },
-  { id: "7", maker: "Honda", model: "シャリー CF50", year: "1973-1983", condition: "B", source: "ヤフオク", avgPrice: 88000, minPrice: 55000, maxPrice: 125000, sampleCount: 22, trend: "down", trendPct: -3.1, updatedAt: "2026-03-13" },
-  { id: "8", maker: "Yamaha", model: "ミニトレ GT80", year: "1972-1980", condition: "B", source: "BDS", avgPrice: 72000, minPrice: 40000, maxPrice: 110000, sampleCount: 12, trend: "down", trendPct: -1.8, updatedAt: "2026-03-09" },
-  { id: "9", maker: "Honda", model: "カブ C50", year: "1966-1979", condition: "A", source: "JBA", avgPrice: 145000, minPrice: 90000, maxPrice: 210000, sampleCount: 31, trend: "up", trendPct: 3.9, updatedAt: "2026-03-13" },
-  { id: "10", maker: "Honda", model: "カブ C50", year: "1966-1979", condition: "B", source: "ヤフオク", avgPrice: 78000, minPrice: 35000, maxPrice: 125000, sampleCount: 58, trend: "flat", trendPct: 0.8, updatedAt: "2026-03-13" },
-]
 
 const MAKERS = ["全メーカー", "Honda", "Yamaha", "Suzuki", "Kawasaki"]
 const SOURCES: Source[] = ["ヤフオク", "BDS", "カチオク", "JBA", "手動"]
@@ -92,7 +61,7 @@ function PriceModal({
 }: {
   open: boolean
   onClose: () => void
-  initial?: Partial<PriceEntry>
+  initial?: Partial<MarketPrice>
 }) {
   if (!open) return null
   const title = initial?.id ? "価格データ編集" : "価格データ追加"
@@ -205,10 +174,10 @@ function PriceModal({
         >
           {(
             [
-              "avgPrice",
-              "minPrice",
-              "maxPrice",
-              "sampleCount",
+              "avg_price",
+              "min_price",
+              "max_price",
+              "sample_count",
             ] as const
           ).map((f) => (
             <div key={f}>
@@ -222,11 +191,11 @@ function PriceModal({
                   letterSpacing: "0.08em",
                 }}
               >
-                {f === "avgPrice"
+                {f === "avg_price"
                   ? "平均価格"
-                  : f === "minPrice"
+                  : f === "min_price"
                     ? "最低価格"
-                    : f === "maxPrice"
+                    : f === "max_price"
                       ? "最高価格"
                       : "サンプル数"}
               </label>
@@ -403,20 +372,29 @@ function PriceModal({
 }
 
 export function MarketPricesContent() {
+  const [data, setData] = useState<MarketPrice[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [makerFilter, setMakerFilter] = useState("全メーカー")
   const [condFilter, setCondFilter] = useState<string>("all")
   const [srcFilter, setSrcFilter] = useState<string>("all")
-  const [sortKey, setSortKey] = useState<keyof PriceEntry>("avgPrice")
+  const [sortKey, setSortKey] = useState<keyof MarketPrice>("avg_price")
   const [sortAsc, setSortAsc] = useState(false)
   const [modal, setModal] = useState<{
     open: boolean
-    entry?: PriceEntry
+    entry?: MarketPrice
   }>({ open: false })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
+  useEffect(() => {
+    getMarketPrices()
+      .then(setData)
+      .catch(() => setData([]))
+      .finally(() => setLoading(false))
+  }, [])
+
   const filtered = useMemo(() => {
-    let d = MOCK
+    let d = data
     if (search) d = d.filter((r) => `${r.maker}${r.model}`.includes(search))
     if (makerFilter !== "全メーカー")
       d = d.filter((r) => r.maker === makerFilter)
@@ -428,9 +406,9 @@ export function MarketPricesContent() {
       const bv = b[sortKey] as string | number
       return sortAsc ? (av > bv ? 1 : -1) : av < bv ? 1 : -1
     })
-  }, [search, makerFilter, condFilter, srcFilter, sortKey, sortAsc])
+  }, [data, search, makerFilter, condFilter, srcFilter, sortKey, sortAsc])
 
-  const toggleSort = (k: keyof PriceEntry) => {
+  const toggleSort = (k: keyof MarketPrice) => {
     if (sortKey === k) setSortAsc(!sortAsc)
     else {
       setSortKey(k)
@@ -439,7 +417,7 @@ export function MarketPricesContent() {
   }
 
   const avgAll = Math.round(
-    filtered.reduce((s, r) => s + r.avgPrice, 0) / (filtered.length || 1)
+    filtered.reduce((s, r) => s + r.avg_price, 0) / (filtered.length || 1)
   )
 
   const stats = [
@@ -457,7 +435,7 @@ export function MarketPricesContent() {
     },
   ]
 
-  const thStyle = (k: keyof PriceEntry): CSSProperties => ({
+  const thStyle = (k: keyof MarketPrice): CSSProperties => ({
     padding: "10px 14px",
     textAlign: "left",
     fontFamily: C.font,
@@ -473,6 +451,23 @@ export function MarketPricesContent() {
     padding: "12px 14px",
     borderBottom: `1px solid ${C.border}20`,
     verticalAlign: "middle",
+  }
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          fontFamily: C.font,
+          color: C.textMuted,
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        読み込み中...
+      </div>
+    )
   }
 
   return (
@@ -751,13 +746,13 @@ export function MarketPricesContent() {
                     ["year", "年式"],
                     ["condition", "状態"],
                     ["source", "ソース"],
-                    ["avgPrice", "平均相場"],
-                    ["minPrice", "最低"],
-                    ["maxPrice", "最高"],
-                    ["sampleCount", "件数"],
+                    ["avg_price", "平均相場"],
+                    ["min_price", "最低"],
+                    ["max_price", "最高"],
+                    ["sample_count", "件数"],
                     ["trend", "トレンド"],
-                    ["updatedAt", "更新日"],
-                  ] as [keyof PriceEntry, string][]
+                    ["updated_at", "更新日"],
+                  ] as [keyof MarketPrice, string][]
                 ).map(([k, label]) => (
                   <th
                     key={k}
@@ -774,7 +769,7 @@ export function MarketPricesContent() {
             </thead>
             <tbody>
               {filtered.map((r, i) => {
-                const tr = trendIcon(r.trend, r.trendPct)
+                const tr = trendIcon(r.trend, r.trend_pct)
                 return (
                   <tr
                     key={r.id}
@@ -883,7 +878,7 @@ export function MarketPricesContent() {
                         color: C.orange,
                       }}
                     >
-                      {fmt(r.avgPrice)}
+                      {fmt(r.avg_price)}
                     </td>
                     <td
                       style={{
@@ -893,7 +888,7 @@ export function MarketPricesContent() {
                         color: C.textSub,
                       }}
                     >
-                      {fmt(r.minPrice)}
+                      {fmt(r.min_price)}
                     </td>
                     <td
                       style={{
@@ -903,7 +898,7 @@ export function MarketPricesContent() {
                         color: C.textSub,
                       }}
                     >
-                      {fmt(r.maxPrice)}
+                      {fmt(r.max_price)}
                     </td>
                     <td
                       style={{
@@ -914,7 +909,7 @@ export function MarketPricesContent() {
                         textAlign: "center",
                       }}
                     >
-                      {r.sampleCount}
+                      {r.sample_count}
                     </td>
                     <td style={tdStyle}>
                       <span
@@ -935,7 +930,7 @@ export function MarketPricesContent() {
                         color: C.textMuted,
                       }}
                     >
-                      {r.updatedAt}
+                      {r.updated_at}
                     </td>
                     <td style={tdStyle}>
                       <div style={{ display: "flex", gap: 6 }}>
@@ -1011,7 +1006,7 @@ export function MarketPricesContent() {
               color: C.textMuted,
             }}
           >
-            {filtered.length} 件表示 / 全{MOCK.length}件
+            {filtered.length} 件表示 / 全{data.length}件
             {selectedIds.size > 0 && ` · ${selectedIds.size}件選択中`}
           </span>
           <div style={{ display: "flex", gap: 8 }}>
