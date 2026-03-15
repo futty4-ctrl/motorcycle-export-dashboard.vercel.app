@@ -163,6 +163,185 @@ export default function InvoiceEditor({
     day: "numeric",
   })
 
+  const handlePrint = () => {
+    const printWindow = window.open("", "_blank", "width=900,height=700")
+    if (!printWindow) return
+
+    const todayStr = new Date(issueDate).toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+    const titleLabelStr =
+      invoiceType === "invoice" ? "御　請　求　書" : "御　見　積　書"
+    const dateLabelStr = invoiceType === "invoice" ? "請求日" : "見積日"
+
+    const itemRows = items
+      .map(
+        (item, i) => `
+    <tr style="background:${i % 2 === 0 ? "#fff" : "#f9f9f9"}">
+      <td style="padding:2.5mm 3mm;border-bottom:1px solid #ddd">${item.desc || "　"}</td>
+      <td style="padding:2.5mm 3mm;border-bottom:1px solid #ddd;text-align:right">${item.qty.toLocaleString()}</td>
+      <td style="padding:2.5mm 3mm;border-bottom:1px solid #ddd;text-align:center">${item.unit}</td>
+      <td style="padding:2.5mm 3mm;border-bottom:1px solid #ddd;text-align:right">¥${item.price.toLocaleString()}</td>
+      <td style="padding:2.5mm 3mm;border-bottom:1px solid #ddd;text-align:right;font-weight:600">¥${(item.qty * item.price).toLocaleString()}</td>
+    </tr>
+  `
+      )
+      .join("")
+
+    const emptyRows = Array.from({
+      length: Math.max(0, 8 - items.length),
+    })
+      .map(
+        (_, i) => `
+    <tr style="background:${(items.length + i) % 2 === 0 ? "#fff" : "#f9f9f9"}">
+      <td style="padding:2.5mm 3mm;border-bottom:1px solid #ddd">　</td>
+      <td style="padding:2.5mm 3mm;border-bottom:1px solid #ddd">　</td>
+      <td style="padding:2.5mm 3mm;border-bottom:1px solid #ddd">　</td>
+      <td style="padding:2.5mm 3mm;border-bottom:1px solid #ddd">　</td>
+      <td style="padding:2.5mm 3mm;border-bottom:1px solid #ddd">　</td>
+    </tr>
+  `
+      )
+      .join("")
+
+    const bankSection =
+      invoiceType === "invoice" && bankInfo
+        ? `
+    <div style="background:#f8f8f8;border:1px solid #ccc;padding:3mm 5mm;margin-bottom:6mm;font-size:9pt">
+      <div style="font-weight:700;margin-bottom:1mm">■ お振込先</div>
+      ${bankInfo.split("\n").map((l) => `<div>${l}</div>`).join("")}
+    </div>
+  `
+        : ""
+
+    const totalBoxSection =
+      invoiceType === "invoice"
+        ? `
+    <div style="border:2px solid #111;padding:4mm 6mm;margin-bottom:6mm;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:700;font-size:11pt">合計金額（税込）</span>
+      <span style="font-weight:700;font-size:16pt">¥${total.toLocaleString()} ─</span>
+    </div>
+  `
+        : ""
+
+    const notesSection = notes
+      ? `
+    <div style="border-top:1px solid #ccc;padding-top:4mm;font-size:9pt;color:#444">
+      <div style="font-weight:700;margin-bottom:2mm">備考</div>
+      ${notes.split("\n").map((l) => `<div>${l}</div>`).join("")}
+    </div>
+  `
+      : ""
+
+    printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+      <meta charset="UTF-8">
+      <title>${titleLabelStr}</title>
+      <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
+      <style>
+        @page { size: A4; margin: 0; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body {
+          margin: 0; padding: 0;
+          background: #fff; color: #111;
+          font-family: 'Noto Serif JP', 'Yu Mincho', 'Hiragino Mincho ProN', serif;
+          font-size: 10.5pt;
+          line-height: 1.8;
+        }
+        .page {
+          width: 210mm;
+          min-height: 297mm;
+          padding: 20mm 18mm;
+          box-sizing: border-box;
+          background: #fff;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="page">
+
+        <div style="text-align:center;font-size:18pt;font-weight:700;letter-spacing:0.4em;margin-bottom:12mm;padding-bottom:4mm;border-bottom:2px solid #111">
+          ${titleLabelStr}
+        </div>
+
+        <div style="display:flex;justify-content:space-between;margin-bottom:8mm">
+          <div style="flex:1">
+            <div style="font-size:13pt;font-weight:700;border-bottom:1px solid #111;padding-bottom:2mm;margin-bottom:3mm">
+              ${clientName || "　"} 御中
+            </div>
+            <div style="font-size:9pt;color:#555">
+              下記のとおりご${invoiceType === "invoice" ? "請求" : "見積"}申し上げます。
+            </div>
+          </div>
+          <div style="text-align:right;font-size:9pt;line-height:2;min-width:55mm">
+            <div style="font-weight:700;font-size:11pt">淵上 郁也</div>
+            <div>〒570-0006</div>
+            <div>大阪府守口市八雲西町2-1-27</div>
+            <div>TEL：090-6423-4268</div>
+            <div style="margin-top:2mm">${dateLabelStr}：${todayStr}</div>
+          </div>
+        </div>
+
+        <div style="background:#f0f0f0;padding:3mm 5mm;margin-bottom:6mm;font-weight:700;font-size:11pt;border-left:4px solid #111">
+          件名：${subject || "　"}
+        </div>
+
+        ${totalBoxSection}
+        ${bankSection}
+
+        <table style="width:100%;border-collapse:collapse;margin-bottom:4mm;font-size:9.5pt">
+          <thead>
+            <tr>
+              <th style="background:#222;color:#fff;padding:3mm;text-align:left;font-weight:700;border-bottom:2px solid #111">摘要</th>
+              <th style="background:#222;color:#fff;padding:3mm;text-align:right;font-weight:700;border-bottom:2px solid #111;width:16mm">数量</th>
+              <th style="background:#222;color:#fff;padding:3mm;text-align:center;font-weight:700;border-bottom:2px solid #111;width:14mm">単位</th>
+              <th style="background:#222;color:#fff;padding:3mm;text-align:right;font-weight:700;border-bottom:2px solid #111;width:26mm">単価</th>
+              <th style="background:#222;color:#fff;padding:3mm;text-align:right;font-weight:700;border-bottom:2px solid #111;width:28mm">金額</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRows}
+            ${emptyRows}
+          </tbody>
+        </table>
+
+        <div style="display:flex;justify-content:flex-end;margin-bottom:6mm">
+          <table style="font-size:9.5pt;border-collapse:collapse;min-width:80mm">
+            <tr>
+              <td style="padding:2mm 4mm;border-bottom:1px solid #ddd;color:#555">小計</td>
+              <td style="padding:2mm 4mm;border-bottom:1px solid #ddd;text-align:right">¥${subtotal.toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td style="padding:2mm 4mm;border-bottom:1px solid #ddd;color:#555">消費税（${taxRate}%）</td>
+              <td style="padding:2mm 4mm;border-bottom:1px solid #ddd;text-align:right">¥${tax.toLocaleString()}</td>
+            </tr>
+            <tr style="background:#f0f0f0">
+              <td style="padding:3mm 4mm;font-weight:700;border-top:2px solid #111">合計（税込）</td>
+              <td style="padding:3mm 4mm;text-align:right;font-weight:700;font-size:12pt;border-top:2px solid #111">¥${total.toLocaleString()}</td>
+            </tr>
+          </table>
+        </div>
+
+        ${notesSection}
+
+      </div>
+
+      <script>
+        window.onload = function() {
+          window.print()
+          window.onafterprint = function() { window.close() }
+        }
+      </script>
+    </body>
+    </html>
+  `)
+    printWindow.document.close()
+  }
+
   return (
     <>
       <style>{`
@@ -523,7 +702,7 @@ export default function InvoiceEditor({
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={handlePrint}
               style={{
                 padding: "10px 22px",
                 background: "none",
