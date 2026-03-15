@@ -35,6 +35,7 @@ const NAV = [
   {
     group: "管理",
     items: [
+      { href: "/invoices", label: "請求書・見積書", icon: "🧾" },
       { href: "/documents", label: "ドキュメント", icon: "◻" },
       { href: "/settings", label: "設定", icon: "⚙" },
     ],
