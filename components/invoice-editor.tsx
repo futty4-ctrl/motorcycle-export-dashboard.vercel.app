@@ -184,119 +184,119 @@ export default function InvoiceEditor({
     <title>${titleLabelStr}</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
     <style>
-      @page { size: A4 portrait; margin: 12mm 15mm; }
+      @page { size: A4 portrait; margin: 8mm 10mm; }
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
       body {
         margin: 0; padding: 0;
         background: #fff; color: #111;
         font-family: 'Noto Serif JP', 'Yu Mincho', serif;
-        font-size: 9pt;
-        line-height: 1.6;
+        font-size: 8pt;
+        line-height: 1.45;
       }
     </style>
   </head>
   <body>
 
     <!-- タイトル -->
-    <div style="text-align:center;font-size:15pt;font-weight:700;letter-spacing:0.4em;margin-bottom:6mm;padding-bottom:3mm;border-bottom:2px solid #111">
+    <div style="text-align:center;font-size:13pt;font-weight:700;letter-spacing:0.35em;margin-bottom:3mm;padding-bottom:2mm;border-bottom:2px solid #111">
       ${titleLabelStr}
     </div>
 
     <!-- 宛先 + 自社 -->
-    <div style="display:flex;justify-content:space-between;margin-bottom:5mm">
+    <div style="display:flex;justify-content:space-between;margin-bottom:3mm">
       <div style="flex:1">
-        <div style="font-size:11pt;font-weight:700;border-bottom:1px solid #111;padding-bottom:1.5mm;margin-bottom:2mm">
+        <div style="font-size:10pt;font-weight:700;border-bottom:1px solid #111;padding-bottom:1mm;margin-bottom:1mm">
           ${clientName || "　"} 御中
         </div>
-        <div style="font-size:8pt;color:#555">
+        <div style="font-size:7.5pt;color:#555">
           下記のとおりご${invoiceType === "invoice" ? "請求" : "見積"}申し上げます。
         </div>
       </div>
-      <div style="text-align:right;font-size:8pt;line-height:1.8;min-width:52mm;margin-left:8mm">
-        <div style="font-weight:700;font-size:10pt">淵上 郁也</div>
+      <div style="text-align:right;font-size:7.5pt;line-height:1.6;min-width:48mm;margin-left:6mm">
+        <div style="font-weight:700;font-size:9pt">淵上 郁也</div>
         <div>〒570-0006</div>
         <div>大阪府守口市八雲西町2-1-27</div>
         <div>TEL：090-6423-4268</div>
-        <div style="margin-top:1mm">${dateLabelStr}：${todayStr}</div>
+        <div style="margin-top:0.5mm">${dateLabelStr}：${todayStr}</div>
       </div>
     </div>
 
     <!-- 件名 -->
-    <div style="background:#f0f0f0;padding:2mm 4mm;margin-bottom:4mm;font-weight:700;font-size:10pt;border-left:4px solid #111">
+    <div style="background:#f0f0f0;padding:1.5mm 3mm;margin-bottom:2.5mm;font-weight:700;font-size:9pt;border-left:4px solid #111">
       件名：${subject || "　"}
     </div>
 
     <!-- 合計金額ボックス（請求書のみ） -->
     ${invoiceType === "invoice" ? `
-      <div style="border:2px solid #111;padding:2.5mm 5mm;margin-bottom:4mm;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:700;font-size:10pt">合計金額（税込）</span>
-        <span style="font-weight:700;font-size:14pt">¥${total.toLocaleString()} ─</span>
+      <div style="border:2px solid #111;padding:2mm 4mm;margin-bottom:2.5mm;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:700;font-size:9pt">合計金額（税込）</span>
+        <span style="font-weight:700;font-size:12pt">¥${total.toLocaleString()} ─</span>
       </div>
     ` : ""}
 
     <!-- 振込先（請求書のみ） -->
     ${invoiceType === "invoice" && bankInfo ? `
-      <div style="background:#f8f8f8;border:1px solid #ccc;padding:2mm 4mm;margin-bottom:4mm;font-size:8pt">
-        <div style="font-weight:700;margin-bottom:1mm">■ お振込先</div>
+      <div style="background:#f8f8f8;border:1px solid #ccc;padding:1.5mm 3mm;margin-bottom:2.5mm;font-size:7.5pt">
+        <div style="font-weight:700;margin-bottom:0.5mm">■ お振込先</div>
         ${bankInfo.split("\n").map((l) => `<div>${l}</div>`).join("")}
       </div>
     ` : ""}
 
     <!-- 明細テーブル -->
-    <table style="width:100%;border-collapse:collapse;margin-bottom:3mm;font-size:8.5pt">
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2mm;font-size:8pt">
       <thead>
         <tr>
-          <th style="background:#222;color:#fff;padding:2mm 3mm;text-align:left;font-weight:700">摘要</th>
-          <th style="background:#222;color:#fff;padding:2mm 3mm;text-align:right;width:14mm">数量</th>
-          <th style="background:#222;color:#fff;padding:2mm 3mm;text-align:center;width:12mm">単位</th>
-          <th style="background:#222;color:#fff;padding:2mm 3mm;text-align:right;width:24mm">単価</th>
-          <th style="background:#222;color:#fff;padding:2mm 3mm;text-align:right;width:26mm">金額</th>
+          <th style="background:#222;color:#fff;padding:1.5mm 2mm;text-align:left;font-weight:700">摘要</th>
+          <th style="background:#222;color:#fff;padding:1.5mm 2mm;text-align:right;width:12mm">数量</th>
+          <th style="background:#222;color:#fff;padding:1.5mm 2mm;text-align:center;width:10mm">単位</th>
+          <th style="background:#222;color:#fff;padding:1.5mm 2mm;text-align:right;width:22mm">単価</th>
+          <th style="background:#222;color:#fff;padding:1.5mm 2mm;text-align:right;width:24mm">金額</th>
         </tr>
       </thead>
       <tbody>
         ${items.map((item, i) => `
           <tr style="background:${i % 2 === 0 ? "#fff" : "#f9f9f9"}">
-            <td style="padding:2mm 3mm;border-bottom:1px solid #e0e0e0">${item.desc || "　"}</td>
-            <td style="padding:2mm 3mm;border-bottom:1px solid #e0e0e0;text-align:right">${item.qty.toLocaleString()}</td>
-            <td style="padding:2mm 3mm;border-bottom:1px solid #e0e0e0;text-align:center">${item.unit}</td>
-            <td style="padding:2mm 3mm;border-bottom:1px solid #e0e0e0;text-align:right">¥${item.price.toLocaleString()}</td>
-            <td style="padding:2mm 3mm;border-bottom:1px solid #e0e0e0;text-align:right;font-weight:600">¥${(item.qty * item.price).toLocaleString()}</td>
+            <td style="padding:1.5mm 2mm;border-bottom:1px solid #e0e0e0">${item.desc || "　"}</td>
+            <td style="padding:1.5mm 2mm;border-bottom:1px solid #e0e0e0;text-align:right">${item.qty.toLocaleString()}</td>
+            <td style="padding:1.5mm 2mm;border-bottom:1px solid #e0e0e0;text-align:center">${item.unit}</td>
+            <td style="padding:1.5mm 2mm;border-bottom:1px solid #e0e0e0;text-align:right">¥${item.price.toLocaleString()}</td>
+            <td style="padding:1.5mm 2mm;border-bottom:1px solid #e0e0e0;text-align:right;font-weight:600">¥${(item.qty * item.price).toLocaleString()}</td>
           </tr>
         `).join("")}
-        ${Array.from({ length: Math.max(0, 5 - items.length) }).map((_, i) => `
+        ${Array.from({ length: Math.max(0, 3 - items.length) }).map((_, i) => `
           <tr style="background:${(items.length + i) % 2 === 0 ? "#fff" : "#f9f9f9"}">
-            <td style="padding:2mm 3mm;border-bottom:1px solid #e0e0e0">　</td>
-            <td style="padding:2mm 3mm;border-bottom:1px solid #e0e0e0"></td>
-            <td style="padding:2mm 3mm;border-bottom:1px solid #e0e0e0"></td>
-            <td style="padding:2mm 3mm;border-bottom:1px solid #e0e0e0"></td>
-            <td style="padding:2mm 3mm;border-bottom:1px solid #e0e0e0"></td>
+            <td style="padding:1.5mm 2mm;border-bottom:1px solid #e0e0e0">　</td>
+            <td style="padding:1.5mm 2mm;border-bottom:1px solid #e0e0e0"></td>
+            <td style="padding:1.5mm 2mm;border-bottom:1px solid #e0e0e0"></td>
+            <td style="padding:1.5mm 2mm;border-bottom:1px solid #e0e0e0"></td>
+            <td style="padding:1.5mm 2mm;border-bottom:1px solid #e0e0e0"></td>
           </tr>
         `).join("")}
       </tbody>
     </table>
 
     <!-- 小計・税・合計 -->
-    <div style="display:flex;justify-content:flex-end;margin-bottom:4mm">
-      <table style="font-size:8.5pt;border-collapse:collapse;min-width:72mm">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:2.5mm">
+      <table style="font-size:8pt;border-collapse:collapse;min-width:68mm">
         <tr>
-          <td style="padding:1.5mm 4mm;border-bottom:1px solid #ddd;color:#555">小計</td>
-          <td style="padding:1.5mm 4mm;border-bottom:1px solid #ddd;text-align:right">¥${subtotal.toLocaleString()}</td>
+          <td style="padding:1mm 3mm;border-bottom:1px solid #ddd;color:#555">小計</td>
+          <td style="padding:1mm 3mm;border-bottom:1px solid #ddd;text-align:right">¥${subtotal.toLocaleString()}</td>
         </tr>
         <tr>
-          <td style="padding:1.5mm 4mm;border-bottom:1px solid #ddd;color:#555">消費税（${taxRate}%）</td>
-          <td style="padding:1.5mm 4mm;border-bottom:1px solid #ddd;text-align:right">¥${tax.toLocaleString()}</td>
+          <td style="padding:1mm 3mm;border-bottom:1px solid #ddd;color:#555">消費税（${taxRate}%）</td>
+          <td style="padding:1mm 3mm;border-bottom:1px solid #ddd;text-align:right">¥${tax.toLocaleString()}</td>
         </tr>
         <tr style="background:#f0f0f0">
-          <td style="padding:2.5mm 4mm;font-weight:700;border-top:2px solid #111">合計（税込）</td>
-          <td style="padding:2.5mm 4mm;text-align:right;font-weight:700;font-size:11pt;border-top:2px solid #111">¥${total.toLocaleString()}</td>
+          <td style="padding:2mm 3mm;font-weight:700;border-top:2px solid #111">合計（税込）</td>
+          <td style="padding:2mm 3mm;text-align:right;font-weight:700;font-size:10pt;border-top:2px solid #111">¥${total.toLocaleString()}</td>
         </tr>
       </table>
     </div>
 
     <!-- 備考 -->
     ${notes ? `
-      <div style="border-top:1px solid #ccc;padding-top:3mm;font-size:8pt;color:#444">
-        <div style="font-weight:700;margin-bottom:1.5mm">備考</div>
+      <div style="border-top:1px solid #ccc;padding-top:2mm;font-size:7.5pt;color:#444">
+        <div style="font-weight:700;margin-bottom:1mm">備考</div>
         ${notes.split("\n").map((l) => `<div>${l}</div>`).join("")}
       </div>
     ` : ""}
