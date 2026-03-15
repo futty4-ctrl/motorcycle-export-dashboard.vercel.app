@@ -7,24 +7,19 @@ export type Source =
   | "手動"
 export type Trend = "up" | "down" | "flat"
 
-// ── 在庫 ──────────────────────────────────────────────────────
+// vehicles テーブル（既存スキーマに合わせる）
 export interface Vehicle {
   id: string
-  maker: string
-  model: string
-  year: string
-  condition: Condition
-  purchase_price: number
-  target_price: number
   status: "in_stock" | "listed" | "sold" | "exported"
-  location: string
-  memo: string | null
-  images: string[]
-  created_at: string
-  updated_at: string
+  bds_rating: string | null
+  chassis_number: string | null
+  drive_link: string | null
+  // 右側に見えてないカラムがあれば後で追加
+  created_at?: string
+  updated_at?: string
 }
 
-// ── 査定履歴 ─────────────────────────────────────────────────
+// assess_history（新規作成したテーブル）
 export interface AssessHistory {
   id: string
   manufacturer: string
@@ -36,12 +31,12 @@ export interface AssessHistory {
   created_at: string
 }
 
-// ── 市場価格 ─────────────────────────────────────────────────
+// market_prices（新規作成したテーブル）
 export interface MarketPrice {
   id: string
   maker: string
   model: string
-  year: string
+  year: string | null
   condition: Condition
   source: Source
   avg_price: number

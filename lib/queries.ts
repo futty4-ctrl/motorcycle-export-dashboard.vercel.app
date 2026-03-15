@@ -1,6 +1,10 @@
 export {
   getVehicles,
+  updateVehicleStatus,
   getAssessHistory,
+  insertAssessHistory,
+  clearAssessHistory,
   getMarketPrices,
-  getDashboardStats,
+  upsertMarketPrice,
+  deleteMarketPrice,
 } from "./api"

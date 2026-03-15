@@ -1,7 +1,7 @@
 import { supabase } from "./supabase"
 import type { Vehicle, AssessHistory, MarketPrice } from "./types"
 
-// ── 在庫 ──────────────────────────────────────────────────────
+// ── 在庫（既存テーブルそのまま）────────────────────────────
 export async function getVehicles() {
   const { data, error } = await supabase
     .from("vehicles")
@@ -11,22 +11,18 @@ export async function getVehicles() {
   return data as Vehicle[]
 }
 
-export async function upsertVehicle(vehicle: Partial<Vehicle>) {
-  const { data, error } = await supabase
+export async function updateVehicleStatus(
+  id: string,
+  status: Vehicle["status"]
+) {
+  const { error } = await supabase
     .from("vehicles")
-    .upsert(vehicle)
-    .select()
-    .single()
-  if (error) throw error
-  return data as Vehicle
-}
-
-export async function deleteVehicle(id: string) {
-  const { error } = await supabase.from("vehicles").delete().eq("id", id)
+    .update({ status })
+    .eq("id", id)
   if (error) throw error
 }
 
-// ── 査定履歴 ─────────────────────────────────────────────────
+// ── 査定履歴（新規テーブル）────────────────────────────────
 export async function getAssessHistory(limit = 50) {
   const { data, error } = await supabase
     .from("assess_history")
@@ -53,11 +49,11 @@ export async function clearAssessHistory() {
   const { error } = await supabase
     .from("assess_history")
     .delete()
-    .neq("id", "00000000-0000-0000-0000-000000000000") // 全件削除
+    .neq("id", "00000000-0000-0000-0000-000000000000")
   if (error) throw error
 }
 
-// ── 市場価格 ─────────────────────────────────────────────────
+// ── 市場価格（新規テーブル）────────────────────────────────
 export async function getMarketPrices() {
   const { data, error } = await supabase
     .from("market_prices")
@@ -78,30 +74,9 @@ export async function upsertMarketPrice(entry: Partial<MarketPrice>) {
 }
 
 export async function deleteMarketPrice(id: string) {
-  const { error } = await supabase.from("market_prices").delete().eq("id", id)
+  const { error } = await supabase
+    .from("market_prices")
+    .delete()
+    .eq("id", id)
   if (error) throw error
-}
-
-// ── ダッシュボード用集計 ──────────────────────────────────────
-export async function getDashboardStats() {
-  const [vehicles, assessHistory] = await Promise.all([
-    getVehicles(),
-    getAssessHistory(100),
-  ])
-
-  const inStock = vehicles.filter((v) => v.status === "in_stock").length
-  const listed = vehicles.filter((v) => v.status === "listed").length
-  const sold = vehicles.filter((v) => v.status === "sold")
-  const totalRevenue = sold.reduce((s, v) => s + v.target_price, 0)
-  const totalCost = sold.reduce((s, v) => s + v.purchase_price, 0)
-  const grossProfit = totalRevenue - totalCost
-
-  return {
-    inStock,
-    listed,
-    soldCount: sold.length,
-    totalRevenue,
-    grossProfit,
-    assessCount: assessHistory.length,
-  }
 }
