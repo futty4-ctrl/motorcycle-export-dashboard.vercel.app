@@ -371,7 +371,7 @@ function PriceModal({
   )
 }
 
-export function MarketPricesContent() {
+export default function MarketPricesContent() {
   const [data, setData] = useState<MarketPrice[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")

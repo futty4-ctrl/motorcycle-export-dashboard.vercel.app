@@ -1,5 +1,5 @@
-import { MarketPricesContent } from "@/components/market-prices-content"
+import MarketPricesContent from "@/components/market-prices-content"
 
-export default function MarketPage() {
+export default function MarketPricesPage() {
   return <MarketPricesContent />
 }
