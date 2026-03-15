@@ -5,12 +5,9 @@ import type { CSSProperties } from "react"
 import { supabase } from "@/lib/supabase"
 
 const C = {
-  bg: "#0a0a0a",
   surface: "#111111",
   surfaceHigh: "#1a1a1a",
-  surfaceHover: "#222222",
   border: "#2a2a2a",
-  borderLight: "#333333",
   orange: "#f97316",
   green: "#22c55e",
   greenDim: "#14532d",
@@ -41,11 +38,10 @@ const newItem = (): LineItem => ({
 
 const UNITS = ["式", "時間", "個", "件", "月", "日", "枚", "台"]
 
-const fmt = (n: number) =>
-  n.toLocaleString("ja-JP", { style: "currency", currency: "JPY" })
+const fmtYen = (n: number) => `¥${n.toLocaleString()}`
 
-const inputStyle = (width = "100%"): CSSProperties => ({
-  width,
+const inputStyle = (): CSSProperties => ({
+  width: "100%",
   background: C.surfaceHigh,
   border: `1px solid ${C.border}`,
   borderRadius: 5,
@@ -64,6 +60,13 @@ const labelStyle: CSSProperties = {
   color: C.textMuted,
   marginBottom: 5,
   letterSpacing: "0.08em",
+}
+
+const MY_INFO = {
+  name: "淵上 郁也",
+  zip: "〒570-0006",
+  address: "大阪府守口市八雲西町2-1-27",
+  tel: "090-6423-4268",
 }
 
 export default function InvoiceEditor({
@@ -99,14 +102,13 @@ export default function InvoiceEditor({
   const [notes, setNotes] = useState(
     initial?.notes ?? "上記のとおり、領収申し上げます。"
   )
-
   const [items, setItems] = useState<LineItem[]>(
     initial?.items?.length ? initial.items : [newItem()]
   )
 
-  const updateItem = (id: string, key: keyof LineItem, value: string | number) =>
+  const updateItem = (id: string, key: keyof LineItem, val: string | number) =>
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, [key]: value } : it))
+      prev.map((it) => (it.id === id ? { ...it, [key]: val } : it))
     )
 
   const removeItem = (id: string) =>
@@ -152,10 +154,9 @@ export default function InvoiceEditor({
     }
   }
 
-  const handlePrint = () => window.print()
-
   const titleLabel =
     invoiceType === "invoice" ? "御　請　求　書" : "御　見　積　書"
+  const dateLabel = invoiceType === "invoice" ? "請求日" : "見積日"
   const today = new Date(issueDate).toLocaleDateString("ja-JP", {
     year: "numeric",
     month: "long",
@@ -163,125 +164,159 @@ export default function InvoiceEditor({
   })
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 480px",
-        gap: 24,
-        alignItems: "start",
-      }}
-    >
-      <div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-          {(
-            [
-              ["invoice", "請求書"],
-              ["quote", "見積書"],
-            ] as const
-          ).map(([v, l]) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setInvoiceType(v)}
-              style={{
-                padding: "8px 20px",
-                background: invoiceType === v ? C.orange : C.surfaceHigh,
-                border: `1px solid ${invoiceType === v ? C.orange : C.border}`,
-                borderRadius: 6,
-                color: invoiceType === v ? "#fff" : C.textSub,
-                fontFamily: C.fontSans,
-                fontWeight: 600,
-                fontSize: 13,
-                cursor: "pointer",
-              }}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap');
 
-        <div
-          style={{
-            background: C.surface,
-            border: `1px solid ${C.border}`,
-            borderRadius: 10,
-            padding: "20px 24px",
-            marginBottom: 16,
-          }}
-        >
-          <div
-            style={{
-              fontFamily: C.fontSans,
-              fontWeight: 700,
-              fontSize: 14,
-              color: C.text,
-              marginBottom: 16,
-            }}
-          >
-            基本情報
+        @media print {
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+          body > * { display: none !important; }
+          #invoice-print-area { display: block !important; }
+
+          #invoice-print-area {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+        }
+
+        @media screen {
+          #invoice-print-area { display: none; }
+        }
+      `}</style>
+
+      <div id="invoice-print-area">
+        <PrintPreview
+          titleLabel={titleLabel}
+          dateLabel={dateLabel}
+          today={today}
+          clientName={clientName}
+          subject={subject}
+          bankInfo={bankInfo}
+          invoiceType={invoiceType}
+          items={items}
+          subtotal={subtotal}
+          tax={tax}
+          taxRate={taxRate}
+          total={total}
+          notes={notes}
+        />
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 440px",
+          gap: 24,
+          alignItems: "start",
+        }}
+      >
+        <div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {(
+              [
+                ["invoice", "請求書"],
+                ["quote", "見積書"],
+              ] as const
+            ).map(([v, l]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setInvoiceType(v)}
+                style={{
+                  padding: "8px 20px",
+                  background: invoiceType === v ? C.orange : C.surfaceHigh,
+                  border: `1px solid ${invoiceType === v ? C.orange : C.border}`,
+                  borderRadius: 6,
+                  color: invoiceType === v ? "#fff" : C.textSub,
+                  fontFamily: C.fontSans,
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                {l}
+              </button>
+            ))}
           </div>
 
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 14,
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: 10,
+              padding: "20px 24px",
               marginBottom: 14,
             }}
           >
-            <div>
-              <label style={labelStyle}>宛先（会社名）</label>
+            <div
+              style={{
+                fontFamily: C.fontSans,
+                fontWeight: 700,
+                fontSize: 14,
+                color: C.text,
+                marginBottom: 16,
+              }}
+            >
+              基本情報
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 14,
+                marginBottom: 14,
+              }}
+            >
+              <div>
+                <label style={labelStyle}>宛先（会社名）</label>
+                <input
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder="株式会社〇〇"
+                  style={inputStyle()}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>{dateLabel}</label>
+                <input
+                  type="date"
+                  value={issueDate}
+                  onChange={(e) => setIssueDate(e.target.value)}
+                  style={inputStyle()}
+                />
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>件名</label>
               <input
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                placeholder="株式会社〇〇"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="作業代金"
                 style={inputStyle()}
               />
             </div>
+            {invoiceType === "invoice" && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>振込先</label>
+                <textarea
+                  value={bankInfo}
+                  onChange={(e) => setBankInfo(e.target.value)}
+                  rows={2}
+                  style={{ ...inputStyle(), resize: "none" }}
+                />
+              </div>
+            )}
             <div>
-              <label style={labelStyle}>請求日</label>
-              <input
-                type="date"
-                value={issueDate}
-                onChange={(e) => setIssueDate(e.target.value)}
-                style={inputStyle()}
-              />
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>件名</label>
-            <input
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="作業代金"
-              style={inputStyle()}
-            />
-          </div>
-
-          <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>振込先</label>
-            <textarea
-              value={bankInfo}
-              onChange={(e) => setBankInfo(e.target.value)}
-              rows={2}
-              style={{ ...inputStyle(), resize: "none" }}
-            />
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 14,
-            }}
-          >
-            <div>
-              <label style={labelStyle}>消費税率 (%)</label>
+              <label style={labelStyle}>消費税率</label>
               <select
                 value={taxRate}
                 onChange={(e) => setTaxRate(Number(e.target.value))}
-                style={inputStyle()}
+                style={{ ...inputStyle(), width: 160 }}
               >
                 <option value={0}>0%（非課税）</option>
                 <option value={8}>8%</option>
@@ -289,439 +324,644 @@ export default function InvoiceEditor({
               </select>
             </div>
           </div>
-        </div>
-
-        <div
-          style={{
-            background: C.surface,
-            border: `1px solid ${C.border}`,
-            borderRadius: 10,
-            padding: "20px 24px",
-            marginBottom: 16,
-          }}
-        >
-          <div
-            style={{
-              fontFamily: C.fontSans,
-              fontWeight: 700,
-              fontSize: 14,
-              color: C.text,
-              marginBottom: 16,
-            }}
-          >
-            明細
-          </div>
 
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 80px 80px 110px 110px 36px",
-              gap: 8,
-              marginBottom: 8,
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: 10,
+              padding: "20px 24px",
+              marginBottom: 14,
             }}
           >
-            {["摘要", "数量", "単位", "単価", "金額", ""].map((h) => (
-              <div
-                key={h}
-                style={{
-                  fontFamily: C.font,
-                  fontSize: 10,
-                  color: C.textMuted,
-                  letterSpacing: "0.08em",
-                }}
-              >
-                {h}
-              </div>
-            ))}
-          </div>
-
-          {items.map((item) => (
             <div
-              key={item.id}
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 80px 80px 110px 110px 36px",
-                gap: 8,
-                marginBottom: 8,
-                alignItems: "center",
+                fontFamily: C.fontSans,
+                fontWeight: 700,
+                fontSize: 14,
+                color: C.text,
+                marginBottom: 14,
               }}
             >
-              <input
-                value={item.desc}
-                onChange={(e) => updateItem(item.id, "desc", e.target.value)}
-                placeholder="作業費（〇〇 〇日）"
-                style={inputStyle()}
-              />
-              <input
-                type="number"
-                value={item.qty}
-                onChange={(e) =>
-                  updateItem(item.id, "qty", Number(e.target.value))
-                }
-                style={inputStyle()}
-              />
-              <select
-                value={item.unit}
-                onChange={(e) => updateItem(item.id, "unit", e.target.value)}
-                style={inputStyle()}
-              >
-                {UNITS.map((u) => (
-                  <option key={u}>{u}</option>
-                ))}
-              </select>
-              <input
-                type="number"
-                value={item.price}
-                onChange={(e) =>
-                  updateItem(item.id, "price", Number(e.target.value))
-                }
-                style={inputStyle()}
-              />
-              <div
-                style={{
-                  fontFamily: C.fontSans,
-                  fontWeight: 600,
-                  fontSize: 13,
-                  color: C.orange,
-                  textAlign: "right",
-                }}
-              >
-                {fmt(item.qty * item.price)}
-              </div>
-              <button
-                type="button"
-                onClick={() => removeItem(item.id)}
-                disabled={items.length === 1}
-                style={{
-                  background: "none",
-                  border: `1px solid ${C.redDim}`,
-                  borderRadius: 4,
-                  color: C.red,
-                  cursor: "pointer",
-                  fontSize: 14,
-                  padding: "4px",
-                  opacity: items.length === 1 ? 0.3 : 1,
-                }}
-              >
-                ×
-              </button>
+              明細
             </div>
-          ))}
-
-          <button
-            type="button"
-            onClick={() => setItems((prev) => [...prev, newItem()])}
-            style={{
-              marginTop: 8,
-              padding: "8px 16px",
-              background: "none",
-              border: `1px dashed ${C.border}`,
-              borderRadius: 6,
-              color: C.textSub,
-              fontFamily: C.fontSans,
-              fontSize: 12,
-              cursor: "pointer",
-              width: "100%",
-            }}
-          >
-            ＋ 行を追加
-          </button>
-
-          <div
-            style={{
-              marginTop: 16,
-              paddingTop: 16,
-              borderTop: `1px solid ${C.border}`,
-            }}
-          >
-            {[
-              ["小計", fmt(subtotal)],
-              [`消費税 (${taxRate}%)`, fmt(tax)],
-            ].map(([k, v]) => (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 70px 72px 100px 100px 32px",
+                gap: 6,
+                marginBottom: 8,
+              }}
+            >
+              {["摘要", "数量", "単位", "単価", "金額", ""].map((h) => (
+                <div
+                  key={h}
+                  style={{
+                    fontFamily: C.font,
+                    fontSize: 10,
+                    color: C.textMuted,
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  {h}
+                </div>
+              ))}
+            </div>
+            {items.map((item) => (
               <div
-                key={k}
+                key={item.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 70px 72px 100px 100px 32px",
+                  gap: 6,
+                  marginBottom: 6,
+                  alignItems: "center",
+                }}
+              >
+                <input
+                  value={item.desc}
+                  onChange={(e) => updateItem(item.id, "desc", e.target.value)}
+                  placeholder="作業内容"
+                  style={inputStyle()}
+                />
+                <input
+                  type="number"
+                  value={item.qty}
+                  onChange={(e) =>
+                    updateItem(item.id, "qty", Number(e.target.value))
+                  }
+                  style={inputStyle()}
+                />
+                <select
+                  value={item.unit}
+                  onChange={(e) => updateItem(item.id, "unit", e.target.value)}
+                  style={inputStyle()}
+                >
+                  {UNITS.map((u) => (
+                    <option key={u}>{u}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  value={item.price}
+                  onChange={(e) =>
+                    updateItem(item.id, "price", Number(e.target.value))
+                  }
+                  style={inputStyle()}
+                />
+                <div
+                  style={{
+                    fontFamily: C.fontSans,
+                    fontWeight: 600,
+                    fontSize: 12,
+                    color: C.orange,
+                    textAlign: "right",
+                  }}
+                >
+                  {fmtYen(item.qty * item.price)}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeItem(item.id)}
+                  disabled={items.length === 1}
+                  style={{
+                    background: "none",
+                    border: `1px solid ${C.redDim}`,
+                    borderRadius: 4,
+                    color: C.red,
+                    cursor: "pointer",
+                    fontSize: 13,
+                    padding: "3px 6px",
+                    opacity: items.length === 1 ? 0.3 : 1,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setItems((prev) => [...prev, newItem()])}
+              style={{
+                marginTop: 8,
+                padding: "8px",
+                background: "none",
+                border: `1px dashed ${C.border}`,
+                borderRadius: 6,
+                color: C.textSub,
+                fontFamily: C.fontSans,
+                fontSize: 12,
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
+              ＋ 行を追加
+            </button>
+
+            <div
+              style={{
+                marginTop: 14,
+                paddingTop: 14,
+                borderTop: `1px solid ${C.border}`,
+              }}
+            >
+              {[
+                ["小計", fmtYen(subtotal)],
+                [`消費税 (${taxRate}%)`, fmtYen(tax)],
+              ].map(([k, v]) => (
+                <div
+                  key={k}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "5px 0",
+                    fontFamily: C.fontSans,
+                    fontSize: 13,
+                    color: C.textSub,
+                  }}
+                >
+                  <span>{k}</span>
+                  <span>{v}</span>
+                </div>
+              ))}
+              <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  padding: "6px 0",
+                  padding: "10px 0 0",
+                  borderTop: `1px solid ${C.border}`,
                   fontFamily: C.fontSans,
-                  fontSize: 13,
-                  color: C.textSub,
+                  fontWeight: 700,
+                  fontSize: 17,
+                  color: C.orange,
                 }}
               >
-                <span>{k}</span>
-                <span>{v}</span>
+                <span>合計（税込）</span>
+                <span>{fmtYen(total)}</span>
               </div>
-            ))}
-            <div
+            </div>
+          </div>
+
+          <div
+            style={{
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: 10,
+              padding: "20px 24px",
+              marginBottom: 20,
+            }}
+          >
+            <label style={{ ...labelStyle, marginBottom: 8 }}>備考</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              style={{ ...inputStyle(), resize: "none" }}
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              onClick={() => window.print()}
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "10px 0 0",
-                borderTop: `1px solid ${C.border}`,
+                padding: "10px 22px",
+                background: "none",
+                border: `1px solid ${C.border}`,
+                borderRadius: 7,
+                color: C.textSub,
                 fontFamily: C.fontSans,
-                fontWeight: 700,
-                fontSize: 18,
-                color: C.orange,
+                fontSize: 13,
+                cursor: "pointer",
               }}
             >
-              <span>合計（税込）</span>
-              <span>{fmt(total)}</span>
-            </div>
+              🖨 印刷 / PDF保存
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || !clientName || !subject}
+              style={{
+                padding: "10px 28px",
+                background: saved ? C.greenDim : C.orange,
+                border: `1px solid ${saved ? C.green : C.orange}`,
+                borderRadius: 7,
+                color: saved ? C.green : "#fff",
+                fontFamily: C.fontSans,
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: "pointer",
+                opacity: !clientName || !subject ? 0.5 : 1,
+              }}
+            >
+              {saving ? "保存中..." : saved ? "✓ 保存済み" : "保存"}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ position: "sticky", top: 20 }}>
+          <div
+            style={{
+              fontFamily: C.font,
+              fontSize: 10,
+              color: C.textMuted,
+              letterSpacing: "0.1em",
+              marginBottom: 8,
+            }}
+          >
+            PREVIEW — 印刷イメージ
+          </div>
+          <div style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.5)", borderRadius: 4 }}>
+            <PrintPreview
+              titleLabel={titleLabel}
+              dateLabel={dateLabel}
+              today={today}
+              clientName={clientName}
+              subject={subject}
+              bankInfo={bankInfo}
+              invoiceType={invoiceType}
+              items={items}
+              subtotal={subtotal}
+              tax={tax}
+              taxRate={taxRate}
+              total={total}
+              notes={notes}
+            />
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function PrintPreview({
+  titleLabel,
+  dateLabel,
+  today,
+  clientName,
+  subject,
+  bankInfo,
+  invoiceType,
+  items,
+  subtotal,
+  tax,
+  taxRate,
+  total,
+  notes,
+}: {
+  titleLabel: string
+  dateLabel: string
+  today: string
+  clientName: string
+  subject: string
+  bankInfo: string
+  invoiceType: string
+  items: LineItem[]
+  subtotal: number
+  tax: number
+  taxRate: number
+  total: number
+  notes: string
+}) {
+  return (
+    <div
+      style={{
+        background: "#fff",
+        color: "#111",
+        width: "210mm",
+        minHeight: "297mm",
+        padding: "20mm 18mm",
+        boxSizing: "border-box",
+        fontFamily:
+          "'Noto Serif JP', 'Yu Mincho', 'Hiragino Mincho ProN', serif",
+        fontSize: "10.5pt",
+        lineHeight: 1.8,
+      }}
+    >
+      <div
+        style={{
+          textAlign: "center",
+          fontSize: "18pt",
+          fontWeight: 700,
+          letterSpacing: "0.4em",
+          marginBottom: "12mm",
+          paddingBottom: "4mm",
+          borderBottom: "2px solid #111",
+        }}
+      >
+        {titleLabel}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: "8mm",
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: "13pt",
+              fontWeight: 700,
+              borderBottom: "1px solid #111",
+              paddingBottom: "2mm",
+              marginBottom: "3mm",
+            }}
+          >
+            {clientName || "　"} 御中
+          </div>
+          <div style={{ fontSize: "9pt", color: "#555" }}>
+            下記のとおりご
+            {invoiceType === "invoice" ? "請求" : "見積"}申し上げます。
           </div>
         </div>
 
         <div
           style={{
-            background: C.surface,
-            border: `1px solid ${C.border}`,
-            borderRadius: 10,
-            padding: "20px 24px",
-            marginBottom: 20,
+            textAlign: "right",
+            fontSize: "9pt",
+            lineHeight: 2,
+            minWidth: "55mm",
           }}
         >
-          <label style={{ ...labelStyle, marginBottom: 8 }}>備考</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={3}
-            style={{ ...inputStyle(), resize: "none" }}
-          />
-        </div>
-
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button
-            type="button"
-            onClick={handlePrint}
-            style={{
-              padding: "10px 22px",
-              background: "none",
-              border: `1px solid ${C.border}`,
-              borderRadius: 7,
-              color: C.textSub,
-              fontFamily: C.fontSans,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
-          >
-            印刷 / PDF
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || !clientName || !subject}
-            style={{
-              padding: "10px 28px",
-              background: saved ? C.greenDim : C.orange,
-              border: `1px solid ${saved ? C.green : C.orange}`,
-              borderRadius: 7,
-              color: saved ? C.green : "#fff",
-              fontFamily: C.fontSans,
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: "pointer",
-              opacity: !clientName || !subject ? 0.5 : 1,
-            }}
-          >
-            {saving ? "保存中..." : saved ? "✓ 保存済み" : "保存"}
-          </button>
+          <div style={{ fontWeight: 700, fontSize: "11pt" }}>{MY_INFO.name}</div>
+          <div>{MY_INFO.zip}</div>
+          <div>{MY_INFO.address}</div>
+          <div>TEL：{MY_INFO.tel}</div>
+          <div style={{ marginTop: "2mm" }}>
+            {dateLabel}：{today}
+          </div>
         </div>
       </div>
 
       <div
         style={{
-          background: "#fff",
-          color: "#111",
-          borderRadius: 10,
-          padding: "40px 36px",
-          fontFamily: "'Noto Serif JP', 'Yu Mincho', serif",
-          fontSize: 13,
-          lineHeight: 1.7,
-          boxShadow: "0 4px 32px rgba(0,0,0,0.4)",
-          position: "sticky",
-          top: 20,
+          background: "#f0f0f0",
+          padding: "3mm 5mm",
+          marginBottom: "6mm",
+          fontWeight: 700,
+          fontSize: "11pt",
+          borderLeft: "4px solid #111",
         }}
       >
-        <div
-          style={{
-            textAlign: "center",
-            fontSize: 22,
-            fontWeight: 700,
-            letterSpacing: "0.3em",
-            marginBottom: 28,
-          }}
-        >
-          {titleLabel}
-        </div>
+        件名：{subject || "　"}
+      </div>
 
+      {invoiceType === "invoice" && (
         <div
           style={{
+            border: "2px solid #111",
+            padding: "4mm 6mm",
+            marginBottom: "6mm",
             display: "flex",
             justifyContent: "space-between",
-            marginBottom: 24,
+            alignItems: "center",
           }}
         >
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>
-              {clientName || "株式会社〇〇"} 御中
-            </div>
-          </div>
-          <div style={{ textAlign: "right", fontSize: 12, lineHeight: 1.8 }}>
-            <div style={{ fontWeight: 700 }}>淵上 郁也</div>
-            <div>〒570-0006</div>
-            <div>大阪府守口市八雲西町2-1-27</div>
-            <div>TEL：090-6423-4268</div>
-          </div>
-        </div>
-
-        <div style={{ textAlign: "right", fontSize: 12, marginBottom: 16 }}>
-          {invoiceType === "invoice" ? "請求日" : "見積日"}：{today}
-        </div>
-
-        {invoiceType === "invoice" && bankInfo && (
-          <div
-            style={{
-              background: "#f8f8f8",
-              border: "1px solid #ddd",
-              borderRadius: 4,
-              padding: "10px 14px",
-              fontSize: 12,
-              marginBottom: 20,
-              lineHeight: 1.8,
-            }}
-          >
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>振込先</div>
-            {bankInfo.split("\n").map((line, i) => (
-              <div key={i}>{line}</div>
-            ))}
-          </div>
-        )}
-
-        <div style={{ marginBottom: 16, fontWeight: 700 }}>
-          件名：{subject || "〇〇"}
-        </div>
-
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            fontSize: 12,
-            marginBottom: 16,
-          }}
-        >
-          <thead>
-            <tr style={{ background: "#222", color: "#fff" }}>
-              {["摘要", "数量", "単位", "単価", "金額"].map((h) => (
-                <th
-                  key={h}
-                  style={{
-                    padding: "6px 8px",
-                    textAlign: h === "摘要" ? "left" : "right",
-                    fontWeight: 600,
-                  }}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item, i) => (
-              <tr
-                key={item.id}
-                style={{
-                  background: i % 2 === 0 ? "#fff" : "#f9f9f9",
-                }}
-              >
-                <td
-                  style={{
-                    padding: "6px 8px",
-                    borderBottom: "1px solid #eee",
-                  }}
-                >
-                  {item.desc || "─"}
-                </td>
-                <td
-                  style={{
-                    padding: "6px 8px",
-                    textAlign: "right",
-                    borderBottom: "1px solid #eee",
-                  }}
-                >
-                  {item.qty.toLocaleString()}
-                </td>
-                <td
-                  style={{
-                    padding: "6px 8px",
-                    textAlign: "right",
-                    borderBottom: "1px solid #eee",
-                  }}
-                >
-                  {item.unit}
-                </td>
-                <td
-                  style={{
-                    padding: "6px 8px",
-                    textAlign: "right",
-                    borderBottom: "1px solid #eee",
-                  }}
-                >
-                  ¥{item.price.toLocaleString()}
-                </td>
-                <td
-                  style={{
-                    padding: "6px 8px",
-                    textAlign: "right",
-                    borderBottom: "1px solid #eee",
-                    fontWeight: 600,
-                  }}
-                >
-                  ¥{(item.qty * item.price).toLocaleString()}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div style={{ textAlign: "right", fontSize: 12 }}>
-          {[
-            ["小計", fmt(subtotal)],
-            [`消費税 (${taxRate}%)`, fmt(tax)],
-          ].map(([k, v]) => (
-            <div key={k} style={{ padding: "3px 0" }}>
-              {k}：{v}
-            </div>
-          ))}
-          <div
+          <span style={{ fontWeight: 700, fontSize: "11pt" }}>
+            合計金額（税込）
+          </span>
+          <span
             style={{
               fontWeight: 700,
-              fontSize: 16,
-              marginTop: 6,
-              paddingTop: 6,
-              borderTop: "2px solid #222",
+              fontSize: "16pt",
+              letterSpacing: "0.05em",
             }}
           >
-            合計（税込）：{fmt(total)}
-          </div>
+            {`¥${total.toLocaleString()}`} ─
+          </span>
         </div>
+      )}
 
-        {notes && (
-          <div
-            style={{
-              marginTop: 20,
-              fontSize: 12,
-              color: "#555",
-              borderTop: "1px solid #ddd",
-              paddingTop: 12,
-            }}
-          >
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>備考</div>
-            {notes.split("\n").map((line, i) => (
-              <div key={i}>{line}</div>
-            ))}
+      {invoiceType === "invoice" && bankInfo && (
+        <div
+          style={{
+            background: "#f8f8f8",
+            border: "1px solid #ccc",
+            padding: "3mm 5mm",
+            marginBottom: "6mm",
+            fontSize: "9pt",
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: "1mm" }}>
+            ■ お振込先
           </div>
-        )}
+          {bankInfo.split("\n").map((line, i) => (
+            <div key={i}>{line}</div>
+          ))}
+        </div>
+      )}
+
+      <table
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          marginBottom: "4mm",
+          fontSize: "9.5pt",
+        }}
+      >
+        <thead>
+          <tr>
+            {[
+              { label: "摘要", align: "left" as const, w: "auto" },
+              { label: "数量", align: "right" as const, w: "16mm" },
+              { label: "単位", align: "center" as const, w: "14mm" },
+              { label: "単価", align: "right" as const, w: "26mm" },
+              { label: "金額", align: "right" as const, w: "28mm" },
+            ].map((h) => (
+              <th
+                key={h.label}
+                style={{
+                  background: "#222",
+                  color: "#fff",
+                  padding: "3mm 3mm",
+                  textAlign: h.align,
+                  width: h.w,
+                  fontWeight: 700,
+                  borderBottom: "2px solid #111",
+                }}
+              >
+                {h.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, i) => (
+            <tr
+              key={item.id}
+              style={{
+                background: i % 2 === 0 ? "#fff" : "#f9f9f9",
+              }}
+            >
+              <td
+                style={{
+                  padding: "2.5mm 3mm",
+                  borderBottom: "1px solid #ddd",
+                }}
+              >
+                {item.desc || "　"}
+              </td>
+              <td
+                style={{
+                  padding: "2.5mm 3mm",
+                  textAlign: "right",
+                  borderBottom: "1px solid #ddd",
+                }}
+              >
+                {item.qty.toLocaleString()}
+              </td>
+              <td
+                style={{
+                  padding: "2.5mm 3mm",
+                  textAlign: "center",
+                  borderBottom: "1px solid #ddd",
+                }}
+              >
+                {item.unit}
+              </td>
+              <td
+                style={{
+                  padding: "2.5mm 3mm",
+                  textAlign: "right",
+                  borderBottom: "1px solid #ddd",
+                }}
+              >
+                ¥{item.price.toLocaleString()}
+              </td>
+              <td
+                style={{
+                  padding: "2.5mm 3mm",
+                  textAlign: "right",
+                  borderBottom: "1px solid #ddd",
+                  fontWeight: 600,
+                }}
+              >
+                ¥{(item.qty * item.price).toLocaleString()}
+              </td>
+            </tr>
+          ))}
+          {Array.from({ length: Math.max(0, 8 - items.length) }).map((_, i) => (
+            <tr
+              key={`empty-${i}`}
+              style={{
+                background:
+                  (items.length + i) % 2 === 0 ? "#fff" : "#f9f9f9",
+              }}
+            >
+              {[...Array(5)].map((_, j) => (
+                <td
+                  key={j}
+                  style={{
+                    padding: "2.5mm 3mm",
+                    borderBottom: "1px solid #ddd",
+                  }}
+                >
+                  　
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: "6mm",
+        }}
+      >
+        <table
+          style={{
+            fontSize: "9.5pt",
+            borderCollapse: "collapse",
+            minWidth: "80mm",
+          }}
+        >
+          <tbody>
+            <tr>
+              <td
+                style={{
+                  padding: "2mm 4mm",
+                  borderBottom: "1px solid #ddd",
+                  color: "#555",
+                }}
+              >
+                小計
+              </td>
+              <td
+                style={{
+                  padding: "2mm 4mm",
+                  borderBottom: "1px solid #ddd",
+                  textAlign: "right",
+                }}
+              >
+                ¥{subtotal.toLocaleString()}
+              </td>
+            </tr>
+            <tr>
+              <td
+                style={{
+                  padding: "2mm 4mm",
+                  borderBottom: "1px solid #ddd",
+                  color: "#555",
+                }}
+              >
+                消費税（{taxRate}%）
+              </td>
+              <td
+                style={{
+                  padding: "2mm 4mm",
+                  borderBottom: "1px solid #ddd",
+                  textAlign: "right",
+                }}
+              >
+                ¥{tax.toLocaleString()}
+              </td>
+            </tr>
+            <tr style={{ background: "#f0f0f0" }}>
+              <td
+                style={{
+                  padding: "3mm 4mm",
+                  fontWeight: 700,
+                  borderTop: "2px solid #111",
+                }}
+              >
+                合計（税込）
+              </td>
+              <td
+                style={{
+                  padding: "3mm 4mm",
+                  textAlign: "right",
+                  fontWeight: 700,
+                  fontSize: "12pt",
+                  borderTop: "2px solid #111",
+                }}
+              >
+                ¥{total.toLocaleString()}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
+
+      {notes && (
+        <div
+          style={{
+            borderTop: "1px solid #ccc",
+            paddingTop: "4mm",
+            fontSize: "9pt",
+            color: "#444",
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: "2mm" }}>備考</div>
+          {notes.split("\n").map((line, i) => (
+            <div key={i}>{line}</div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
