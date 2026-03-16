@@ -7,14 +7,21 @@ export type Source =
   | "手動"
 export type Trend = "up" | "down" | "flat"
 
-// vehicles テーブル（既存スキーマに合わせる）
+// vehicles テーブル（DBスキーマに合わせる）
 export interface Vehicle {
   id: string
-  status: "in_stock" | "listed" | "sold" | "exported"
+  status: "仕入中" | "査定中" | "落札" | "在庫あり" | "出品中" | "売却済" | "発送中"
   bds_rating: string | null
   chassis_number: string | null
   drive_link: string | null
-  // 右側に見えてないカラムがあれば後で追加
+  lot_number: string | null
+  source_url: string | null
+  image_url: string | null
+  name: string | null
+  year: number | null
+  mileage: string | null
+  onsite_notes: string | null
+  seller_info: string | null
   created_at?: string
   updated_at?: string
 }

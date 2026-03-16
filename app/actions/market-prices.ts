@@ -1,19 +1,11 @@
 "use server"
 
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-
-export type MarketPriceRow = {
-  id: string
-  model_name: string
-  bds_avg_jpy: number | null
-  yahoo_avg_jpy: number | null
-  created_at: string
-  updated_at: string
-}
+import type { MarketPrice } from "@/lib/types"
 
 export async function getMarketPrices(): Promise<{
   success: boolean
-  rows?: MarketPriceRow[]
+  rows?: MarketPrice[]
   error?: string
 }> {
   try {
@@ -21,31 +13,23 @@ export async function getMarketPrices(): Promise<{
     const { data, error } = await supabase
       .from("market_prices")
       .select("*")
-      .order("model_name", { ascending: true })
+      .order("updated_at", { ascending: false })
     if (error) throw error
-    return { success: true, rows: (data ?? []) as MarketPriceRow[] }
+    return { success: true, rows: (data ?? []) as unknown as MarketPrice[] }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "相場データの取得に失敗しました"
     return { success: false, error: msg }
   }
 }
 
-export async function upsertMarketPrice(params: {
-  model_name: string
-  bds_avg_jpy?: number | null
-  yahoo_avg_jpy?: number | null
-}): Promise<{ success: boolean; error?: string }> {
+export async function upsertMarketPrice(
+  entry: Partial<MarketPrice>
+): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = createServerSupabaseClient()
-    const { error } = await supabase.from("market_prices").upsert(
-      {
-        model_name: params.model_name.trim(),
-        bds_avg_jpy: params.bds_avg_jpy ?? null,
-        yahoo_avg_jpy: params.yahoo_avg_jpy ?? null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "model_name" }
-    )
+    const { error } = await supabase
+      .from("market_prices")
+      .upsert({ ...entry, updated_at: new Date().toISOString() })
     if (error) throw error
     return { success: true }
   } catch (err) {
@@ -54,10 +38,9 @@ export async function upsertMarketPrice(params: {
   }
 }
 
-export async function deleteMarketPrice(id: string): Promise<{
-  success: boolean
-  error?: string
-}> {
+export async function deleteMarketPrice(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = createServerSupabaseClient()
     const { error } = await supabase.from("market_prices").delete().eq("id", id)

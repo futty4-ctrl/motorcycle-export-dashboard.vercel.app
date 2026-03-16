@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { getSettings, updateSettings } from "@/app/actions/settings"
 
 const C = {
   bg: "#0a0a0a",
@@ -325,7 +326,24 @@ export function SettingsForm() {
   const [autoSync, setAutoSync] = useState(true)
   const [syncInterval, setSyncInterval] = useState("30")
 
-  const handleSave = () => {
+  useEffect(() => {
+    getSettings().then((s) => {
+      setMarginRate(String(s.marginRatePct))
+      setRepairBuf(String(s.repairBufferJpy))
+      setYahooFee(String(s.yahooFeePct))
+      setExportFee(String(s.exportFeePct))
+    })
+  }, [])
+
+  const handleSave = async () => {
+    if (tab === "auction") {
+      await updateSettings({
+        marginRatePct: Number(marginRate),
+        repairBufferJpy: Number(repairBuf),
+        yahooFeePct: Number(yahooFee),
+        exportFeePct: Number(exportFee),
+      })
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }

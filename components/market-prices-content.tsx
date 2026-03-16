@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react"
 import type { CSSProperties } from "react"
-import { getMarketPrices } from "@/lib/queries"
+import { getMarketPrices, upsertMarketPrice, deleteMarketPrice } from "@/app/actions/market-prices"
 import type { MarketPrice, Source, Trend } from "@/lib/types"
 
 const C = {
@@ -57,14 +57,76 @@ const sourceColor: Record<Source, string> = {
 function PriceModal({
   open,
   onClose,
+  onSave,
   initial,
 }: {
   open: boolean
   onClose: () => void
+  onSave: (entry: Partial<MarketPrice>) => Promise<void>
   initial?: Partial<MarketPrice>
 }) {
+  const [saving, setSaving] = useState(false)
+  const [maker, setMaker] = useState(initial?.maker ?? "")
+  const [model, setModel] = useState(initial?.model ?? "")
+  const [year, setYear] = useState(initial?.year ?? "")
+  const [condition, setCondition] = useState(initial?.condition ?? "B")
+  const [source, setSource] = useState<Source>(initial?.source ?? "手動")
+  const [avgPrice, setAvgPrice] = useState(initial?.avg_price ?? 0)
+  const [minPrice, setMinPrice] = useState(initial?.min_price ?? 0)
+  const [maxPrice, setMaxPrice] = useState(initial?.max_price ?? 0)
+  const [sampleCount, setSampleCount] = useState(initial?.sample_count ?? 0)
+  const [trend, setTrend] = useState<Trend>(initial?.trend ?? "flat")
+  const [trendPct, setTrendPct] = useState(initial?.trend_pct ?? 0)
+  const [memo, setMemo] = useState(initial?.memo ?? "")
+
   if (!open) return null
   const title = initial?.id ? "価格データ編集" : "価格データ追加"
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave({
+        id: initial?.id,
+        maker,
+        model,
+        year,
+        condition: condition as MarketPrice["condition"],
+        source,
+        avg_price: Number(avgPrice),
+        min_price: Number(minPrice),
+        max_price: Number(maxPrice),
+        sample_count: Number(sampleCount),
+        trend,
+        trend_pct: Number(trendPct),
+        memo,
+      })
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputStyle = {
+    width: "100%",
+    background: C.surfaceHigh,
+    border: `1px solid ${C.border}`,
+    borderRadius: 6,
+    padding: "10px 14px",
+    color: C.text,
+    fontFamily: C.font,
+    fontSize: 13,
+    outline: "none",
+    boxSizing: "border-box" as const,
+  }
+  const labelStyle = {
+    display: "block",
+    fontFamily: C.font,
+    fontSize: 11,
+    color: C.textMuted,
+    marginBottom: 6,
+    letterSpacing: "0.08em",
+  }
+
   return (
     <div
       style={{
@@ -97,273 +159,91 @@ function PriceModal({
             marginBottom: 24,
           }}
         >
-          <span
-            style={{
-              fontFamily: C.fontSans,
-              fontWeight: 700,
-              fontSize: 16,
-              color: C.text,
-            }}
-          >
+          <span style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: 16, color: C.text }}>
             {title}
           </span>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: C.textMuted,
-              cursor: "pointer",
-              fontSize: 20,
-            }}
-          >
+          <button onClick={onClose} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 20 }}>
             ×
           </button>
         </div>
 
-        {(["maker", "model", "year"] as const).map((field) => (
-          <div key={field} style={{ marginBottom: 16 }}>
-            <label
-              style={{
-                display: "block",
-                fontFamily: C.font,
-                fontSize: 11,
-                color: C.textMuted,
-                marginBottom: 6,
-                letterSpacing: "0.08em",
-              }}
-            >
-              {field === "maker"
-                ? "メーカー"
-                : field === "model"
-                  ? "車種名"
-                  : "年式"}
-            </label>
-            <input
-              defaultValue={(initial as Record<string, unknown>)?.[field] ?? ""}
-              style={{
-                width: "100%",
-                background: C.surfaceHigh,
-                border: `1px solid ${C.border}`,
-                borderRadius: 6,
-                padding: "10px 14px",
-                color: C.text,
-                fontFamily: C.font,
-                fontSize: 13,
-                outline: "none",
-                boxSizing: "border-box",
-              }}
-              placeholder={
-                field === "maker"
-                  ? "Honda"
-                  : field === "model"
-                    ? "モンキー Z50M"
-                    : "1970-1979"
-              }
-            />
-          </div>
-        ))}
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 16,
-            marginBottom: 16,
-          }}
-        >
-          {(
-            [
-              "avg_price",
-              "min_price",
-              "max_price",
-              "sample_count",
-            ] as const
-          ).map((f) => (
-            <div key={f}>
-              <label
-                style={{
-                  display: "block",
-                  fontFamily: C.font,
-                  fontSize: 11,
-                  color: C.textMuted,
-                  marginBottom: 6,
-                  letterSpacing: "0.08em",
-                }}
-              >
-                {f === "avg_price"
-                  ? "平均価格"
-                  : f === "min_price"
-                    ? "最低価格"
-                    : f === "max_price"
-                      ? "最高価格"
-                      : "サンプル数"}
-              </label>
-              <input
-                type="number"
-                defaultValue={(initial as Record<string, unknown>)?.[f] ?? ""}
-                style={{
-                  width: "100%",
-                  background: C.surfaceHigh,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 6,
-                  padding: "10px 14px",
-                  color: C.text,
-                  fontFamily: C.font,
-                  fontSize: 13,
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-          ))}
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>メーカー</label>
+          <input value={maker} onChange={(e) => setMaker(e.target.value)} placeholder="Honda" style={inputStyle} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>車種名</label>
+          <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="モンキー Z50M" style={inputStyle} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>年式</label>
+          <input value={year} onChange={(e) => setYear(e.target.value)} placeholder="1970-1979" style={inputStyle} />
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 16,
-            marginBottom: 16,
-          }}
-        >
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
           <div>
-            <label
-              style={{
-                display: "block",
-                fontFamily: C.font,
-                fontSize: 11,
-                color: C.textMuted,
-                marginBottom: 6,
-                letterSpacing: "0.08em",
-              }}
-            >
-              コンディション
-            </label>
-            <select
-              style={{
-                width: "100%",
-                background: C.surfaceHigh,
-                border: `1px solid ${C.border}`,
-                borderRadius: 6,
-                padding: "10px 14px",
-                color: C.text,
-                fontFamily: C.font,
-                fontSize: 13,
-                outline: "none",
-              }}
-            >
-              {CONDITIONS.map((c) => (
-                <option key={c} value={c}>
-                  {c}ランク
-                </option>
-              ))}
+            <label style={labelStyle}>平均価格</label>
+            <input type="number" value={avgPrice} onChange={(e) => setAvgPrice(Number(e.target.value))} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>最低価格</label>
+            <input type="number" value={minPrice} onChange={(e) => setMinPrice(Number(e.target.value))} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>最高価格</label>
+            <input type="number" value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>サンプル数</label>
+            <input type="number" value={sampleCount} onChange={(e) => setSampleCount(Number(e.target.value))} style={inputStyle} />
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+          <div>
+            <label style={labelStyle}>コンディション</label>
+            <select value={condition} onChange={(e) => setCondition(e.target.value)} style={inputStyle}>
+              {CONDITIONS.map((c) => <option key={c} value={c}>{c}ランク</option>)}
             </select>
           </div>
           <div>
-            <label
-              style={{
-                display: "block",
-                fontFamily: C.font,
-                fontSize: 11,
-                color: C.textMuted,
-                marginBottom: 6,
-                letterSpacing: "0.08em",
-              }}
-            >
-              データソース
-            </label>
-            <select
-              style={{
-                width: "100%",
-                background: C.surfaceHigh,
-                border: `1px solid ${C.border}`,
-                borderRadius: 6,
-                padding: "10px 14px",
-                color: C.text,
-                fontFamily: C.font,
-                fontSize: 13,
-                outline: "none",
-              }}
-            >
-              {SOURCES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
+            <label style={labelStyle}>データソース</label>
+            <select value={source} onChange={(e) => setSource(e.target.value as Source)} style={inputStyle}>
+              {SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+          <div>
+            <label style={labelStyle}>トレンド</label>
+            <select value={trend} onChange={(e) => setTrend(e.target.value as Trend)} style={inputStyle}>
+              <option value="up">▲ 上昇</option>
+              <option value="flat">─ 横ばい</option>
+              <option value="down">▼ 下降</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>変動率（%）</label>
+            <input type="number" value={trendPct} onChange={(e) => setTrendPct(Number(e.target.value))} style={inputStyle} />
           </div>
         </div>
 
         <div style={{ marginBottom: 24 }}>
-          <label
-            style={{
-              display: "block",
-              fontFamily: C.font,
-              fontSize: 11,
-              color: C.textMuted,
-              marginBottom: 6,
-              letterSpacing: "0.08em",
-            }}
-          >
-            メモ（任意）
-          </label>
-          <textarea
-            defaultValue={initial?.memo ?? ""}
-            rows={2}
-            style={{
-              width: "100%",
-              background: C.surfaceHigh,
-              border: `1px solid ${C.border}`,
-              borderRadius: 6,
-              padding: "10px 14px",
-              color: C.text,
-              fontFamily: C.font,
-              fontSize: 13,
-              outline: "none",
-              resize: "none",
-              boxSizing: "border-box",
-            }}
-          />
+          <label style={labelStyle}>メモ（任意）</label>
+          <textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={2} style={{ ...inputStyle, resize: "none" }} />
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            justifyContent: "flex-end",
-          }}
-        >
-          <button
-            onClick={onClose}
-            style={{
-              padding: "10px 24px",
-              background: "none",
-              border: `1px solid ${C.border}`,
-              borderRadius: 6,
-              color: C.textSub,
-              fontFamily: C.fontSans,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
-          >
+        <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ padding: "10px 24px", background: "none", border: `1px solid ${C.border}`, borderRadius: 6, color: C.textSub, fontFamily: C.fontSans, fontSize: 13, cursor: "pointer" }}>
             キャンセル
           </button>
           <button
-            onClick={onClose}
-            style={{
-              padding: "10px 24px",
-              background: C.orange,
-              border: "none",
-              borderRadius: 6,
-              color: "#fff",
-              fontFamily: C.fontSans,
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
+            onClick={handleSave}
+            disabled={saving}
+            style={{ padding: "10px 24px", background: saving ? C.orangeDim : C.orange, border: "none", borderRadius: 6, color: "#fff", fontFamily: C.fontSans, fontWeight: 600, fontSize: 13, cursor: saving ? "not-allowed" : "pointer" }}
           >
-            保存
+            {saving ? "保存中..." : "保存"}
           </button>
         </div>
       </div>
@@ -386,12 +266,27 @@ export default function MarketPricesContent() {
   }>({ open: false })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
+  const load = () => {
     getMarketPrices()
-      .then(setData)
+      .then((res) => {
+        if (res.success && res.rows) setData(res.rows)
+      })
       .catch(() => setData([]))
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { load() }, [])
+
+  const handleSave = async (entry: Partial<MarketPrice>) => {
+    await upsertMarketPrice(entry)
+    load()
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("削除しますか？")) return
+    await deleteMarketPrice(id)
+    setData((prev) => prev.filter((r) => r.id !== id))
+  }
 
   const filtered = useMemo(() => {
     let d = data
@@ -935,9 +830,7 @@ export default function MarketPricesContent() {
                     <td style={tdStyle}>
                       <div style={{ display: "flex", gap: 6 }}>
                         <button
-                          onClick={() =>
-                            setModal({ open: true, entry: r })
-                          }
+                          onClick={() => setModal({ open: true, entry: r })}
                           style={{
                             padding: "4px 10px",
                             background: "none",
@@ -952,6 +845,7 @@ export default function MarketPricesContent() {
                           編集
                         </button>
                         <button
+                          onClick={() => handleDelete(r.id)}
                           style={{
                             padding: "4px 10px",
                             background: "none",
@@ -1052,8 +946,10 @@ export default function MarketPricesContent() {
       </div>
 
       <PriceModal
+        key={modal.entry?.id ?? "new"}
         open={modal.open}
         onClose={() => setModal({ open: false })}
+        onSave={handleSave}
         initial={modal.entry}
       />
     </div>

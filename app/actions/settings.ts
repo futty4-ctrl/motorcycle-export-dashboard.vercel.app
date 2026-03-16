@@ -9,6 +9,10 @@ export type AppSettings = {
   ebayFeesUsd: number
   ebayShippingUsd: number
   fallbackUsdJpy: number
+  marginRatePct: number
+  repairBufferJpy: number
+  yahooFeePct: number
+  exportFeePct: number
 }
 
 const KEYS: (keyof AppSettings)[] = [
@@ -18,6 +22,10 @@ const KEYS: (keyof AppSettings)[] = [
   "ebayFeesUsd",
   "ebayShippingUsd",
   "fallbackUsdJpy",
+  "marginRatePct",
+  "repairBufferJpy",
+  "yahooFeePct",
+  "exportFeePct",
 ]
 
 const DB_KEY_MAP: Record<keyof AppSettings, string> = {
@@ -27,6 +35,10 @@ const DB_KEY_MAP: Record<keyof AppSettings, string> = {
   ebayFeesUsd: "ebay_fees_usd",
   ebayShippingUsd: "ebay_shipping_usd",
   fallbackUsdJpy: "fallback_usd_jpy",
+  marginRatePct: "margin_rate_pct",
+  repairBufferJpy: "repair_buffer_jpy",
+  yahooFeePct: "yahoo_fee_pct",
+  exportFeePct: "export_fee_pct",
 }
 
 const DEFAULTS: AppSettings = {
@@ -36,6 +48,10 @@ const DEFAULTS: AppSettings = {
   ebayFeesUsd: 50,
   ebayShippingUsd: 40,
   fallbackUsdJpy: 150,
+  marginRatePct: 18,
+  repairBufferJpy: 15000,
+  yahooFeePct: 10,
+  exportFeePct: 8,
 }
 
 function parseNumber(val: unknown): number {
@@ -70,6 +86,10 @@ export async function getSettings(): Promise<AppSettings> {
       ebayFeesUsd: map.get("ebay_fees_usd") ?? DEFAULTS.ebayFeesUsd,
       ebayShippingUsd: map.get("ebay_shipping_usd") ?? DEFAULTS.ebayShippingUsd,
       fallbackUsdJpy: map.get("fallback_usd_jpy") ?? DEFAULTS.fallbackUsdJpy,
+      marginRatePct: map.get("margin_rate_pct") ?? DEFAULTS.marginRatePct,
+      repairBufferJpy: map.get("repair_buffer_jpy") ?? DEFAULTS.repairBufferJpy,
+      yahooFeePct: map.get("yahoo_fee_pct") ?? DEFAULTS.yahooFeePct,
+      exportFeePct: map.get("export_fee_pct") ?? DEFAULTS.exportFeePct,
     }
   } catch {
     return DEFAULTS

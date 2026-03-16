@@ -28,7 +28,8 @@ const NAV = [
     group: "分析",
     items: [
       { href: "/analytics", label: "アナリティクス", icon: "◎" },
-      { href: "/market-prices", label: "市場価格", icon: "▲" },
+      { href: "/market", label: "市場価格", icon: "▲" },
+      { href: "/research", label: "相場リサーチ", icon: "🔍" },
       { href: "/bds-simulator", label: "BDSシミュレーター", icon: "⟳" },
     ],
   },
@@ -38,6 +39,12 @@ const NAV = [
       { href: "/invoices", label: "請求書・見積書", icon: "🧾" },
       { href: "/documents", label: "ドキュメント", icon: "◻" },
       { href: "/settings", label: "設定", icon: "⚙" },
+    ],
+  },
+  {
+    group: "ヘルプ",
+    items: [
+      { href: "/manual", label: "使い方ガイド", icon: "📖" },
     ],
   },
 ]
