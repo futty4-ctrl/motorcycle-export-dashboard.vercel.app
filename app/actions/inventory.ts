@@ -30,6 +30,10 @@ export type InventoryItemRow = {
   seller_address: string | null
   seller_occupation: string | null
   id_verification_method: string | null
+  sold_price: number | null
+  sold_date: string | null
+  cc_range: string | null
+  bds_venue: string | null
   created_at: string
   updated_at: string
 }
@@ -49,6 +53,8 @@ export type InventoryItemInsert = {
   seller_address?: string | null
   seller_occupation?: string | null
   id_verification_method?: string | null
+  cc_range?: string | null
+  bds_venue?: string | null
 }
 
 export async function getInventoryItems(): Promise<{
@@ -174,6 +180,59 @@ export async function updateInventoryItemStatus(
     return { success: true }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "ステータスの更新に失敗しました"
+    return { success: false, error: msg }
+  }
+}
+
+export async function updateInventoryItemSold(
+  id: string,
+  sold_price: number,
+  sold_date: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = createServerSupabaseClient()
+    const { error } = await supabase
+      .from("inventory_items")
+      .update({ sold_price, sold_date, status: "売却済" })
+      .eq("id", id)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "売却情報の更新に失敗しました"
+    return { success: false, error: msg }
+  }
+}
+
+export async function getSoldItemsForMonth(
+  year: number,
+  month: number
+): Promise<{
+  success: boolean
+  items?: InventoryItemRow[]
+  error?: string
+}> {
+  try {
+    const supabase = createServerSupabaseClient()
+    const startDate = `${year}-${String(month).padStart(2, "0")}-01`
+    const endDate = new Date(year, month, 0).toISOString().slice(0, 10)
+
+    const { data, error } = await supabase
+      .from("inventory_items")
+      .select("*")
+      .eq("status", "売却済")
+      .gte("sold_date", startDate)
+      .lte("sold_date", endDate)
+      .order("sold_date", { ascending: false })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+    return { success: true, items: (data ?? []) as InventoryItemRow[] }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "売却データの取得に失敗しました"
     return { success: false, error: msg }
   }
 }

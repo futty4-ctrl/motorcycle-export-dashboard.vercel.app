@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { getMarketPrices } from "@/app/actions/market-prices"
 import type { MarketPrice } from "@/lib/types"
 
@@ -40,7 +41,7 @@ const SHIPPING: Record<string, Record<string, number>> = {
 const CC_RANGES = ["～125cc", "126～750cc", "751～1200cc", "1201～1500cc", "1501cc以上"]
 const VENUES = ["関東", "九州"]
 const MEMBER_TYPES = ["A", "C"] as const
-const YAHOO_FEE = 1980
+const YAHOO_FEE = 2680 // 落札手数料1980 + 広告費700(100円×7日)
 
 const BDS_FEES: Record<string, { max: number; fee: number }[]> = {
   A: [
@@ -98,6 +99,9 @@ const fmt = (n: number) =>
 const fmtFull = (n: number) => `¥${n.toLocaleString()}`
 
 export default function BdsBorderContent() {
+  const searchParams = useSearchParams()
+  const initialBid = searchParams.get("bid") ?? ""
+
   const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([])
   const [selectedMarket, setSelectedMarket] = useState<MarketPrice | null>(null)
   const [manualYahoo, setManualYahoo] = useState("")
@@ -106,7 +110,7 @@ export default function BdsBorderContent() {
   const [ccRange, setCcRange] = useState("～125cc")
   const [memberType, setMemberType] = useState<"A" | "C">("A")
   const [targetProfit, setTargetProfit] = useState(25000)
-  const [bdsBid, setBdsBid] = useState("")
+  const [bdsBid, setBdsBid] = useState(initialBid)
 
   useEffect(() => {
     getMarketPrices().then((res) => {

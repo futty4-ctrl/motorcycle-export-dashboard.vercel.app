@@ -32,11 +32,15 @@ const NAV = [
       { href: "/research", label: "相場リサーチ", icon: "🔍" },
       { href: "/bds-border", label: "入札ボーダー計算", icon: "🎯" },
       { href: "/bds-simulator", label: "BDSシミュレーター", icon: "⟳" },
+      { href: "/profit-forecast", label: "在庫×期待利益", icon: "📊" },
+      { href: "/monthly-progress", label: "月次進捗", icon: "📈" },
     ],
   },
   {
     group: "管理",
     items: [
+      { href: "/yahoo-template", label: "出品テンプレ", icon: "📝" },
+      { href: "/bds-bookmarklet", label: "BDSブックマーク", icon: "🔖" },
       { href: "/invoices", label: "請求書・見積書", icon: "🧾" },
       { href: "/documents", label: "ドキュメント", icon: "◻" },
       { href: "/settings", label: "設定", icon: "⚙" },
