@@ -54,7 +54,7 @@ function buildTemplate(p: {
   cc: string; km: string; reason: string; storage: string
   cond: string; scratch: string; engineNote: string
   buynow: string; venue: string; ship: string; extra: string
-  checks: string[]
+  checks: string[]; youtubeUrl: string
 }) {
   const sep = "━━━━━━━━━━━━━━━━━━━━\n"
   let t = ""
@@ -82,6 +82,10 @@ function buildTemplate(p: {
     t += "状態詳細は写真・動画にてご確認ください。\n"
     t += "気になる点はご入札前にお気軽にご質問ください。\n\n"
   }
+
+  t += sep + "■ 車両動画（YouTube）\n" + sep
+  t += `実際の車両状態を動画でご確認いただけます。\n`
+  t += `${p.youtubeUrl || "※ 動画URL準備中"}\n\n`
 
   if (p.checks.length > 0) {
     t += sep + "■ 動作確認済み項目\n" + sep
@@ -176,6 +180,7 @@ export function YahooTemplateContent() {
   const [venue, setVenue] = useState<string>("大阪")
   const [ship, setShip] = useState<string>(SHIP_OPTIONS[0])
   const [extra, setExtra] = useState("")
+  const [youtubeUrl, setYoutubeUrl] = useState("")
   const [checks, setChecks] = useState<Record<string, boolean>>({
     "エンジン始動動画あり": true,
     "走行可能（自走確認済）": true,
@@ -192,7 +197,7 @@ export function YahooTemplateContent() {
   const template = buildTemplate({
     maker, model, frame, year, cc, km, reason, storage,
     cond, scratch, engineNote, buynow, venue, ship, extra,
-    checks: checkedItems,
+    checks: checkedItems, youtubeUrl,
   })
 
   const handleCopy = () => {
@@ -395,6 +400,25 @@ export function YahooTemplateContent() {
                   <button key={s} style={toggleBtn(ship === s)} onClick={() => setShip(s)}>{s}</button>
                 ))}
               </div>
+            </div>
+          </div>
+
+          {/* YouTube動画URL */}
+          <div style={{ background: "#1a1a1a", border: "1px solid #f97316", borderRadius: 8, padding: 20 }}>
+            <div style={sectionTitle}>
+              YouTube 動画URL{" "}
+              <span style={{ color: "#f97316", fontSize: 11, fontWeight: 700 }}>★ 必須</span>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <input
+                style={{ ...inputBase, borderColor: "#f97316" }}
+                placeholder="https://youtu.be/xxxxxxxxxxxx"
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+              />
+            </div>
+            <div style={{ fontSize: 11, color: "#888", lineHeight: 1.7 }}>
+              不動車・エンジン不動でも必ず載せてください。動画がない場合は「準備中」と表示されます。
             </div>
           </div>
 
