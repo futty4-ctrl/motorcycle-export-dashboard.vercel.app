@@ -47,12 +47,6 @@ const NAV = [
     ],
   },
   {
-    group: "秘書室",
-    items: [
-      { href: "/secretariat", label: "秘書室", icon: "🤖" },
-    ],
-  },
-  {
     group: "ヘルプ",
     items: [
       { href: "/manual", label: "使い方ガイド", icon: "📖" },
