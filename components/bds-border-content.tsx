@@ -22,6 +22,13 @@ const C = {
 }
 
 const SHIPPING: Record<string, Record<string, number>> = {
+  大阪: {
+    "～125cc": 0,
+    "126～750cc": 0,
+    "751～1200cc": 0,
+    "1201～1500cc": 0,
+    "1501cc以上": 0,
+  },
   関東: {
     "～125cc": 12430,
     "126～750cc": 12980,
@@ -39,7 +46,7 @@ const SHIPPING: Record<string, Record<string, number>> = {
 }
 
 const CC_RANGES = ["～125cc", "126～750cc", "751～1200cc", "1201～1500cc", "1501cc以上"]
-const VENUES = ["関東", "九州"]
+const VENUES = ["大阪", "関東", "九州"]
 const MEMBER_TYPES = ["A", "C"] as const
 const YAHOO_FEE = 2680 // 落札手数料1980 + 広告費700(100円×7日)
 
