@@ -30,6 +30,7 @@ const NAV = [
       { href: "/analytics", label: "アナリティクス", icon: "◎" },
       { href: "/market", label: "市場価格", icon: "▲" },
       { href: "/research", label: "相場リサーチ", icon: "🔍" },
+      { href: "/bds-border", label: "入札ボーダー計算", icon: "🎯" },
       { href: "/bds-simulator", label: "BDSシミュレーター", icon: "⟳" },
     ],
   },
