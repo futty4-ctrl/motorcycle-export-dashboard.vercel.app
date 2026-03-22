@@ -25,6 +25,33 @@ const C = {
 const fmt = (n: number) =>
   n >= 10000 ? `¥${(n / 10000).toFixed(1)}万` : `¥${n.toLocaleString()}`
 
+function calcStats(results: Result[]): Stats | null {
+  if (results.length === 0) return null
+  const prices = results.map((r) => r.price).sort((a, b) => a - b)
+  const avg = Math.round(prices.reduce((s, p) => s + p, 0) / prices.length)
+  const min = prices[0]
+  const max = prices[prices.length - 1]
+  const median = prices[Math.floor(prices.length / 2)]
+  const trimCount = Math.floor(prices.length * 0.1)
+  const trimmed = prices.slice(trimCount, prices.length - trimCount)
+  const trimmedAvg =
+    trimmed.length > 0
+      ? Math.round(trimmed.reduce((s, p) => s + p, 0) / trimmed.length)
+      : avg
+  return {
+    count: results.length,
+    avg,
+    trimmedAvg,
+    median,
+    min,
+    max,
+    range: {
+      low: prices[Math.floor(prices.length * 0.25)],
+      high: prices[Math.floor(prices.length * 0.75)],
+    },
+  }
+}
+
 const PRESETS = [
   "モンキー Z50",
   "ゴリラ Z50J",
@@ -66,6 +93,13 @@ export default function ResearchContent() {
   const [searched, setSearched] = useState("")
   const [registering, setRegistering] = useState(false)
   const [registered, setRegistered] = useState(false)
+
+  const handleDeleteRow = (index: number) => {
+    const next = results.filter((_, i) => i !== index)
+    setResults(next)
+    setStats(calcStats(next))
+    setRegistered(false)
+  }
 
   const handleSearch = async (q?: string) => {
     const keyword = q ?? query
@@ -490,7 +524,7 @@ export default function ResearchContent() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: C.surfaceHigh }}>
-                    {["タイトル", "落札価格", "入札数", "終了日"].map((h) => (
+                    {["タイトル", "落札価格", "入札数", "終了日", ""].map((h) => (
                       <th
                         key={h}
                         style={{
@@ -525,6 +559,7 @@ export default function ResearchContent() {
                           i % 2 === 0 ? "transparent" : `${C.surfaceHigh}44`)
                       }
                     >
+
                       <td
                         style={{
                           padding: "11px 16px",
@@ -592,6 +627,37 @@ export default function ResearchContent() {
                         }}
                       >
                         {r.endDate}
+                      </td>
+                      <td
+                        style={{
+                          padding: "11px 16px",
+                          borderBottom: `1px solid ${C.border}20`,
+                          textAlign: "center",
+                        }}
+                      >
+                        <button
+                          onClick={() => handleDeleteRow(i)}
+                          style={{
+                            padding: "3px 10px",
+                            background: "none",
+                            border: `1px solid ${C.border}`,
+                            borderRadius: 4,
+                            color: C.textMuted,
+                            fontFamily: C.font,
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = C.red
+                            e.currentTarget.style.color = C.red
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = C.border
+                            e.currentTarget.style.color = C.textMuted
+                          }}
+                        >
+                          除外
+                        </button>
                       </td>
                     </tr>
                   ))}

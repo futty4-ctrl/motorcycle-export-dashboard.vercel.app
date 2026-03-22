@@ -20,7 +20,6 @@ const NAV = [
     group: "メイン",
     items: [
       { href: "/", label: "ダッシュボード", icon: "◈" },
-      { href: "/assess", label: "AI査定", icon: "⬡" },
       { href: "/inventory", label: "在庫管理", icon: "▦" },
     ],
   },
@@ -30,6 +29,9 @@ const NAV = [
       { href: "/analytics", label: "アナリティクス", icon: "◎" },
       { href: "/market", label: "市場価格", icon: "▲" },
       { href: "/research", label: "相場リサーチ", icon: "🔍" },
+      { href: "/scoreboard", label: "利益スコアボード", icon: "🏆" },
+      { href: "/performance", label: "売却実績", icon: "📉" },
+      { href: "/recommendation", label: "仕入れ推薦", icon: "🎯" },
       { href: "/bds-border", label: "入札ボーダー計算", icon: "🎯" },
       { href: "/bds-simulator", label: "BDSシミュレーター", icon: "⟳" },
       { href: "/profit-forecast", label: "在庫×期待利益", icon: "📊" },
@@ -40,7 +42,6 @@ const NAV = [
     group: "管理",
     items: [
       { href: "/yahoo-template", label: "出品テンプレ", icon: "📝" },
-      { href: "/bds-bookmarklet", label: "BDSブックマーク", icon: "🔖" },
       { href: "/invoices", label: "請求書・見積書", icon: "🧾" },
       { href: "/documents", label: "ドキュメント", icon: "◻" },
       { href: "/settings", label: "設定", icon: "⚙" },
