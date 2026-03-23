@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import type { CSSProperties } from "react"
 import { supabase } from "@/lib/supabase"
 
@@ -62,12 +62,13 @@ const labelStyle: CSSProperties = {
   letterSpacing: "0.08em",
 }
 
-const MY_INFO = {
+const SENDER_DEFAULTS = {
   name: "淵上 郁也",
   zip: "〒570-0006",
   address: "大阪府守口市八雲西町2-1-27",
   tel: "090-6423-4268",
 }
+const LS_KEY = "invoice_sender_profile"
 
 export default function InvoiceEditor({
   initial,
@@ -78,10 +79,12 @@ export default function InvoiceEditor({
     invoice_type?: "invoice" | "quote"
     issue_date?: string
     client_name?: string
+    client_address?: string
     subject?: string
     bank_info?: string
     tax_rate?: number
     notes?: string
+    payment_due?: string
     items?: LineItem[]
   }
   onSaved?: () => void
@@ -93,6 +96,7 @@ export default function InvoiceEditor({
     initial?.issue_date ?? new Date().toISOString().slice(0, 10)
   )
   const [clientName, setClientName] = useState(initial?.client_name ?? "")
+  const [clientAddress, setClientAddress] = useState(initial?.client_address ?? "")
   const [subject, setSubject] = useState(initial?.subject ?? "")
   const [bankInfo, setBankInfo] = useState(
     initial?.bank_info ??
@@ -102,9 +106,38 @@ export default function InvoiceEditor({
   const [notes, setNotes] = useState(
     initial?.notes ?? "上記のとおり、領収申し上げます。"
   )
+  const [paymentDue, setPaymentDue] = useState(initial?.payment_due ?? "")
   const [items, setItems] = useState<LineItem[]>(
     initial?.items?.length ? initial.items : [newItem()]
   )
+
+  // 発行元（localStorageに保存）
+  const [myName, setMyName] = useState(SENDER_DEFAULTS.name)
+  const [myZip, setMyZip] = useState(SENDER_DEFAULTS.zip)
+  const [myAddress, setMyAddress] = useState(SENDER_DEFAULTS.address)
+  const [myTel, setMyTel] = useState(SENDER_DEFAULTS.tel)
+  const [sealImageDataUrl, setSealImageDataUrl] = useState("")
+  const sealInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LS_KEY)
+      if (saved) {
+        const p = JSON.parse(saved)
+        if (p.name) setMyName(p.name)
+        if (p.zip) setMyZip(p.zip)
+        if (p.address) setMyAddress(p.address)
+        if (p.tel) setMyTel(p.tel)
+        if (p.sealImageDataUrl) setSealImageDataUrl(p.sealImageDataUrl)
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({ name: myName, zip: myZip, address: myAddress, tel: myTel, sealImageDataUrl }))
+    } catch {}
+  }, [myName, myZip, myAddress, myTel, sealImageDataUrl])
 
   const updateItem = (id: string, key: keyof LineItem, val: string | number) =>
     setItems((prev) =>
@@ -129,10 +162,12 @@ export default function InvoiceEditor({
         invoice_type: invoiceType,
         issue_date: issueDate,
         client_name: clientName,
+        client_address: clientAddress,
         subject,
         tax_rate: taxRate,
         notes,
         bank_info: bankInfo,
+        payment_due: paymentDue,
         items,
         updated_at: new Date().toISOString(),
       }
@@ -208,16 +243,19 @@ export default function InvoiceEditor({
         <div style="font-size:10pt;font-weight:700;border-bottom:1px solid #111;padding-bottom:1mm;margin-bottom:1mm">
           ${clientName || "　"} 御中
         </div>
+        ${clientAddress ? `<div style="font-size:7.5pt;color:#444;white-space:pre-wrap;margin-bottom:1mm">${clientAddress}</div>` : ""}
         <div style="font-size:7.5pt;color:#555">
           下記のとおりご${invoiceType === "invoice" ? "請求" : "見積"}申し上げます。
         </div>
       </div>
-      <div style="text-align:right;font-size:7.5pt;line-height:1.6;min-width:48mm;margin-left:6mm">
-        <div style="font-weight:700;font-size:9pt">淵上 郁也</div>
-        <div>〒570-0006</div>
-        <div>大阪府守口市八雲西町2-1-27</div>
-        <div>TEL：090-6423-4268</div>
+      <div style="text-align:right;font-size:7.5pt;line-height:1.6;min-width:48mm;margin-left:6mm;position:relative">
+        ${sealImageDataUrl ? `<img src="${sealImageDataUrl}" style="position:absolute;top:0;right:0;width:18mm;height:18mm;object-fit:contain;opacity:0.85" />` : ""}
+        <div style="font-weight:700;font-size:9pt;padding-right:${sealImageDataUrl ? "20mm" : "0"}">${myName}</div>
+        <div>${myZip}</div>
+        <div>${myAddress}</div>
+        <div>TEL：${myTel}</div>
         <div style="margin-top:0.5mm">${dateLabelStr}：${todayStr}</div>
+        ${invoiceType === "invoice" && paymentDue ? `<div>支払期限：${paymentDue}</div>` : ""}
       </div>
     </div>
 
@@ -345,6 +383,7 @@ export default function InvoiceEditor({
           dateLabel={dateLabel}
           today={today}
           clientName={clientName}
+          clientAddress={clientAddress}
           subject={subject}
           bankInfo={bankInfo}
           invoiceType={invoiceType}
@@ -354,6 +393,12 @@ export default function InvoiceEditor({
           taxRate={taxRate}
           total={total}
           notes={notes}
+          paymentDue={paymentDue}
+          myName={myName}
+          myZip={myZip}
+          myAddress={myAddress}
+          myTel={myTel}
+          sealImageDataUrl={sealImageDataUrl}
         />
       </div>
 
@@ -394,6 +439,7 @@ export default function InvoiceEditor({
             ))}
           </div>
 
+          {/* 基本情報 */}
           <div
             style={{
               background: C.surface,
@@ -442,6 +488,16 @@ export default function InvoiceEditor({
               </div>
             </div>
             <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>宛先の住所</label>
+              <textarea
+                value={clientAddress}
+                onChange={(e) => setClientAddress(e.target.value)}
+                placeholder="〒000-0000 ○○県○○市…"
+                rows={2}
+                style={{ ...inputStyle(), resize: "none" }}
+              />
+            </div>
+            <div style={{ marginBottom: 14 }}>
               <label style={labelStyle}>件名</label>
               <input
                 value={subject}
@@ -461,6 +517,17 @@ export default function InvoiceEditor({
                 />
               </div>
             )}
+            {invoiceType === "invoice" && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>支払期限</label>
+                <input
+                  value={paymentDue}
+                  onChange={(e) => setPaymentDue(e.target.value)}
+                  placeholder="例: 2026年4月30日"
+                  style={{ ...inputStyle(), width: "50%" }}
+                />
+              </div>
+            )}
             <div>
               <label style={labelStyle}>消費税率</label>
               <select
@@ -475,6 +542,140 @@ export default function InvoiceEditor({
             </div>
           </div>
 
+          {/* 発行元 */}
+          <div
+            style={{
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: 10,
+              padding: "20px 24px",
+              marginBottom: 14,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: C.fontSans,
+                fontWeight: 700,
+                fontSize: 14,
+                color: C.text,
+                marginBottom: 4,
+              }}
+            >
+              発行元（自分）
+            </div>
+            <div
+              style={{
+                fontFamily: C.font,
+                fontSize: 10,
+                color: C.textMuted,
+                marginBottom: 16,
+              }}
+            >
+              端末に保存されます
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 14,
+                marginBottom: 14,
+              }}
+            >
+              <div>
+                <label style={labelStyle}>氏名・会社名</label>
+                <input
+                  value={myName}
+                  onChange={(e) => setMyName(e.target.value)}
+                  placeholder="淵上 郁也"
+                  style={inputStyle()}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>TEL</label>
+                <input
+                  value={myTel}
+                  onChange={(e) => setMyTel(e.target.value)}
+                  placeholder="090-0000-0000"
+                  style={inputStyle()}
+                />
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>住所（郵便番号含む）</label>
+              <textarea
+                value={`${myZip}\n${myAddress}`}
+                onChange={(e) => {
+                  const lines = e.target.value.split("\n")
+                  setMyZip(lines[0] ?? "")
+                  setMyAddress(lines.slice(1).join("\n"))
+                }}
+                rows={2}
+                style={{ ...inputStyle(), resize: "none" }}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>印鑑画像</label>
+              <input
+                ref={sealInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (!f) return
+                  const r = new FileReader()
+                  r.onload = () => setSealImageDataUrl(String(r.result))
+                  r.readAsDataURL(f)
+                  e.target.value = ""
+                }}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => sealInputRef.current?.click()}
+                  style={{
+                    padding: "7px 14px",
+                    background: C.surfaceHigh,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 6,
+                    color: C.textSub,
+                    fontFamily: C.fontSans,
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  {sealImageDataUrl ? "画像を差し替え" : "画像を選択"}
+                </button>
+                {sealImageDataUrl && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSealImageDataUrl("")}
+                      style={{
+                        padding: "7px 14px",
+                        background: "none",
+                        border: `1px solid ${C.redDim}`,
+                        borderRadius: 6,
+                        color: C.red,
+                        fontFamily: C.fontSans,
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      削除
+                    </button>
+                    <img
+                      src={sealImageDataUrl}
+                      alt="印鑑"
+                      style={{ width: 52, height: 52, objectFit: "contain" }}
+                    />
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 明細 */}
           <div
             style={{
               background: C.surface,
@@ -727,6 +928,7 @@ export default function InvoiceEditor({
               dateLabel={dateLabel}
               today={today}
               clientName={clientName}
+              clientAddress={clientAddress}
               subject={subject}
               bankInfo={bankInfo}
               invoiceType={invoiceType}
@@ -736,6 +938,12 @@ export default function InvoiceEditor({
               taxRate={taxRate}
               total={total}
               notes={notes}
+              paymentDue={paymentDue}
+              myName={myName}
+              myZip={myZip}
+              myAddress={myAddress}
+              myTel={myTel}
+              sealImageDataUrl={sealImageDataUrl}
             />
           </div>
         </div>
@@ -749,6 +957,7 @@ function PrintPreview({
   dateLabel,
   today,
   clientName,
+  clientAddress,
   subject,
   bankInfo,
   invoiceType,
@@ -758,11 +967,18 @@ function PrintPreview({
   taxRate,
   total,
   notes,
+  paymentDue,
+  myName,
+  myZip,
+  myAddress,
+  myTel,
+  sealImageDataUrl,
 }: {
   titleLabel: string
   dateLabel: string
   today: string
   clientName: string
+  clientAddress: string
   subject: string
   bankInfo: string
   invoiceType: string
@@ -772,6 +988,12 @@ function PrintPreview({
   taxRate: number
   total: number
   notes: string
+  paymentDue: string
+  myName: string
+  myZip: string
+  myAddress: string
+  myTel: string
+  sealImageDataUrl: string
 }) {
   return (
     <div
@@ -821,6 +1043,18 @@ function PrintPreview({
           >
             {clientName || "　"} 御中
           </div>
+          {clientAddress && (
+            <div
+              style={{
+                fontSize: "8.5pt",
+                color: "#444",
+                whiteSpace: "pre-wrap",
+                marginBottom: "2mm",
+              }}
+            >
+              {clientAddress}
+            </div>
+          )}
           <div style={{ fontSize: "9pt", color: "#555" }}>
             下記のとおりご
             {invoiceType === "invoice" ? "請求" : "見積"}申し上げます。
@@ -833,15 +1067,42 @@ function PrintPreview({
             fontSize: "9pt",
             lineHeight: 2,
             minWidth: "55mm",
+            position: "relative",
           }}
         >
-          <div style={{ fontWeight: 700, fontSize: "11pt" }}>{MY_INFO.name}</div>
-          <div>{MY_INFO.zip}</div>
-          <div>{MY_INFO.address}</div>
-          <div>TEL：{MY_INFO.tel}</div>
+          {sealImageDataUrl && (
+            <img
+              src={sealImageDataUrl}
+              alt="印鑑"
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                width: "18mm",
+                height: "18mm",
+                objectFit: "contain",
+                opacity: 0.85,
+              }}
+            />
+          )}
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: "11pt",
+              paddingRight: sealImageDataUrl ? "20mm" : 0,
+            }}
+          >
+            {myName}
+          </div>
+          <div>{myZip}</div>
+          <div>{myAddress}</div>
+          <div>TEL：{myTel}</div>
           <div style={{ marginTop: "2mm" }}>
             {dateLabel}：{today}
           </div>
+          {invoiceType === "invoice" && paymentDue && (
+            <div>支払期限：{paymentDue}</div>
+          )}
         </div>
       </div>
 
@@ -1008,7 +1269,7 @@ function PrintPreview({
                     borderBottom: "1px solid #ddd",
                   }}
                 >
-                  　
+
                 </td>
               ))}
             </tr>
