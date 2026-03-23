@@ -69,6 +69,17 @@ const SENDER_DEFAULTS = {
   tel: "090-6423-4268",
 }
 const LS_KEY = "invoice_sender_profile"
+const LS_CLIENTS_KEY = "invoice_saved_clients"
+const LS_BANKS_KEY = "invoice_saved_banks"
+
+interface SavedClient { name: string; address: string }
+
+function lsGetJSON<T>(key: string, fallback: T): T {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback } catch { return fallback }
+}
+function lsSetJSON(key: string, val: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(val)) } catch {}
+}
 
 export default function InvoiceEditor({
   initial,
@@ -138,6 +149,42 @@ export default function InvoiceEditor({
       localStorage.setItem(LS_KEY, JSON.stringify({ name: myName, zip: myZip, address: myAddress, tel: myTel, sealImageDataUrl }))
     } catch {}
   }, [myName, myZip, myAddress, myTel, sealImageDataUrl])
+
+  // 宛先・振込先の履歴
+  const [savedClients, setSavedClients] = useState<SavedClient[]>([])
+  const [savedBanks, setSavedBanks] = useState<string[]>([])
+
+  useEffect(() => {
+    setSavedClients(lsGetJSON<SavedClient[]>(LS_CLIENTS_KEY, []))
+    setSavedBanks(lsGetJSON<string[]>(LS_BANKS_KEY, []))
+  }, [])
+
+  const saveClient = () => {
+    if (!clientName.trim()) return
+    const entry: SavedClient = { name: clientName.trim(), address: clientAddress.trim() }
+    const next = [entry, ...savedClients.filter((c) => c.name !== entry.name)].slice(0, 20)
+    setSavedClients(next)
+    lsSetJSON(LS_CLIENTS_KEY, next)
+  }
+
+  const deleteClient = (name: string) => {
+    const next = savedClients.filter((c) => c.name !== name)
+    setSavedClients(next)
+    lsSetJSON(LS_CLIENTS_KEY, next)
+  }
+
+  const saveBank = () => {
+    if (!bankInfo.trim()) return
+    const next = [bankInfo.trim(), ...savedBanks.filter((b) => b !== bankInfo.trim())].slice(0, 10)
+    setSavedBanks(next)
+    lsSetJSON(LS_BANKS_KEY, next)
+  }
+
+  const deleteBank = (b: string) => {
+    const next = savedBanks.filter((x) => x !== b)
+    setSavedBanks(next)
+    lsSetJSON(LS_BANKS_KEY, next)
+  }
 
   const updateItem = (id: string, key: keyof LineItem, val: string | number) =>
     setItems((prev) =>
@@ -460,6 +507,47 @@ export default function InvoiceEditor({
             >
               基本情報
             </div>
+            {/* 宛先履歴セレクタ */}
+            {savedClients.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>保存した宛先から選ぶ</label>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      const c = savedClients.find((x) => x.name === e.target.value)
+                      if (c) { setClientName(c.name); setClientAddress(c.address) }
+                      e.target.value = ""
+                    }}
+                    style={{ ...inputStyle(), flex: 1 }}
+                  >
+                    <option value="" disabled>選択…</option>
+                    {savedClients.map((c) => (
+                      <option key={c.name} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const name = savedClients[0]?.name
+                      if (name && window.confirm(`「${name}」を削除しますか？`)) deleteClient(name)
+                    }}
+                    style={{
+                      padding: "0 10px",
+                      background: "none",
+                      border: `1px solid ${C.redDim}`,
+                      borderRadius: 5,
+                      color: C.red,
+                      fontSize: 11,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    削除
+                  </button>
+                </div>
+              </div>
+            )}
             <div
               style={{
                 display: "grid",
@@ -488,7 +576,27 @@ export default function InvoiceEditor({
               </div>
             </div>
             <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>宛先の住所</label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>宛先の住所</label>
+                <button
+                  type="button"
+                  disabled={!clientName.trim()}
+                  onClick={saveClient}
+                  style={{
+                    padding: "3px 10px",
+                    background: "none",
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 4,
+                    color: C.textSub,
+                    fontFamily: C.fontSans,
+                    fontSize: 11,
+                    cursor: "pointer",
+                    opacity: clientName.trim() ? 1 : 0.4,
+                  }}
+                >
+                  この宛先を保存
+                </button>
+              </div>
               <textarea
                 value={clientAddress}
                 onChange={(e) => setClientAddress(e.target.value)}
@@ -508,7 +616,66 @@ export default function InvoiceEditor({
             </div>
             {invoiceType === "invoice" && (
               <div style={{ marginBottom: 14 }}>
-                <label style={labelStyle}>振込先</label>
+                {savedBanks.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <label style={labelStyle}>保存した振込先から選ぶ</label>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          if (e.target.value) setBankInfo(e.target.value)
+                          e.target.value = ""
+                        }}
+                        style={{ ...inputStyle(), flex: 1 }}
+                      >
+                        <option value="" disabled>選択…</option>
+                        {savedBanks.map((b, i) => (
+                          <option key={i} value={b}>{b.split("\n")[0]}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const b = savedBanks[0]
+                          if (b && window.confirm(`「${b.split("\n")[0]}」を削除しますか？`)) deleteBank(b)
+                        }}
+                        style={{
+                          padding: "0 10px",
+                          background: "none",
+                          border: `1px solid ${C.redDim}`,
+                          borderRadius: 5,
+                          color: C.red,
+                          fontSize: 11,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        削除
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>振込先</label>
+                  <button
+                    type="button"
+                    disabled={!bankInfo.trim()}
+                    onClick={saveBank}
+                    style={{
+                      padding: "3px 10px",
+                      background: "none",
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 4,
+                      color: C.textSub,
+                      fontFamily: C.fontSans,
+                      fontSize: 11,
+                      cursor: "pointer",
+                      opacity: bankInfo.trim() ? 1 : 0.4,
+                    }}
+                  >
+                    この振込先を保存
+                  </button>
+                </div>
                 <textarea
                   value={bankInfo}
                   onChange={(e) => setBankInfo(e.target.value)}
