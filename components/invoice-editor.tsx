@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import type { CSSProperties } from "react"
 import { supabase } from "@/lib/supabase"
+import { exportInvoiceToExcel } from "@/lib/quote-tool/export-excel"
 
 const C = {
   surface: "#111111",
@@ -1039,6 +1040,42 @@ export default function InvoiceEditor({
           </div>
 
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              onClick={() => {
+                const filename = `${invoiceType === "invoice" ? "請求書" : "見積書"}_${clientName || "未設定"}_${issueDate}.xlsx`
+                exportInvoiceToExcel({
+                  issueDate,
+                  billTo: clientName,
+                  subject,
+                  rows: items.map((it) => ({
+                    description: it.desc,
+                    quantity: it.qty,
+                    unit: it.unit,
+                    unitPrice: it.price,
+                    amount: it.qty * it.price,
+                  })),
+                  note: notes,
+                  companyName: myName,
+                  companyAddress: `${myZip} ${myAddress} TEL:${myTel}`,
+                  ...(invoiceType === "invoice" && bankInfo
+                    ? { bank: { name: bankInfo, branch: "", branchCode: "", accountType: "", accountNumber: "", accountName: "" } }
+                    : {}),
+                }, filename)
+              }}
+              style={{
+                padding: "10px 22px",
+                background: "none",
+                border: `1px solid ${C.border}`,
+                borderRadius: 7,
+                color: C.textSub,
+                fontFamily: C.fontSans,
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              📊 Excelでダウンロード
+            </button>
             <button
               type="button"
               onClick={handlePrint}
