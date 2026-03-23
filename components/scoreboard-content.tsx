@@ -302,7 +302,7 @@ export default function ScoreboardContent() {
               letterSpacing: "-0.02em",
             }}
           >
-            125cc 利益スコアボード
+            全車種 利益スコアボード
           </h1>
           <span
             style={{
@@ -323,7 +323,7 @@ export default function ScoreboardContent() {
             color: C.textSub,
           }}
         >
-          125cc全{MODELS.length}車種のヤフオク相場を一括スキャンし、BDSボーダーと利益ポテンシャルをランキング表示します。
+          125cc〜400cc 全{MODELS.length}車種のヤフオク相場を一括スキャンし、BDSボーダーと利益ポテンシャルをランキング表示します。
         </p>
       </div>
 

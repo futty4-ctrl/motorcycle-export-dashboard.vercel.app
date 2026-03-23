@@ -17,7 +17,7 @@ import {
   td,
 } from "@/components/ui-system"
 
-const GOAL = 1_000_000
+const GOAL = 1_500_000
 
 const fmt = (n: number | null | undefined) =>
   n != null ? `¥${n.toLocaleString()}` : "—"
@@ -61,7 +61,7 @@ export function MonthlyProgressContent() {
   return (
     <div style={pageWrapper}>
       <div style={pageTitle}>月次進捗トラッカー</div>
-      <div style={pageSub}>粗利 ¥100万/月 達成状況</div>
+      <div style={pageSub}>粗利 ¥150万/月 達成状況（月50台目標）</div>
 
       {/* Month selector */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
@@ -144,7 +144,7 @@ export function MonthlyProgressContent() {
             粗利進捗
           </div>
           <div style={{ fontFamily: font, fontSize: 12, color: C.textSub }}>
-            目標: ¥1,000,000
+            目標: ¥1,500,000
           </div>
         </div>
         <div
