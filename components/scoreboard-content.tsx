@@ -71,6 +71,7 @@ const MODELS = MODEL_CODES.map((m) => ({
   label: m.label,
   category: m.category,
   maker: m.maker,
+  cc: m.cc,
   ccRange: m.cc <= 125 ? "～125cc" : "126～750cc",
 }))
 
@@ -245,6 +246,7 @@ export default function ScoreboardContent() {
     setBulkRegistering(true)
     for (const r of doneResults) {
       if (!r.avgPrice) continue
+      const modelDef = MODELS.find((m) => m.query === r.query)
       await upsertMarketPrice({
         maker: r.maker,
         model: r.label,
@@ -256,7 +258,8 @@ export default function ScoreboardContent() {
         trend: "flat",
         trend_pct: 0,
         condition: "B",
-      })
+        cc: modelDef?.cc ?? null,
+      } as Record<string, unknown>)
     }
     setBulkRegistering(false)
     setBulkDone(true)
