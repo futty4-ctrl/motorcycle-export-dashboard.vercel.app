@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { upsertMarketPrice } from "@/app/actions/market-prices"
+import { MODEL_CODES, CC_RANGES, getCCRange } from "@/lib/model-codes"
 
 const C = {
   surface: "#111111",
@@ -64,73 +65,35 @@ function calcBorder(
 const fmt = (n: number) =>
   n >= 10000 ? `¥${(n / 10000).toFixed(1)}万` : `¥${n.toLocaleString()}`
 
-// 車種リスト（ccRange: "～125cc" | "126～750cc"）
-const MODELS = [
-  // 4mini（高値安定）
-  { query: "モンキー Z50", label: "モンキー Z50", category: "4mini", maker: "Honda", ccRange: "～125cc" },
-  { query: "ゴリラ Z50J", label: "ゴリラ Z50J", category: "4mini", maker: "Honda", ccRange: "～125cc" },
-  { query: "エイプ50", label: "エイプ50", category: "4mini", maker: "Honda", ccRange: "～125cc" },
-  { query: "エイプ100", label: "エイプ100", category: "4mini", maker: "Honda", ccRange: "～125cc" },
-  { query: "ダックス ST70", label: "ダックス ST70", category: "4mini", maker: "Honda", ccRange: "～125cc" },
-  { query: "シャリー CF50", label: "シャリー CF50", category: "4mini", maker: "Honda", ccRange: "～125cc" },
-  // カブ系
-  { query: "スーパーカブ C50", label: "スーパーカブ C50", category: "カブ", maker: "Honda", ccRange: "～125cc" },
-  { query: "スーパーカブ C70", label: "スーパーカブ C70", category: "カブ", maker: "Honda", ccRange: "～125cc" },
-  { query: "スーパーカブ C90", label: "スーパーカブ C90", category: "カブ", maker: "Honda", ccRange: "～125cc" },
-  { query: "スーパーカブ 110", label: "スーパーカブ110", category: "カブ", maker: "Honda", ccRange: "～125cc" },
-  { query: "クロスカブ 110", label: "クロスカブ110", category: "カブ", maker: "Honda", ccRange: "～125cc" },
-  // スクーター（125cc）
-  { query: "アドレスV125", label: "アドレスV125", category: "スクーター", maker: "Suzuki", ccRange: "～125cc" },
-  { query: "シグナスX", label: "シグナスX", category: "スクーター", maker: "Yamaha", ccRange: "～125cc" },
-  { query: "PCX125", label: "PCX125", category: "スクーター", maker: "Honda", ccRange: "～125cc" },
-  { query: "リード125", label: "リード125", category: "スクーター", maker: "Honda", ccRange: "～125cc" },
-  { query: "NMAX 125", label: "NMAX125", category: "スクーター", maker: "Yamaha", ccRange: "～125cc" },
-  { query: "ジョルノ AF24", label: "ジョルノ", category: "スクーター", maker: "Honda", ccRange: "～125cc" },
-  // スポーツ（125cc）
-  { query: "グロム MSX125", label: "グロム MSX125", category: "スポーツ125", maker: "Honda", ccRange: "～125cc" },
-  { query: "CBR125R", label: "CBR125R", category: "スポーツ125", maker: "Honda", ccRange: "～125cc" },
-  { query: "Z125 PRO", label: "Z125 PRO", category: "スポーツ125", maker: "Kawasaki", ccRange: "～125cc" },
-  { query: "KSR110", label: "KSR110", category: "スポーツ125", maker: "Kawasaki", ccRange: "～125cc" },
-  // オフ（125cc）
-  { query: "XR100 モタード", label: "XR100モタード", category: "オフ", maker: "Honda", ccRange: "～125cc" },
-  { query: "CRF100F", label: "CRF100F", category: "オフ", maker: "Honda", ccRange: "～125cc" },
-  { query: "TT-R125", label: "TTR125", category: "オフ", maker: "Yamaha", ccRange: "～125cc" },
-  // ── 250〜400cc ────────────────────────────────
-  // ネイキッド400（需要最大）
-  { query: "CB400SF スーパーフォア", label: "CB400SF", category: "ネイキッド400", maker: "Honda", ccRange: "126～750cc" },
-  { query: "XJR400", label: "XJR400", category: "ネイキッド400", maker: "Yamaha", ccRange: "126～750cc" },
-  { query: "ZRX400", label: "ZRX400", category: "ネイキッド400", maker: "Kawasaki", ccRange: "126～750cc" },
-  { query: "GSX400 インパルス", label: "GSX400 Impulse", category: "ネイキッド400", maker: "Suzuki", ccRange: "126～750cc" },
-  // 旧車400（高値）
-  { query: "CBX400F", label: "CBX400F", category: "旧車400", maker: "Honda", ccRange: "126～750cc" },
-  { query: "Z400FX", label: "Z400FX", category: "旧車400", maker: "Kawasaki", ccRange: "126～750cc" },
-  { query: "Z400GP", label: "Z400GP", category: "旧車400", maker: "Kawasaki", ccRange: "126～750cc" },
-  { query: "GS400 スズキ", label: "GS400", category: "旧車400", maker: "Suzuki", ccRange: "126～750cc" },
-  // レーサーレプリカ250（ノスタルジー）
-  { query: "NSR250R ホンダ", label: "NSR250R", category: "レプリカ250", maker: "Honda", ccRange: "126～750cc" },
-  { query: "RZ250R ヤマハ", label: "RZ250R", category: "レプリカ250", maker: "Yamaha", ccRange: "126～750cc" },
-  { query: "RG250Γ ガンマ", label: "RG250Γ", category: "レプリカ250", maker: "Suzuki", ccRange: "126～750cc" },
-  { query: "FZR400 ヤマハ", label: "FZR400", category: "レプリカ250", maker: "Yamaha", ccRange: "126～750cc" },
-  // スポーツ400
-  { query: "CBR400RR ホンダ", label: "CBR400RR", category: "スポーツ400", maker: "Honda", ccRange: "126～750cc" },
-  { query: "VFR400R NC30", label: "VFR400R", category: "スポーツ400", maker: "Honda", ccRange: "126～750cc" },
-  // オフ250
-  { query: "XR250 ホンダ", label: "XR250", category: "オフ250", maker: "Honda", ccRange: "126～750cc" },
-  { query: "TT250R ヤマハ", label: "TT250R", category: "オフ250", maker: "Yamaha", ccRange: "126～750cc" },
-  { query: "DR250S スズキ", label: "DR250S", category: "オフ250", maker: "Suzuki", ccRange: "126～750cc" },
-]
+// MODEL_CODESからスコアボード用フォーマットに変換
+const MODELS = MODEL_CODES.map((m) => ({
+  query: m.query,
+  label: m.label,
+  category: m.category,
+  maker: m.maker,
+  ccRange: m.cc <= 125 ? "～125cc" : "126～750cc",
+}))
 
 const CATEGORY_COLORS: Record<string, string> = {
   "4mini": "#f97316",
   "カブ": "#22c55e",
   "スクーター": "#3b82f6",
   "スポーツ125": "#a855f7",
-  "オフ": "#eab308",
-  "ネイキッド400": "#ef4444",
-  "旧車400": "#f59e0b",
-  "レプリカ250": "#ec4899",
-  "スポーツ400": "#8b5cf6",
   "オフ250": "#10b981",
+  "ネイキッド400": "#ef4444",
+  "ネイキッド250": "#f87171",
+  "旧車400": "#f59e0b",
+  "旧車250": "#fbbf24",
+  "レプリカ250": "#ec4899",
+  "レプリカ400": "#db2777",
+  "スポーツ400": "#8b5cf6",
+  "スポーツ250": "#7c3aed",
+  "スポーツ": "#6d28d9",
+  "アメリカン400": "#64748b",
+  "アメリカン250": "#94a3b8",
+  "アドベンチャー": "#0ea5e9",
+  "旧車50": "#78716c",
+  "オフ": "#84cc16",
 }
 
 const SHIPPING: Record<string, Record<string, number>> = {
@@ -154,6 +117,7 @@ interface ModelResult {
   maker: string
   status: ScanStatus
   avgPrice?: number
+  medianPrice?: number
   sampleCount?: number
   border?: number
   bdsFee?: number
@@ -177,7 +141,17 @@ export default function ScoreboardContent() {
   const [exclude, setExclude] = useState("ジャンク,パーツ,部品,外装,エンジン")
   const [bulkRegistering, setBulkRegistering] = useState(false)
   const [bulkDone, setBulkDone] = useState(false)
-  const [sortKey, setSortKey] = useState<"border" | "avg" | "profit">("border")
+  const [sortKey, setSortKey] = useState<"border" | "avg" | "median" | "profit">("border")
+  const [filterCC, setFilterCC] = useState<string>("全て")
+  const [filterMaker, setFilterMaker] = useState<string>("全て")
+
+  const displayedResults = results.filter((r) => {
+    const model = MODEL_CODES.find((m) => m.label === r.label)
+    if (!model) return true
+    if (filterCC !== "全て" && getCCRange(model.cc) !== filterCC) return false
+    if (filterMaker !== "全て" && model.maker !== filterMaker) return false
+    return true
+  })
 
   const handleScan = async () => {
     setScanning(true)
@@ -212,6 +186,7 @@ export default function ScoreboardContent() {
                     ...r,
                     status: "done",
                     avgPrice: avg,
+                    medianPrice: data.stats.median,
                     sampleCount: data.stats.count,
                     border,
                     bdsFee,
@@ -246,11 +221,12 @@ export default function ScoreboardContent() {
     setScanning(false)
   }
 
-  const doneResults = results.filter((r) => r.status === "done" && r.avgPrice)
+  const doneResults = displayedResults.filter((r) => r.status === "done" && r.avgPrice)
 
   const sorted = [...doneResults].sort((a, b) => {
     if (sortKey === "border") return (b.border ?? 0) - (a.border ?? 0)
     if (sortKey === "avg") return (b.avgPrice ?? 0) - (a.avgPrice ?? 0)
+    if (sortKey === "median") return (b.medianPrice ?? 0) - (a.medianPrice ?? 0)
     if (sortKey === "profit") return (b.border ?? 0) - (a.border ?? 0)
     return 0
   })
@@ -323,8 +299,34 @@ export default function ScoreboardContent() {
             color: C.textSub,
           }}
         >
-          125cc〜400cc 全{MODELS.length}車種のヤフオク相場を一括スキャンし、BDSボーダーと利益ポテンシャルをランキング表示します。
+          全{MODELS.length}車種（50〜400cc）のヤフオク相場を一括スキャンし、BDSボーダーと利益ポテンシャルをランキング表示します。
         </p>
+      </div>
+
+      {/* CC帯 / メーカーフィルター */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <span style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, alignSelf: "center", letterSpacing: "0.08em" }}>CC帯：</span>
+        {["全て", ...CC_RANGES].map((r) => (
+          <button key={r} onClick={() => setFilterCC(r)} style={{
+            padding: "5px 14px",
+            background: filterCC === r ? C.orange : C.surfaceHigh,
+            border: `1px solid ${filterCC === r ? C.orange : C.border}`,
+            borderRadius: 20,
+            color: filterCC === r ? "#fff" : C.textSub,
+            fontFamily: C.fontSans, fontSize: 12, cursor: "pointer",
+          }}>{r}</button>
+        ))}
+        <span style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, alignSelf: "center", letterSpacing: "0.08em", marginLeft: 8 }}>メーカー：</span>
+        {["全て", "Honda", "Yamaha", "Suzuki", "Kawasaki"].map((m) => (
+          <button key={m} onClick={() => setFilterMaker(m)} style={{
+            padding: "5px 14px",
+            background: filterMaker === m ? C.blue : C.surfaceHigh,
+            border: `1px solid ${filterMaker === m ? C.blue : C.border}`,
+            borderRadius: 20,
+            color: filterMaker === m ? "#fff" : C.textSub,
+            fontFamily: C.fontSans, fontSize: 12, cursor: "pointer",
+          }}>{m}</button>
+        ))}
       </div>
 
       {/* スキャン設定 */}
@@ -451,7 +453,7 @@ export default function ScoreboardContent() {
           >
             <div style={{ display: "flex", gap: 8 }}>
               {(["border", "avg", "profit"] as const).map((key) => {
-                const labels = { border: "BDSボーダー順", avg: "ヤフオク相場順", profit: "利益額順" }
+                const labels = { border: "BDSボーダー順", avg: "ヤフオク相場順", median: "中央値順", profit: "利益額順" }
                 return (
                   <button
                     key={key}
@@ -507,7 +509,7 @@ export default function ScoreboardContent() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: C.surfaceHigh }}>
-                    {["#", "車種", "カテゴリ", "ヤフオク平均", "BDSボーダー", "目標粗利", "相場レンジ", "件数"].map((h) => (
+                    {["#", "車種", "カテゴリ", "ヤフオク平均", "中央値", "BDSボーダー", "目標粗利", "相場レンジ", "件数"].map((h) => (
                       <th
                         key={h}
                         style={{
@@ -565,6 +567,9 @@ export default function ScoreboardContent() {
                         </td>
                         <td style={{ padding: "10px 14px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.fontSans, fontWeight: 700, fontSize: 14, color: C.orange, whiteSpace: "nowrap" as const }}>
                           {fmt(r.avgPrice ?? 0)}
+                        </td>
+                        <td style={{ padding: "10px 14px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.fontSans, fontWeight: 600, fontSize: 13, color: C.yellow, whiteSpace: "nowrap" as const }}>
+                          {fmt(r.medianPrice ?? 0)}
                         </td>
                         <td style={{ padding: "10px 14px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.fontSans, fontWeight: 700, fontSize: 14, color: C.blue, whiteSpace: "nowrap" as const }}>
                           {(r.border ?? 0) > 0 ? fmt(r.border ?? 0) : "—"}
