@@ -35,6 +35,7 @@ export default function RecommendationContent() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<RecommendationResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [filterCC, setFilterCC] = useState<string>("全て")
 
   const handleGenerate = async () => {
     setLoading(true)
@@ -99,6 +100,12 @@ export default function RecommendationContent() {
             style={{ ...inputStyle, width: 130 }}
           />
         </div>
+        <div>
+          <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, marginBottom: 6, letterSpacing: "0.08em" }}>排気量フィルター</div>
+          <select value={filterCC} onChange={(e) => setFilterCC(e.target.value)} style={{ ...inputStyle, width: 130 }}>
+            {["全て", "〜50cc", "51〜125cc", "126〜250cc", "251〜400cc"].map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
         <button
           onClick={handleGenerate}
           disabled={loading}
@@ -146,7 +153,17 @@ export default function RecommendationContent() {
             <div style={{ background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: 10, padding: 32, textAlign: "center", fontFamily: C.fontSans, fontSize: 15, fontWeight: 600, color: C.green }}>
               今月の目標達成済み！
             </div>
-          ) : result.items.length === 0 ? (
+          ) : (() => {
+            const filtered = result.items.filter((item) => {
+              if (filterCC === "全て") return true
+              const cc = item.cc ?? 0
+              if (filterCC === "〜50cc") return cc <= 50
+              if (filterCC === "51〜125cc") return cc > 50 && cc <= 125
+              if (filterCC === "126〜250cc") return cc > 125 && cc <= 250
+              if (filterCC === "251〜400cc") return cc > 250 && cc <= 400
+              return true
+            })
+            return filtered.length === 0 ? (
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 40, textAlign: "center", fontFamily: C.fontSans, fontSize: 13, color: C.textMuted }}>
               相場マスターにデータがありません。スコアボードでスキャンしてデータを蓄積してください。
             </div>
@@ -164,7 +181,7 @@ export default function RecommendationContent() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ background: C.surfaceHigh }}>
-                      {["#", "車種", "推薦台数", "BDSボーダー", "予想粗利/台", "平均在庫日数", "根拠"].map((h) => (
+                      {["#", "車種", "排気量", "推薦台数", "BDSボーダー", "予想粗利/台", "平均在庫日数", "根拠"].map((h) => (
                         <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontFamily: C.font, fontSize: 10, color: C.textMuted, letterSpacing: "0.1em", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" as const }}>
                           {h}
                         </th>
@@ -172,7 +189,7 @@ export default function RecommendationContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {result.items.map((item, i) => (
+                    {filtered.map((item, i) => (
                       <tr
                         key={`${item.maker}-${item.model}`}
                         style={{ background: i % 2 === 0 ? "transparent" : `${C.surfaceHigh}44` }}
@@ -185,6 +202,9 @@ export default function RecommendationContent() {
                         <td style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}20` }}>
                           <div style={{ fontFamily: C.fontSans, fontWeight: 600, fontSize: 13, color: C.text }}>{item.model}</div>
                           <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, marginTop: 2 }}>{item.maker}</div>
+                        </td>
+                        <td style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.font, fontSize: 11, color: C.textSub, whiteSpace: "nowrap" as const }}>
+                          {item.cc ? `${item.cc}cc` : "—"}
                         </td>
                         <td style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}20`, whiteSpace: "nowrap" as const }}>
                           <span style={{
@@ -223,7 +243,7 @@ export default function RecommendationContent() {
                 ※ 相場マスターに登録されている車種のみ表示。スコアボードでスキャンするとデータが増えます。実績データ（✓）がある車種ほど精度が高い。
               </div>
             </div>
-          )}
+          )})()}
         </>
       )}
 

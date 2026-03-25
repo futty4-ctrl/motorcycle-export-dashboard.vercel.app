@@ -42,12 +42,13 @@ export type RecommendItem = {
   maker: string
   model: string
   category: string | null
+  cc: number | null
   avgPrice: number
   border: number
   estProfit: number
-  avgDaysToSell: number | null  // 実績あれば。なければ null
-  actualSalesCount: number      // 実績売却台数
-  recommendQty: number          // 推薦仕入れ台数
+  avgDaysToSell: number | null
+  actualSalesCount: number
+  recommendQty: number
   reason: string
   hasActual: boolean
 }
@@ -87,10 +88,10 @@ export async function getRecommendations(
     const remaining = Math.max(0, monthTarget - soldThisMonth)
     const dailyNeeded = daysLeft > 0 ? Math.ceil(remaining / daysLeft) : remaining
 
-    // 相場マスターから全車種取得
+    // 相場マスターから全車種取得（ccカラム含む）
     const { data: marketRows, error: mErr } = await supabase
       .from("market_prices")
-      .select("maker, model, avg_price, sample_count")
+      .select("maker, model, avg_price, sample_count, cc")
       .gt("avg_price", 0)
       .order("avg_price", { ascending: false })
 
@@ -122,8 +123,8 @@ export async function getRecommendations(
     const scored = marketRows.map((row) => {
       const key = `${row.maker}__${row.model}`
 
-      // ccRangeは avg_price から推定（～5万 = 125cc以下、それ以上 = 126～750cc）
-      const ccRange = row.avg_price < 150000 ? "～125cc" : "126～750cc"
+      // ccカラムがあれば正確に判定、なければavg_priceから推定
+      const ccRange = (row.cc && row.cc <= 125) ? "～125cc" : "126～750cc"
       const shipping = SHIPPING[venueKey]?.[ccRange] ?? 0
       const border = calcBorder(row.avg_price, shipping, targetProfit)
       const estProfit = row.avg_price - border - shipping - YAHOO_FEE
@@ -140,6 +141,7 @@ export async function getRecommendations(
         maker: row.maker ?? "",
         model: row.model ?? "",
         category: null as string | null,
+        cc: row.cc ?? null,
         avgPrice: row.avg_price,
         border,
         estProfit,
@@ -153,7 +155,7 @@ export async function getRecommendations(
     .sort((a, b) => b.score - a.score)
 
     // 推薦台数を配分（スコア上位に多く割り当て）
-    const top = scored.slice(0, 15)
+    const top = scored.slice(0, 30)
     const totalScore = top.reduce((s, r) => s + r.score, 0)
     let allocated = 0
 
@@ -177,6 +179,7 @@ export async function getRecommendations(
         maker: r.maker,
         model: r.model,
         category: r.category,
+        cc: r.cc,
         avgPrice: r.avgPrice,
         border: r.border,
         estProfit: r.estProfit,
