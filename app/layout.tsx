@@ -3,6 +3,7 @@ import { DM_Mono, DM_Sans } from "next/font/google"
 import "./globals.css"
 import { Sidebar } from "@/components/sidebar"
 import { Toaster } from "@/components/ui/sonner"
+import { SWRegister } from "@/components/sw-register"
 
 const dmMono = DM_Mono({
   subsets: ["latin"],
@@ -18,6 +19,19 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "MotoExport Dashboard",
   description: "バイク輸出管理システム",
+  manifest: "/manifest.json",
+  themeColor: "#166534",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "MotoExport",
+  },
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
 }
 
 export default function RootLayout({
@@ -27,6 +41,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
+      <head>
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+      </head>
       <body
         className={`${dmMono.variable} ${dmSans.variable}`}
         style={{ margin: 0, background: "#0a0a0a", color: "#f5f5f5" }}
@@ -47,6 +64,7 @@ export default function RootLayout({
           </main>
         </div>
         <Toaster />
+        <SWRegister />
       </body>
     </html>
   )

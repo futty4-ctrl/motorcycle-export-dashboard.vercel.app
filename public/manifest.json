@@ -1,7 +1,7 @@
 {
-  "name": "MotoExport Pro",
-  "short_name": "MotoExport",
-  "description": "バイク輸出ダッシュボード・現場で写真アップロード",
+  "name": "JFPバイク管理",
+  "short_name": "JFPバイク",
+  "description": "BDS仕入れ・ヤフオク販売・相場管理ダッシュボード",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f1319",
