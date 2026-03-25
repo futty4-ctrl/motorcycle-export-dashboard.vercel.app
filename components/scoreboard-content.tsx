@@ -224,10 +224,20 @@ export default function ScoreboardContent() {
   const doneResults = displayedResults.filter((r) => r.status === "done" && r.avgPrice)
 
   const sorted = [...doneResults].sort((a, b) => {
-    if (sortKey === "border") return (b.border ?? 0) - (a.border ?? 0)
+    const calcProfit = (r: ModelResult) => {
+      const md = MODELS.find((m) => m.query === r.query)
+      const sh = getShipping(md?.ccRange ?? "～125cc")
+      const { border: bd, bdsFee: bf } = r.avgPrice ? calcBorder(r.avgPrice, sh, targetProfit) : { border: 0, bdsFee: 0 }
+      return (r.avgPrice ?? 0) - bd - sh - YAHOO_FEE - (bf || 0)
+    }
+    if (sortKey === "border") {
+      const bA = a.avgPrice ? calcBorder(a.avgPrice, getShipping(MODELS.find((m) => m.query === a.query)?.ccRange ?? "～125cc"), targetProfit).border : 0
+      const bB = b.avgPrice ? calcBorder(b.avgPrice, getShipping(MODELS.find((m) => m.query === b.query)?.ccRange ?? "～125cc"), targetProfit).border : 0
+      return bB - bA
+    }
     if (sortKey === "avg") return (b.avgPrice ?? 0) - (a.avgPrice ?? 0)
     if (sortKey === "median") return (b.medianPrice ?? 0) - (a.medianPrice ?? 0)
-    if (sortKey === "profit") return (b.border ?? 0) - (a.border ?? 0)
+    if (sortKey === "profit") return calcProfit(b) - calcProfit(a)
     return 0
   })
 
@@ -366,7 +376,6 @@ export default function ScoreboardContent() {
             type="number"
             value={targetProfit}
             onChange={(e) => setTargetProfit(parseInt(e.target.value) || 0)}
-            disabled={scanning}
             style={{ ...inputStyle, width: 130 }}
           />
         </div>
@@ -509,7 +518,7 @@ export default function ScoreboardContent() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: C.surfaceHigh }}>
-                    {["#", "車種", "カテゴリ", "ヤフオク平均", "中央値", "BDSボーダー", "目標粗利", "相場レンジ", "件数"].map((h) => (
+                    {["#", "車種", "カテゴリ", "ヤフオク平均", "中央値", "BDSボーダー", "想定利益", "相場レンジ", "件数"].map((h) => (
                       <th
                         key={h}
                         style={{
@@ -532,7 +541,10 @@ export default function ScoreboardContent() {
                   {sorted.map((r, i) => {
                     const modelDef = MODELS.find((m) => m.query === r.query)
                   const rowShipping = getShipping(modelDef?.ccRange ?? "～125cc")
-                  const estProfit = (r.avgPrice ?? 0) - (r.border ?? 0) - rowShipping - YAHOO_FEE
+                  const { border: liveBorder, bdsFee: liveBdsFee } = r.avgPrice
+                    ? calcBorder(r.avgPrice, rowShipping, targetProfit)
+                    : { border: 0, bdsFee: 0 }
+                  const estProfit = (r.avgPrice ?? 0) - liveBorder - rowShipping - YAHOO_FEE - (liveBdsFee || 0)
                     const catColor = CATEGORY_COLORS[r.category] ?? C.textMuted
                     return (
                       <tr
@@ -572,10 +584,10 @@ export default function ScoreboardContent() {
                           {fmt(r.medianPrice ?? 0)}
                         </td>
                         <td style={{ padding: "10px 14px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.fontSans, fontWeight: 700, fontSize: 14, color: C.blue, whiteSpace: "nowrap" as const }}>
-                          {(r.border ?? 0) > 0 ? fmt(r.border ?? 0) : "—"}
+                          {liveBorder > 0 ? fmt(liveBorder) : "—"}
                         </td>
-                        <td style={{ padding: "10px 14px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.fontSans, fontWeight: 700, fontSize: 13, color: estProfit >= targetProfit ? C.green : C.red, whiteSpace: "nowrap" as const }}>
-                          {fmt(targetProfit)}
+                        <td style={{ padding: "10px 14px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.fontSans, fontWeight: 700, fontSize: 13, color: estProfit > 0 ? C.green : C.red, whiteSpace: "nowrap" as const }}>
+                          {fmt(estProfit)}
                         </td>
                         <td style={{ padding: "10px 14px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.font, fontSize: 11, color: C.textSub, whiteSpace: "nowrap" as const }}>
                           {fmt(r.rangeMin ?? 0)} 〜 {fmt(r.rangeMax ?? 0)}
