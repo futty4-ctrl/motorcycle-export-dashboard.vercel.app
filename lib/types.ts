@@ -39,6 +39,9 @@ export interface AssessHistory {
 }
 
 // market_prices（新規作成したテーブル）
+export type Season = "通年" | "春夏高" | "冬高"
+export type RiskLevel = "低" | "中" | "高"
+
 export interface MarketPrice {
   id: string
   maker: string
@@ -53,5 +56,11 @@ export interface MarketPrice {
   trend: Trend
   trend_pct: number
   memo: string | null
+  shipping_cost: number
+  avg_days_to_sell: number | null
+  cc: number | null
+  season: Season | null
+  risk_level: RiskLevel
+  last_scanned_at: string | null
   updated_at: string
 }
