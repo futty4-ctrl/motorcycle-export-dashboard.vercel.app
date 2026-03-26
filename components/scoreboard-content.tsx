@@ -130,7 +130,7 @@ interface ModelResult {
 
 export default function ScoreboardContent() {
   const [results, setResults] = useState<ModelResult[]>(
-    MODELS.map((m) => ({ ...m, status: "pending" }))
+    MODELS.map((m) => ({ query: m.query, label: m.label, category: m.category, maker: m.maker, cc: m.cc, ccRange: m.ccRange, status: "pending" as ScanStatus }))
   )
   const [scanning, setScanning] = useState(false)
   const [scanned, setScanned] = useState(0)
@@ -150,7 +150,10 @@ export default function ScoreboardContent() {
   const [filterMaker, setFilterMaker] = useState<string>("全て")
 
   const displayedResults = results.filter((r) => {
-    if (filterCC !== "全て" && getCCRange(r.cc) !== filterCC) return false
+    if (filterCC !== "全て") {
+      const ccRange = getCCRange(r.cc ?? 0)
+      if (ccRange !== filterCC) return false
+    }
     if (filterMaker !== "全て" && r.maker !== filterMaker) return false
     return true
   })
@@ -168,7 +171,7 @@ export default function ScoreboardContent() {
     })
 
     setScanTotal(targets.length)
-    setResults(targets.map((m) => ({ ...m, status: "pending" })))
+    setResults(targets.map((m) => ({ query: m.query, label: m.label, category: m.category, maker: m.maker, cc: m.cc, ccRange: m.ccRange, status: "pending" as ScanStatus })))
 
     for (let i = 0; i < targets.length; i++) {
       const model = targets[i]
