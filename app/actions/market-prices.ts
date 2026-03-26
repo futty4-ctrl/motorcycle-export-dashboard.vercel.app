@@ -51,3 +51,15 @@ export async function deleteMarketPrice(
     return { success: false, error: msg }
   }
 }
+
+export async function deleteAllMarketPrices(): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = createServerSupabaseClient()
+    const { error } = await supabase.from("market_prices").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+    if (error) throw error
+    return { success: true }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "全データの削除に失敗しました"
+    return { success: false, error: msg }
+  }
+}

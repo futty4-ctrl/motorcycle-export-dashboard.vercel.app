@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react"
 import type { CSSProperties } from "react"
-import { getMarketPrices, upsertMarketPrice, deleteMarketPrice } from "@/app/actions/market-prices"
+import { getMarketPrices, upsertMarketPrice, deleteMarketPrice, deleteAllMarketPrices } from "@/app/actions/market-prices"
 import type { MarketPrice, Source, Trend } from "@/lib/types"
 
 const C = {
@@ -32,8 +32,7 @@ const MAKERS = ["全メーカー", "Honda", "Yamaha", "Suzuki", "Kawasaki"]
 const SOURCES: Source[] = ["ヤフオク", "BDS", "カチオク", "JBA", "手動"]
 const CONDITIONS = ["A", "B", "C", "D"] as const
 
-const fmt = (n: number) =>
-  n >= 10000 ? `¥${(n / 10000).toFixed(1)}万` : `¥${n.toLocaleString()}`
+const fmt = (n: number) => `¥${n.toLocaleString()}`
 
 const condColor: Record<string, string> = {
   A: C.green,
@@ -627,6 +626,30 @@ export default function MarketPricesContent() {
           >
             CSV書出
           </button>
+          <button
+            onClick={async () => {
+              if (!confirm(`全${data.length}件のデータを削除しますか？\nこの操作は取り消せません。`)) return
+              const res = await deleteAllMarketPrices()
+              if (res.success) {
+                setData([])
+                setSelectedIds(new Set())
+              } else {
+                alert(res.error)
+              }
+            }}
+            style={{
+              padding: "9px 14px",
+              background: "none",
+              border: `1px solid ${C.red}40`,
+              borderRadius: 6,
+              color: C.red,
+              fontFamily: C.fontSans,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            全データ削除
+          </button>
         </div>
       </div>
 
@@ -851,7 +874,7 @@ export default function MarketPricesContent() {
                         color: C.textMuted,
                       }}
                     >
-                      {r.updated_at}
+                      {r.updated_at ? new Date(r.updated_at).toLocaleDateString("ja-JP") : "—"}
                     </td>
                     <td style={tdStyle}>
                       <div style={{ display: "flex", gap: 6 }}>
