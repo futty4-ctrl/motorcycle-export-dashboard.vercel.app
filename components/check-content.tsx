@@ -84,6 +84,8 @@ type CartItem = {
 
 export default function CheckContent() {
   const [search, setSearch] = useState("")
+  const [filterMaker, setFilterMaker] = useState("全て")
+  const [filterCC, setFilterCC] = useState("全て")
   const [selectedModel, setSelectedModel] = useState<typeof MODEL_CODES[0] | null>(null)
   const [bdsBid, setBdsBid] = useState<number>(0)
   const [venue, setVenue] = useState("大阪")
@@ -94,18 +96,34 @@ export default function CheckContent() {
   const [medianPrice, setMedianPrice] = useState<number | null>(null)
   const [sampleCount, setSampleCount] = useState<number>(0)
   const [cart, setCart] = useState<CartItem[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  const filteredModels = useMemo(() => {
+    let list = MODEL_CODES
+    if (filterMaker !== "全て") list = list.filter((m) => m.maker === filterMaker)
+    if (filterCC !== "全て") {
+      list = list.filter((m) => {
+        if (filterCC === "〜50cc") return m.cc <= 50
+        if (filterCC === "51〜125cc") return m.cc > 50 && m.cc <= 125
+        if (filterCC === "126〜250cc") return m.cc > 125 && m.cc <= 250
+        if (filterCC === "251〜400cc") return m.cc > 250 && m.cc <= 400
+        return true
+      })
+    }
+    return list
+  }, [filterMaker, filterCC])
 
   const suggestions = useMemo(() => {
-    if (!search || search.length < 1) return []
+    if (!search || search.length < 1) return filteredModels.slice(0, 20)
     const q = search.toLowerCase()
-    return MODEL_CODES.filter(
+    return filteredModels.filter(
       (m) =>
         m.label.toLowerCase().includes(q) ||
         m.query.toLowerCase().includes(q) ||
         m.maker.toLowerCase().includes(q) ||
         m.katashiki.some((k) => k.toLowerCase().includes(q))
-    ).slice(0, 15)
-  }, [search])
+    ).slice(0, 20)
+  }, [search, filteredModels])
 
   const handleSelect = async (model: typeof MODEL_CODES[0]) => {
     setSelectedModel(model)
@@ -173,10 +191,26 @@ export default function CheckContent() {
         </p>
       </div>
 
+      {/* 絞り込みプルダウン */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, marginBottom: 6, letterSpacing: "0.08em" }}>メーカー</div>
+          <select value={filterMaker} onChange={(e) => { setFilterMaker(e.target.value); setSelectedModel(null); setSearch("") }} style={inputStyle}>
+            {["全て", "Honda", "Yamaha", "Suzuki", "Kawasaki"].map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, marginBottom: 6, letterSpacing: "0.08em" }}>排気量</div>
+          <select value={filterCC} onChange={(e) => { setFilterCC(e.target.value); setSelectedModel(null); setSearch("") }} style={inputStyle}>
+            {["全て", "〜50cc", "51〜125cc", "126〜250cc", "251〜400cc"].map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+      </div>
+
       {/* 車種検索 */}
       <div style={{ position: "relative", marginBottom: 16 }}>
         <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, marginBottom: 6, letterSpacing: "0.08em" }}>
-          車種・型式で検索
+          車種・型式で検索（{filteredModels.length}車種）
         </div>
         <input
           value={search}
@@ -187,10 +221,12 @@ export default function CheckContent() {
               setMarketPrice(null)
             }
           }}
-          placeholder="例: PCX125, JF28, モンキー..."
+          placeholder="例: PCX125, JF28, モンキー...（空欄で一覧表示）"
           style={inputStyle}
+          onFocus={() => setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
         />
-        {suggestions.length > 0 && !selectedModel && (
+        {showSuggestions && suggestions.length > 0 && !selectedModel && (
           <div
             style={{
               position: "absolute",
