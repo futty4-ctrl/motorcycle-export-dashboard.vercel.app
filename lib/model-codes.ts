@@ -444,6 +444,8 @@ export const MODEL_CODES: ModelCode[] = [
   { maker: "Suzuki", label: "RG50Γ",         katashiki: ["HC11A"],               cc: 50,  category: "旧車50",    query: "RG50 ガンマ HC11A" },
   { maker: "Suzuki", label: "Hi-Up R",       katashiki: ["CA18A"],               cc: 50,  category: "スクーター", query: "ハイアップ スズキ" },
   { maker: "Suzuki", label: "チョイノリ",    katashiki: ["CZ41A"],               cc: 50,  category: "スクーター", query: "チョイノリ CZ41A" },
+  { maker: "Suzuki", label: "ラブ",          katashiki: ["CL50"],                cc: 50,  category: "スクーター", query: "ラブ スズキ CL50" },
+  { maker: "Suzuki", label: "ラブスリー",    katashiki: ["CX50D"],               cc: 50,  category: "スクーター", query: "ラブスリー スズキ CX50D" },
   { maker: "Suzuki", label: "ヴェルデ",      katashiki: ["CA1MA"],               cc: 50,  category: "スクーター", query: "ヴェルデ CA1MA" },
   { maker: "Suzuki", label: "バンバン50",    katashiki: ["RV50"],                cc: 50,  category: "オフ",      query: "バンバン50 RV50" },
   { maker: "Suzuki", label: "ジェンマ50",    katashiki: ["CS50"],                cc: 50,  category: "スクーター", query: "ジェンマ50 スズキ CS50" },
