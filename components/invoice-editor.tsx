@@ -108,7 +108,6 @@ export default function InvoiceEditor({
     initial?.issue_date ?? new Date().toISOString().slice(0, 10)
   )
   const [clientName, setClientName] = useState(initial?.client_name ?? "")
-  const [honorific, setHonorific] = useState<"御中" | "様">("御中")
   const [clientAddress, setClientAddress] = useState(initial?.client_address ?? "")
   const [subject, setSubject] = useState(initial?.subject ?? "")
   const [bankInfo, setBankInfo] = useState(
@@ -250,7 +249,6 @@ export default function InvoiceEditor({
   const handlePrint = () => {
     const printWindow = window.open("", "_blank", "width=900,height=700")
     if (!printWindow) return
-    const clientLabel = (clientName || "　") + " " + honorific
 
     const todayStr = new Date(issueDate).toLocaleDateString("ja-JP", {
       year: "numeric",
@@ -291,7 +289,7 @@ export default function InvoiceEditor({
     <div style="display:flex;justify-content:space-between;margin-bottom:3mm">
       <div style="flex:1">
         <div style="font-size:10pt;font-weight:700;border-bottom:1px solid #111;padding-bottom:1mm;margin-bottom:1mm">
-          ${clientLabel}
+          ${clientName || "　"} 御中
         </div>
         ${clientAddress ? `<div style="font-size:7.5pt;color:#444;white-space:pre-wrap;margin-bottom:1mm">${clientAddress}</div>` : ""}
         <div style="font-size:7.5pt;color:#555">
@@ -560,23 +558,13 @@ export default function InvoiceEditor({
               }}
             >
               <div>
-                <label style={labelStyle}>宛先（会社名・個人名）</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    placeholder="株式会社〇〇 / 山田太郎"
-                    style={{ ...inputStyle(), flex: 1 }}
-                  />
-                  <select
-                    value={honorific}
-                    onChange={(e) => setHonorific(e.target.value as "御中" | "様")}
-                    style={{ ...inputStyle(), width: 70, flexShrink: 0 }}
-                  >
-                    <option value="御中">御中</option>
-                    <option value="様">様</option>
-                  </select>
-                </div>
+                <label style={labelStyle}>宛先（会社名）</label>
+                <input
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder="株式会社〇〇"
+                  style={inputStyle()}
+                />
               </div>
               <div>
                 <label style={labelStyle}>{dateLabel}</label>
@@ -1257,7 +1245,7 @@ function PrintPreview({
               marginBottom: "3mm",
             }}
           >
-            {clientName || "　"} {honorific}
+            {clientName || "　"} 御中
           </div>
           {clientAddress && (
             <div
