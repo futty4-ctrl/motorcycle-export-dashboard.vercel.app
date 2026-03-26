@@ -619,9 +619,9 @@ export default function ScoreboardContent() {
           </div>
 
           {/* スキャン失敗 or データなし件数 */}
-          {results.filter((r) => r.status === "error").length > 0 && (
+          {displayedResults.filter((r) => r.status === "error").length > 0 && (
             <div style={{ marginTop: 10, fontFamily: C.font, fontSize: 11, color: C.textMuted, letterSpacing: "0.05em" }}>
-              データなし / 取得失敗: {results.filter((r) => r.status === "error").map((r) => r.label).join(", ")}
+              データなし / 取得失敗: {displayedResults.filter((r) => r.status === "error").map((r) => r.label).join(", ")}
             </div>
           )}
         </>
@@ -646,7 +646,7 @@ export default function ScoreboardContent() {
               color: C.text,
             }}
           >
-            スキャン対象 {scanTotal}車種
+            スキャン対象 {displayedResults.length}車種
           </div>
           <div
             style={{
@@ -655,7 +655,7 @@ export default function ScoreboardContent() {
               gap: 0,
             }}
           >
-            {results.map((r) => {
+            {displayedResults.map((r) => {
               const catColor = CATEGORY_COLORS[r.category] ?? C.textMuted
               const statusColor =
                 r.status === "loading"
