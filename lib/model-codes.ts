@@ -166,6 +166,8 @@ export const MODEL_CODES: ModelCode[] = [
 
   // BDSランキング上位・漏れ追加
   { maker: "Honda", label: "CL250",          katashiki: ["MC57"],                cc: 250, category: "ネイキッド250", query: "CL250 MC57" },
+  { maker: "Honda", label: "CB223S",         katashiki: ["MC40"],                cc: 223, category: "ネイキッド250", query: "CB223S MC40" },
+  { maker: "Honda", label: "GB350C",         katashiki: ["NC59"],                cc: 350, category: "ネイキッド400", query: "GB350C NC59" },
   { maker: "Honda", label: "ADV160",         katashiki: ["KF54"],                cc: 160, category: "スクーター", query: "ADV160 KF54" },
   { maker: "Honda", label: "GB350",          katashiki: ["NC59"],                cc: 350, category: "ネイキッド400", query: "GB350 NC59" },
   { maker: "Honda", label: "GB350S",         katashiki: ["NC59"],                cc: 350, category: "ネイキッド400", query: "GB350S NC59" },
@@ -527,6 +529,7 @@ export const MODEL_CODES: ModelCode[] = [
   { maker: "Suzuki", label: "GSX-R400(GK76A)", katashiki: ["GK76A"], cc: 400, category: "スポーツ400", query: "GSX-R400 GK76A" },
   { maker: "Suzuki", label: "イントルーダークラシック400", katashiki: ["VK54A"], cc: 400, category: "アメリカン400", query: "イントルーダークラシック400 VK54A" },
   { maker: "Suzuki", label: "ジクサーSF250", katashiki: ["GL10A"],               cc: 250, category: "スポーツ250", query: "ジクサーSF250 GL10A" },
+  { maker: "Suzuki", label: "ジクサー150",  katashiki: ["ED13N"],               cc: 155, category: "ネイキッド250", query: "ジクサー150 GIXXER ED13N" },
   { maker: "Suzuki", label: "Vストローム250SX", katashiki: ["DS45A"],            cc: 250, category: "アドベンチャー", query: "Vストローム250SX DS45A" },
   { maker: "Suzuki", label: "スカイウェイブ250(CJ43A)", katashiki: ["CJ43A"], cc: 250, category: "スクーター", query: "スカイウェイブ250 CJ43A" },
   { maker: "Suzuki", label: "スカイウェイブ250(CJ44A)", katashiki: ["CJ44A"], cc: 250, category: "スクーター", query: "スカイウェイブ250 CJ44A" },
@@ -567,6 +570,8 @@ export const MODEL_CODES: ModelCode[] = [
   { maker: "Kawasaki", label: "Ninja250(EX250P)", katashiki: ["EX250P"], cc: 250, category: "スポーツ250", query: "Ninja250 EX250P" },
   { maker: "Kawasaki", label: "Z250",         katashiki: ["ER250C"],              cc: 250, category: "ネイキッド250", query: "Z250 ER250C" },
   { maker: "Kawasaki", label: "Ninja250SL",   katashiki: ["BX250A"],              cc: 250, category: "スポーツ250", query: "Ninja250SL BX250A" },
+  { maker: "Kawasaki", label: "Ninja ZX-25R", katashiki: ["ZX250E"],             cc: 250, category: "スポーツ250", query: "Ninja ZX-25R ZX250E" },
+  { maker: "Kawasaki", label: "W230",         katashiki: ["BJ230A"],              cc: 230, category: "ネイキッド250", query: "W230 カワサキ BJ230A" },
   { maker: "Kawasaki", label: "エストレヤ(BJ250A)", katashiki: ["BJ250A"], cc: 250, category: "ネイキッド250", query: "エストレヤ BJ250A" },
   { maker: "Kawasaki", label: "エストレヤ(BJ250E)", katashiki: ["BJ250E"], cc: 250, category: "ネイキッド250", query: "エストレヤ BJ250E" },
   { maker: "Kawasaki", label: "バリウス",     katashiki: ["ZR250C"],              cc: 250, category: "ネイキッド250", query: "バリウス ZR250C" },
