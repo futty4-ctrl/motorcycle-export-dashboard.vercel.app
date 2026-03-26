@@ -90,6 +90,7 @@ function BarChart({ data }: { data: MonthlyRow[] }) {
 export default function PerformanceContent() {
   const [stats, setStats] = useState<InventoryStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [rankSort, setRankSort] = useState<"avgProfit" | "count" | "avgDays">("avgProfit")
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -157,6 +158,13 @@ export default function PerformanceContent() {
     { label: "平均粗利 / 台", value: fmtFull(stats.avgProfit), color: C.blue },
     { label: "平均在庫日数", value: `${stats.avgDaysToSell}日`, color: stats.avgDaysToSell <= 14 ? C.green : C.yellow },
   ]
+
+  const sortedRanking = [...stats.modelRanking].sort((a, b) => {
+    if (rankSort === "avgProfit") return b.avgProfit - a.avgProfit
+    if (rankSort === "count") return b.count - a.count
+    if (rankSort === "avgDays") return (a.avgDays || 999) - (b.avgDays || 999)
+    return 0
+  })
 
   return (
     <div style={{ fontFamily: C.font, color: C.text }}>
@@ -264,7 +272,7 @@ export default function PerformanceContent() {
         </div>
       </div>
 
-      {/* 車種別ランキング */}
+      {/* 車種別損益分析 */}
       <div
         style={{
           background: C.surface,
@@ -278,19 +286,43 @@ export default function PerformanceContent() {
             padding: "14px 20px",
             borderBottom: `1px solid ${C.border}`,
             background: C.surfaceHigh,
-            fontFamily: C.fontSans,
-            fontWeight: 600,
-            fontSize: 13,
-            color: C.text,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
-          車種別利益ランキング（平均粗利順）
+          <span style={{ fontFamily: C.fontSans, fontWeight: 600, fontSize: 13, color: C.text }}>
+            車種別 損益分析
+          </span>
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["avgProfit", "count", "avgDays"] as const).map((key) => {
+              const labels = { avgProfit: "利益順", count: "台数順", avgDays: "回転順" }
+              return (
+                <button
+                  key={key}
+                  onClick={() => setRankSort(key)}
+                  style={{
+                    padding: "4px 12px",
+                    background: rankSort === key ? C.orange : C.surfaceHigh,
+                    border: `1px solid ${rankSort === key ? C.orange : C.border}`,
+                    borderRadius: 14,
+                    color: rankSort === key ? "#fff" : C.textSub,
+                    fontFamily: C.fontSans,
+                    fontSize: 11,
+                    cursor: "pointer",
+                  }}
+                >
+                  {labels[key]}
+                </button>
+              )
+            })}
+          </div>
         </div>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: C.surfaceHigh }}>
-                {["#", "車種", "メーカー", "売却台数", "累計粗利", "平均粗利", "平均在庫日数"].map((h) => (
+                {["#", "車種", "メーカー", "台数", "累計粗利", "平均粗利", "在庫日数", "判定"].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -310,13 +342,21 @@ export default function PerformanceContent() {
               </tr>
             </thead>
             <tbody>
-              {stats.modelRanking.map((r: ModelRankRow, i) => (
+              {sortedRanking.map((r: ModelRankRow, i) => {
+                const verdict = r.avgProfit >= 30000 && r.avgDays <= 14
+                  ? { label: "優良", color: C.green, bg: "rgba(34,197,94,0.12)" }
+                  : r.avgProfit >= 15000
+                  ? { label: "合格", color: C.blue, bg: "rgba(59,130,246,0.12)" }
+                  : r.avgProfit >= 0
+                  ? { label: "要注意", color: C.yellow, bg: "rgba(234,179,8,0.12)" }
+                  : { label: "仕入れNG", color: C.red, bg: "rgba(239,68,68,0.15)" }
+                return (
                 <tr
                   key={`${r.maker}-${r.model}`}
-                  style={{ background: i % 2 === 0 ? "transparent" : `${C.surfaceHigh}44` }}
+                  style={{ background: r.avgProfit < 0 ? "rgba(239,68,68,0.05)" : i % 2 === 0 ? "transparent" : `${C.surfaceHigh}44` }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = C.surfaceHover)}
                   onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = i % 2 === 0 ? "transparent" : `${C.surfaceHigh}44`)
+                    (e.currentTarget.style.background = r.avgProfit < 0 ? "rgba(239,68,68,0.05)" : i % 2 === 0 ? "transparent" : `${C.surfaceHigh}44`)
                   }
                 >
                   <td style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.font, fontSize: 12, color: i < 3 ? C.orange : C.textMuted, fontWeight: i < 3 ? 700 : 400 }}>
@@ -331,19 +371,37 @@ export default function PerformanceContent() {
                   <td style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.font, fontSize: 13, color: C.textSub }}>
                     {r.count}台
                   </td>
-                  <td style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.fontSans, fontWeight: 600, fontSize: 13, color: C.green }}>
+                  <td style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.fontSans, fontWeight: 600, fontSize: 13, color: r.totalProfit >= 0 ? C.green : C.red }}>
                     {fmt(r.totalProfit)}
                   </td>
-                  <td style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.fontSans, fontWeight: 700, fontSize: 14, color: r.avgProfit >= 25000 ? C.orange : C.textSub }}>
+                  <td style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.fontSans, fontWeight: 700, fontSize: 14, color: r.avgProfit >= 30000 ? C.orange : r.avgProfit >= 0 ? C.textSub : C.red }}>
                     {fmtFull(r.avgProfit)}
                   </td>
                   <td style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}20`, fontFamily: C.font, fontSize: 12, color: r.avgDays > 0 && r.avgDays <= 10 ? C.green : r.avgDays > 20 ? C.red : C.textSub }}>
                     {r.avgDays > 0 ? `${r.avgDays}日` : "—"}
                   </td>
+                  <td style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}20` }}>
+                    <span style={{
+                      padding: "3px 10px",
+                      borderRadius: 10,
+                      background: verdict.bg,
+                      color: verdict.color,
+                      fontFamily: C.fontSans,
+                      fontWeight: 700,
+                      fontSize: 11,
+                      whiteSpace: "nowrap" as const,
+                    }}>
+                      {verdict.label}
+                    </span>
+                  </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
+        </div>
+        <div style={{ padding: "12px 20px", borderTop: `1px solid ${C.border}`, background: C.surfaceHigh, fontFamily: C.font, fontSize: 10, color: C.textMuted }}>
+          判定基準: 優良=平均粗利3万以上＆14日以内 / 合格=1.5万以上 / 要注意=利益薄 / 仕入れNG=赤字
         </div>
       </div>
     </div>
