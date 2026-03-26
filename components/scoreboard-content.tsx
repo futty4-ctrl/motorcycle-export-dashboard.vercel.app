@@ -160,6 +160,10 @@ export default function ScoreboardContent() {
   const [sortKey, setSortKey] = useState<"border" | "avg" | "median" | "profit">("border")
   const [filterCC, setFilterCC] = useState<string>("全て")
   const [filterMaker, setFilterMaker] = useState<string>("全て")
+  const [showMissing, setShowMissing] = useState(false)
+
+  const dbModelSet = new Set(dbData.map((r) => r.model))
+  const missingModels = MODELS.filter((m) => !dbModelSet.has(m.label))
 
   const matchCC = (cc: number, filter: string): boolean => {
     if (filter === "全て") return true
@@ -181,12 +185,15 @@ export default function ScoreboardContent() {
     setScanned(0)
     setBulkDone(false)
 
-    // フィルター済みの車種のみスキャン
-    const targets = MODELS.filter((m) => {
+    // フィルター済みの車種のみスキャン（未登録モードなら未登録のみ）
+    let targets = MODELS.filter((m) => {
       if (!matchCC(m.cc, filterCC)) return false
       if (filterMaker !== "全て" && m.maker !== filterMaker) return false
       return true
     })
+    if (showMissing) {
+      targets = targets.filter((m) => !dbModelSet.has(m.label))
+    }
 
     setScanTotal(targets.length)
     setResults(targets.map((m) => ({ query: m.query, label: m.label, category: m.category, maker: m.maker, cc: m.cc, ccRange: m.ccRange, status: "pending" as ScanStatus })))
@@ -406,6 +413,24 @@ export default function ScoreboardContent() {
             {m === "db" ? `保存済みデータ（${dbData.length}件）` : "新規スキャン"}
           </button>
         ))}
+        {missingModels.length > 0 && (
+          <button
+            onClick={() => { setShowMissing(!showMissing); if (!showMissing) setMode("scan") }}
+            style={{
+              padding: "8px 20px",
+              background: showMissing ? C.red : C.surfaceHigh,
+              border: `1px solid ${showMissing ? C.red : C.border}`,
+              borderRadius: 8,
+              color: showMissing ? "#fff" : C.red,
+              fontFamily: C.fontSans,
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            未登録（{missingModels.length}件）
+          </button>
+        )}
       </div>
 
       {/* CC帯 / メーカーフィルター */}
