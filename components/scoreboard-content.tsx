@@ -434,8 +434,8 @@ export default function ScoreboardContent() {
         ))}
       </div>
 
-      {/* スキャン設定（scanモード時のみ） */}
-      {mode === "scan" && <div
+      {/* 計算条件（常に表示） */}
+      <div
         style={{
           background: C.surface,
           border: `1px solid ${C.border}`,
@@ -474,37 +474,41 @@ export default function ScoreboardContent() {
             style={{ ...inputStyle, width: 130 }}
           />
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, marginBottom: 6, letterSpacing: "0.08em" }}>
-            除外キーワード
-          </div>
-          <input
-            value={exclude}
-            onChange={(e) => setExclude(e.target.value)}
-            disabled={scanning}
-            style={{ ...inputStyle, width: "100%", boxSizing: "border-box" as const }}
-          />
-        </div>
-        <button
-          onClick={handleScan}
-          disabled={scanning}
-          style={{
-            padding: "10px 28px",
-            background: scanning ? C.surfaceHigh : C.orange,
-            border: `1px solid ${scanning ? C.border : C.orange}`,
-            borderRadius: 8,
-            color: scanning ? C.textMuted : "#fff",
-            fontFamily: C.fontSans,
-            fontWeight: 700,
-            fontSize: 14,
-            cursor: scanning ? "not-allowed" : "pointer",
-            whiteSpace: "nowrap" as const,
-            flexShrink: 0,
-          }}
-        >
-          {scanning ? `スキャン中... (${scanned}/${scanTotal})` : "スキャン開始"}
-        </button>
-      </div>}
+        {mode === "scan" && (
+          <>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, marginBottom: 6, letterSpacing: "0.08em" }}>
+                除外キーワード
+              </div>
+              <input
+                value={exclude}
+                onChange={(e) => setExclude(e.target.value)}
+                disabled={scanning}
+                style={{ ...inputStyle, width: "100%", boxSizing: "border-box" as const }}
+              />
+            </div>
+            <button
+              onClick={handleScan}
+              disabled={scanning}
+              style={{
+                padding: "10px 28px",
+                background: scanning ? C.surfaceHigh : C.orange,
+                border: `1px solid ${scanning ? C.border : C.orange}`,
+                borderRadius: 8,
+                color: scanning ? C.textMuted : "#fff",
+                fontFamily: C.fontSans,
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: scanning ? "not-allowed" : "pointer",
+                whiteSpace: "nowrap" as const,
+                flexShrink: 0,
+              }}
+            >
+              {scanning ? `スキャン中... (${scanned}/${scanTotal})` : "スキャン開始"}
+            </button>
+          </>
+        )}
+      </div>
 
       {/* プログレスバー */}
       {scanning && (
