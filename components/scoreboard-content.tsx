@@ -116,6 +116,8 @@ interface ModelResult {
   label: string
   category: string
   maker: string
+  cc: number
+  ccRange: string
   status: ScanStatus
   avgPrice?: number
   medianPrice?: number
@@ -132,6 +134,7 @@ export default function ScoreboardContent() {
   )
   const [scanning, setScanning] = useState(false)
   const [scanned, setScanned] = useState(0)
+  const [scanTotal, setScanTotal] = useState(MODELS.length)
   const [venue, setVenue] = useState("大阪（¥0）")
   const [targetProfit, setTargetProfit] = useState(25000)
 
@@ -147,10 +150,8 @@ export default function ScoreboardContent() {
   const [filterMaker, setFilterMaker] = useState<string>("全て")
 
   const displayedResults = results.filter((r) => {
-    const model = MODEL_CODES.find((m) => m.label === r.label)
-    if (!model) return true
-    if (filterCC !== "全て" && getCCRange(model.cc) !== filterCC) return false
-    if (filterMaker !== "全て" && model.maker !== filterMaker) return false
+    if (filterCC !== "全て" && getCCRange(r.cc) !== filterCC) return false
+    if (filterMaker !== "全て" && r.maker !== filterMaker) return false
     return true
   })
 
@@ -158,10 +159,19 @@ export default function ScoreboardContent() {
     setScanning(true)
     setScanned(0)
     setBulkDone(false)
-    setResults(MODELS.map((m) => ({ ...m, status: "pending" })))
 
-    for (let i = 0; i < MODELS.length; i++) {
-      const model = MODELS[i]
+    // フィルター済みの車種のみスキャン
+    const targets = MODELS.filter((m) => {
+      if (filterCC !== "全て" && getCCRange(m.cc) !== filterCC) return false
+      if (filterMaker !== "全て" && m.maker !== filterMaker) return false
+      return true
+    })
+
+    setScanTotal(targets.length)
+    setResults(targets.map((m) => ({ ...m, status: "pending" })))
+
+    for (let i = 0; i < targets.length; i++) {
+      const model = targets[i]
       setResults((prev) =>
         prev.map((r, idx) => (idx === i ? { ...r, status: "loading" } : r))
       )
@@ -214,7 +224,7 @@ export default function ScoreboardContent() {
 
       setScanned(i + 1)
       // レート制限回避のため間隔を置く
-      if (i < MODELS.length - 1) {
+      if (i < targets.length - 1) {
         await new Promise((r) => setTimeout(r, 600))
       }
     }
@@ -409,7 +419,7 @@ export default function ScoreboardContent() {
             flexShrink: 0,
           }}
         >
-          {scanning ? `スキャン中... (${scanned}/${MODELS.length})` : "スキャン開始"}
+          {scanning ? `スキャン中... (${scanned}/${scanTotal})` : "スキャン開始"}
         </button>
       </div>
 
@@ -427,7 +437,7 @@ export default function ScoreboardContent() {
             <div
               style={{
                 height: "100%",
-                width: `${(scanned / MODELS.length) * 100}%`,
+                width: `${(scanned / scanTotal) * 100}%`,
                 background: C.orange,
                 borderRadius: 2,
                 transition: "width 0.3s",
@@ -443,7 +453,7 @@ export default function ScoreboardContent() {
               letterSpacing: "0.08em",
             }}
           >
-            {scanned}/{MODELS.length} 車種スキャン完了
+            {scanned}/{scanTotal} 車種スキャン完了
           </div>
         </div>
       )}
@@ -627,7 +637,7 @@ export default function ScoreboardContent() {
               color: C.text,
             }}
           >
-            スキャン対象 {MODELS.length}車種
+            スキャン対象 {scanTotal}車種
           </div>
           <div
             style={{
