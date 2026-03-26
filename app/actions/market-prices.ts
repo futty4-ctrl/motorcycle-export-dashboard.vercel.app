@@ -29,7 +29,7 @@ export async function upsertMarketPrice(
     const supabase = createServerSupabaseClient()
     const { error } = await supabase
       .from("market_prices")
-      .upsert({ ...entry, updated_at: new Date().toISOString() })
+      .upsert({ ...entry, updated_at: new Date().toISOString() }, { onConflict: "maker,model" })
     if (error) throw error
     return { success: true }
   } catch (err) {
