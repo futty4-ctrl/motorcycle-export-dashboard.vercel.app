@@ -1,4 +1,8 @@
-import InvoiceEditor from "@/components/invoice-editor"
+"use client"
+
+import dynamic from "next/dynamic"
+
+const InvoiceEditor = dynamic(() => import("@/components/invoice-editor"), { ssr: false })
 
 export default function InvoicesPage() {
   return (
