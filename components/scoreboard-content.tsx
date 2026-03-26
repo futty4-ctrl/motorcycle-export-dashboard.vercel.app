@@ -149,11 +149,17 @@ export default function ScoreboardContent() {
   const [filterCC, setFilterCC] = useState<string>("全て")
   const [filterMaker, setFilterMaker] = useState<string>("全て")
 
+  const matchCC = (cc: number, filter: string): boolean => {
+    if (filter === "全て") return true
+    if (filter === "〜50cc") return cc <= 50
+    if (filter === "51〜125cc") return cc > 50 && cc <= 125
+    if (filter === "126〜250cc") return cc > 125 && cc <= 250
+    if (filter === "251〜400cc") return cc > 250 && cc <= 400
+    return true
+  }
+
   const displayedResults = results.filter((r) => {
-    if (filterCC !== "全て") {
-      const ccRange = getCCRange(r.cc ?? 0)
-      if (ccRange !== filterCC) return false
-    }
+    if (!matchCC(r.cc, filterCC)) return false
     if (filterMaker !== "全て" && r.maker !== filterMaker) return false
     return true
   })
@@ -165,7 +171,7 @@ export default function ScoreboardContent() {
 
     // フィルター済みの車種のみスキャン
     const targets = MODELS.filter((m) => {
-      if (filterCC !== "全て" && getCCRange(m.cc) !== filterCC) return false
+      if (!matchCC(m.cc, filterCC)) return false
       if (filterMaker !== "全て" && m.maker !== filterMaker) return false
       return true
     })
