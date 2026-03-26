@@ -68,6 +68,20 @@ const CHECKLIST = [
   { id: "mileage", label: "走行距離メーター確認", category: "書類・付属" },
 ]
 
+type CartItem = {
+  label: string
+  maker: string
+  cc: number
+  bdsBid: number
+  bdsFee: number
+  shipping: number
+  marketPrice: number
+  medianPrice: number
+  profit: number
+  profitMedian: number
+  memo: string
+}
+
 export default function CheckContent() {
   const [search, setSearch] = useState("")
   const [selectedModel, setSelectedModel] = useState<typeof MODEL_CODES[0] | null>(null)
@@ -79,6 +93,7 @@ export default function CheckContent() {
   const [marketPrice, setMarketPrice] = useState<number | null>(null)
   const [medianPrice, setMedianPrice] = useState<number | null>(null)
   const [sampleCount, setSampleCount] = useState<number>(0)
+  const [cart, setCart] = useState<CartItem[]>([])
 
   const suggestions = useMemo(() => {
     if (!search || search.length < 1) return []
@@ -378,32 +393,185 @@ export default function CheckContent() {
             />
           </div>
 
-          {/* 仕入れ判定サマリー */}
+          {/* 仕入れ判定サマリー & カート追加 */}
           {bdsBid > 0 && marketPrice && (
-            <div style={{
-              background: profit && profit >= 30000 && allChecked ? C.orangeGlow : C.surfaceHigh,
-              border: `1px solid ${profit && profit >= 30000 && allChecked ? C.orange : C.border}`,
-              borderRadius: 10,
-              padding: 20,
-              textAlign: "center",
-              marginBottom: 16,
-            }}>
-              {profit && profit >= 30000 && allChecked ? (
-                <div style={{ fontFamily: C.fontSans, fontWeight: 800, fontSize: 18, color: C.orange }}>
-                  仕入れOK（想定利益 {fmtFull(profit)}）
-                </div>
-              ) : (
-                <div style={{ fontFamily: C.fontSans, fontWeight: 600, fontSize: 14, color: C.textMuted }}>
-                  {!allChecked && `チェック未完了（残り${totalChecks - checkedCount}項目）`}
-                  {allChecked && profit && profit < 30000 && `利益が目標（¥30,000）に届きません（${fmtFull(profit)}）`}
-                </div>
-              )}
-            </div>
+            <>
+              <div style={{
+                background: profit && profit >= 30000 && allChecked ? C.orangeGlow : C.surfaceHigh,
+                border: `1px solid ${profit && profit >= 30000 && allChecked ? C.orange : C.border}`,
+                borderRadius: 10,
+                padding: 20,
+                textAlign: "center",
+                marginBottom: 12,
+              }}>
+                {profit && profit >= 30000 && allChecked ? (
+                  <div style={{ fontFamily: C.fontSans, fontWeight: 800, fontSize: 18, color: C.orange }}>
+                    仕入れOK（想定利益 {fmtFull(profit)}）
+                  </div>
+                ) : (
+                  <div style={{ fontFamily: C.fontSans, fontWeight: 600, fontSize: 14, color: C.textMuted }}>
+                    {!allChecked && `チェック未完了（残り${totalChecks - checkedCount}項目）`}
+                    {allChecked && profit && profit < 30000 && `利益が目標（¥30,000）に届きません（${fmtFull(profit)}）`}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  if (!selectedModel || !marketPrice) return
+                  setCart((prev) => [...prev, {
+                    label: selectedModel.label,
+                    maker: selectedModel.maker,
+                    cc: selectedModel.cc,
+                    bdsBid,
+                    bdsFee,
+                    shipping,
+                    marketPrice: marketPrice,
+                    medianPrice: medianPrice ?? 0,
+                    profit: profit ?? 0,
+                    profitMedian: profitMedian ?? 0,
+                    memo,
+                  }])
+                  setSearch("")
+                  setSelectedModel(null)
+                  setBdsBid(0)
+                  setChecks({})
+                  setMemo("")
+                  setMarketPrice(null)
+                  setMedianPrice(null)
+                }}
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  background: C.blue,
+                  border: "none",
+                  borderRadius: 10,
+                  color: "#fff",
+                  fontFamily: C.fontSans,
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: "pointer",
+                  marginBottom: 16,
+                }}
+              >
+                仕入れ候補に追加
+              </button>
+            </>
           )}
         </>
       )}
 
-      {!selectedModel && (
+      {/* 仕入れ候補カート */}
+      {cart.length > 0 && (
+        <div style={{
+          background: C.surface,
+          border: `1px solid ${C.blue}40`,
+          borderRadius: 10,
+          padding: 16,
+          marginTop: 8,
+          marginBottom: 16,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: 14, color: C.blue }}>
+              今日の仕入れ候補（{cart.length}台）
+            </span>
+            <button
+              onClick={() => { if (confirm("候補リストをクリアしますか？")) setCart([]) }}
+              style={{
+                padding: "4px 12px",
+                background: "none",
+                border: `1px solid ${C.border}`,
+                borderRadius: 6,
+                color: C.textSub,
+                fontFamily: C.font,
+                fontSize: 11,
+                cursor: "pointer",
+              }}
+            >
+              クリア
+            </button>
+          </div>
+
+          {cart.map((item, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "10px 0",
+                borderBottom: i < cart.length - 1 ? `1px solid ${C.border}20` : "none",
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: C.fontSans, fontWeight: 600, fontSize: 13, color: C.text }}>
+                  {item.label}
+                </div>
+                <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted }}>
+                  {item.maker} / {item.cc}cc{item.memo ? ` / ${item.memo}` : ""}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", marginRight: 12 }}>
+                <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted }}>入札</div>
+                <div style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: 13, color: C.text }}>
+                  {fmtFull(item.bdsBid)}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", marginRight: 12 }}>
+                <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted }}>想定利益</div>
+                <div style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: 13, color: item.profit > 0 ? C.green : C.red }}>
+                  {fmtFull(item.profit)}
+                </div>
+              </div>
+              <button
+                onClick={() => setCart((prev) => prev.filter((_, j) => j !== i))}
+                style={{
+                  padding: "4px 8px",
+                  background: "none",
+                  border: `1px solid ${C.red}40`,
+                  borderRadius: 4,
+                  color: C.red,
+                  fontSize: 11,
+                  cursor: "pointer",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+
+          {/* 概算サマリー */}
+          <div style={{
+            marginTop: 12,
+            padding: 14,
+            background: C.surfaceHigh,
+            borderRadius: 8,
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 12,
+          }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontFamily: C.font, fontSize: 9, color: C.textMuted, marginBottom: 4 }}>合計仕入れ</div>
+              <div style={{ fontFamily: C.fontSans, fontWeight: 800, fontSize: 18, color: C.text }}>
+                {fmtFull(cart.reduce((s, c) => s + c.bdsBid + c.bdsFee + c.shipping, 0))}
+              </div>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontFamily: C.font, fontSize: 9, color: C.textMuted, marginBottom: 4 }}>合計想定利益</div>
+              <div style={{ fontFamily: C.fontSans, fontWeight: 800, fontSize: 18, color: cart.reduce((s, c) => s + c.profit, 0) > 0 ? C.green : C.red }}>
+                {fmtFull(cart.reduce((s, c) => s + c.profit, 0))}
+              </div>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontFamily: C.font, fontSize: 9, color: C.textMuted, marginBottom: 4 }}>平均利益/台</div>
+              <div style={{ fontFamily: C.fontSans, fontWeight: 800, fontSize: 18, color: C.orange }}>
+                {fmtFull(Math.round(cart.reduce((s, c) => s + c.profit, 0) / cart.length))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!selectedModel && cart.length === 0 && (
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 48, textAlign: "center" }}>
           <div style={{ fontSize: 32, marginBottom: 16 }}>🔍</div>
           <div style={{ fontFamily: C.fontSans, fontWeight: 600, fontSize: 15, color: C.text, marginBottom: 8 }}>
