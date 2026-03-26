@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { upsertMarketPrice } from "@/app/actions/market-prices"
+import { useState, useEffect } from "react"
+import { upsertMarketPrice, getMarketPrices } from "@/app/actions/market-prices"
 import { MODEL_CODES, CC_RANGES, getCCRange } from "@/lib/model-codes"
+import type { MarketPrice } from "@/lib/types"
 
 const C = {
   surface: "#111111",
@@ -129,6 +130,9 @@ interface ModelResult {
 }
 
 export default function ScoreboardContent() {
+  const [mode, setMode] = useState<"db" | "scan">("db")
+  const [dbData, setDbData] = useState<MarketPrice[]>([])
+  const [dbLoading, setDbLoading] = useState(true)
   const [results, setResults] = useState<ModelResult[]>(
     MODELS.map((m) => ({ query: m.query, label: m.label, category: m.category, maker: m.maker, cc: m.cc, ccRange: m.ccRange, status: "pending" as ScanStatus }))
   )
@@ -137,6 +141,14 @@ export default function ScoreboardContent() {
   const [scanTotal, setScanTotal] = useState(MODELS.length)
   const [venue, setVenue] = useState("大阪（¥0）")
   const [targetProfit, setTargetProfit] = useState(25000)
+
+  // DB読み込み
+  useEffect(() => {
+    getMarketPrices().then((res) => {
+      if (res.success && res.rows) setDbData(res.rows)
+      setDbLoading(false)
+    })
+  }, [])
 
   const getShipping = (ccRange: string) => {
     const venueKey = VENUE_KEYS[venue] ?? "大阪"
@@ -243,14 +255,53 @@ export default function ScoreboardContent() {
 
   const doneResults = displayedResults.filter((r) => r.status === "done" && r.avgPrice)
 
-  // ソート用にボーダーを計算
-  const withLive = doneResults.map((r) => {
+  // DBモード: market_pricesからデータを変換
+  const dbResults = dbData
+    .filter((r) => {
+      const cc = (r as Record<string, unknown>).cc as number | null
+      if (filterMaker !== "全て" && r.maker !== filterMaker) return false
+      if (filterCC !== "全て" && cc) {
+        if (filterCC === "〜50cc" && cc > 50) return false
+        if (filterCC === "51〜125cc" && (cc <= 50 || cc > 125)) return false
+        if (filterCC === "126〜250cc" && (cc <= 125 || cc > 250)) return false
+        if (filterCC === "251〜400cc" && (cc <= 250 || cc > 400)) return false
+      }
+      return r.avg_price > 0
+    })
+    .map((r) => {
+      const cc = ((r as Record<string, unknown>).cc as number) ?? 0
+      const ccRange = cc <= 125 ? "～125cc" : "126～750cc"
+      const sh = getShipping(ccRange)
+      const { border, bdsFee } = calcBorder(r.avg_price, sh, targetProfit)
+      const profit = r.avg_price - border - sh - bdsFee - YAHOO_FEE
+      return {
+        query: r.model,
+        label: r.model,
+        category: "",
+        maker: r.maker,
+        cc,
+        ccRange,
+        status: "done" as ScanStatus,
+        avgPrice: r.avg_price,
+        medianPrice: 0,
+        sampleCount: r.sample_count,
+        rangeMin: r.min_price,
+        rangeMax: r.max_price,
+        liveBorder: border,
+        liveProfit: profit,
+      }
+    })
+
+  // スキャンモード: スキャン結果からデータを変換
+  const scanResults = doneResults.map((r) => {
     const md = MODELS.find((m) => m.query === r.query)
     const sh = getShipping(md?.ccRange ?? "～125cc")
     const { border, bdsFee } = r.avgPrice ? calcBorder(r.avgPrice, sh, targetProfit) : { border: 0, bdsFee: 0 }
     const profit = (r.avgPrice ?? 0) - border - sh - bdsFee - YAHOO_FEE
     return { ...r, liveBorder: border, liveProfit: profit }
   })
+
+  const withLive = mode === "db" ? dbResults : scanResults
 
   const sorted = [...withLive].sort((a, b) => {
     if (sortKey === "border") return b.liveBorder - a.liveBorder
@@ -334,6 +385,29 @@ export default function ScoreboardContent() {
         </p>
       </div>
 
+      {/* モード切替 */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        {(["db", "scan"] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            style={{
+              padding: "8px 20px",
+              background: mode === m ? (m === "db" ? C.blue : C.orange) : C.surfaceHigh,
+              border: `1px solid ${mode === m ? (m === "db" ? C.blue : C.orange) : C.border}`,
+              borderRadius: 8,
+              color: mode === m ? "#fff" : C.textSub,
+              fontFamily: C.fontSans,
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            {m === "db" ? `保存済みデータ（${dbData.length}件）` : "新規スキャン"}
+          </button>
+        ))}
+      </div>
+
       {/* CC帯 / メーカーフィルター */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <span style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, alignSelf: "center", letterSpacing: "0.08em" }}>CC帯：</span>
@@ -360,8 +434,8 @@ export default function ScoreboardContent() {
         ))}
       </div>
 
-      {/* スキャン設定 */}
-      <div
+      {/* スキャン設定（scanモード時のみ） */}
+      {mode === "scan" && <div
         style={{
           background: C.surface,
           border: `1px solid ${C.border}`,
@@ -430,7 +504,7 @@ export default function ScoreboardContent() {
         >
           {scanning ? `スキャン中... (${scanned}/${scanTotal})` : "スキャン開始"}
         </button>
-      </div>
+      </div>}
 
       {/* プログレスバー */}
       {scanning && (
@@ -468,7 +542,7 @@ export default function ScoreboardContent() {
       )}
 
       {/* 結果テーブル or ステータスリスト */}
-      {doneResults.length > 0 ? (
+      {(mode === "db" ? dbResults.length > 0 : doneResults.length > 0) ? (
         <>
           {/* ソート + 一括登録 */}
           <div
@@ -504,27 +578,29 @@ export default function ScoreboardContent() {
                 )
               })}
             </div>
-            <button
-              onClick={handleBulkRegister}
-              disabled={bulkRegistering || bulkDone}
-              style={{
-                padding: "8px 18px",
-                background: bulkDone ? C.greenDim : C.surfaceHigh,
-                border: `1px solid ${bulkDone ? C.green : C.border}`,
-                borderRadius: 7,
-                color: bulkDone ? C.green : C.textSub,
-                fontFamily: C.fontSans,
-                fontSize: 12,
-                cursor: bulkRegistering || bulkDone ? "not-allowed" : "pointer",
-                whiteSpace: "nowrap" as const,
-              }}
-            >
-              {bulkDone
-                ? `✓ ${doneResults.length}件登録済み`
-                : bulkRegistering
-                ? "登録中..."
-                : `全${doneResults.length}件を相場マスターに登録`}
-            </button>
+            {mode === "scan" && (
+              <button
+                onClick={handleBulkRegister}
+                disabled={bulkRegistering || bulkDone}
+                style={{
+                  padding: "8px 18px",
+                  background: bulkDone ? C.greenDim : C.surfaceHigh,
+                  border: `1px solid ${bulkDone ? C.green : C.border}`,
+                  borderRadius: 7,
+                  color: bulkDone ? C.green : C.textSub,
+                  fontFamily: C.fontSans,
+                  fontSize: 12,
+                  cursor: bulkRegistering || bulkDone ? "not-allowed" : "pointer",
+                  whiteSpace: "nowrap" as const,
+                }}
+              >
+                {bulkDone
+                  ? `✓ ${doneResults.length}件登録済み`
+                  : bulkRegistering
+                  ? "登録中..."
+                  : `全${doneResults.length}件を相場マスターに登録`}
+              </button>
+            )}
           </div>
 
           <div
@@ -625,7 +701,7 @@ export default function ScoreboardContent() {
             </div>
           )}
         </>
-      ) : (
+      ) : mode === "scan" ? (
         /* スキャン前 or スキャン中のモデルリスト */
         <div
           style={{
@@ -724,6 +800,17 @@ export default function ScoreboardContent() {
               「スキャン開始」を押すと全車種のヤフオク相場を自動取得し、BDSボーダーをランキング表示します
             </div>
           )}
+        </div>
+      ) : (
+        /* DBモードでデータなし */
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 48, textAlign: "center" }}>
+          <div style={{ fontSize: 32, marginBottom: 16 }}>📊</div>
+          <div style={{ fontFamily: C.fontSans, fontWeight: 600, fontSize: 15, color: C.text, marginBottom: 8 }}>
+            {dbLoading ? "読み込み中..." : "保存済みデータがありません"}
+          </div>
+          <div style={{ fontFamily: C.fontSans, fontSize: 13, color: C.textMuted }}>
+            「新規スキャン」モードでスキャン→一括登録してください
+          </div>
         </div>
       )}
     </div>
