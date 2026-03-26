@@ -33,6 +33,7 @@ const NAV = [
       { href: "/scoreboard", label: "利益スコアボード", icon: "🏆" },
       { href: "/performance", label: "売却実績", icon: "📉" },
       { href: "/recommendation", label: "仕入れ推薦", icon: "🎯" },
+      { href: "/check", label: "仕入れチェック", icon: "✅" },
       { href: "/bds-border", label: "入札ボーダー計算", icon: "🎯" },
       { href: "/bds-simulator", label: "BDSシミュレーター", icon: "⟳" },
       { href: "/profit-forecast", label: "在庫×期待利益", icon: "📊" },
