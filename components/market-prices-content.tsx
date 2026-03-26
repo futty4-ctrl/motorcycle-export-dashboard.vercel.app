@@ -256,6 +256,7 @@ export default function MarketPricesContent() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [makerFilter, setMakerFilter] = useState("全メーカー")
+  const [ccFilter, setCcFilter] = useState<string>("全て")
   const [condFilter, setCondFilter] = useState<string>("all")
   const [srcFilter, setSrcFilter] = useState<string>("all")
   const [sortKey, setSortKey] = useState<keyof MarketPrice>("avg_price")
@@ -293,6 +294,17 @@ export default function MarketPricesContent() {
     if (search) d = d.filter((r) => `${r.maker}${r.model}`.includes(search))
     if (makerFilter !== "全メーカー")
       d = d.filter((r) => r.maker === makerFilter)
+    if (ccFilter !== "全て") {
+      d = d.filter((r) => {
+        const cc = (r as Record<string, unknown>).cc as number | null
+        if (!cc) return false
+        if (ccFilter === "〜50cc") return cc <= 50
+        if (ccFilter === "51〜125cc") return cc > 50 && cc <= 125
+        if (ccFilter === "126〜250cc") return cc > 125 && cc <= 250
+        if (ccFilter === "251〜400cc") return cc > 250 && cc <= 400
+        return true
+      })
+    }
     if (condFilter !== "all")
       d = d.filter((r) => r.condition === condFilter)
     if (srcFilter !== "all") d = d.filter((r) => r.source === srcFilter)
@@ -301,7 +313,7 @@ export default function MarketPricesContent() {
       const bv = b[sortKey] as string | number
       return sortAsc ? (av > bv ? 1 : -1) : av < bv ? 1 : -1
     })
-  }, [data, search, makerFilter, condFilter, srcFilter, sortKey, sortAsc])
+  }, [data, search, makerFilter, ccFilter, condFilter, srcFilter, sortKey, sortAsc])
 
   const toggleSort = (k: keyof MarketPrice) => {
     if (sortKey === k) setSortAsc(!sortAsc)
@@ -504,36 +516,41 @@ export default function MarketPricesContent() {
           />
         </div>
 
-        {[
-          {
-            value: makerFilter,
-            onChange: setMakerFilter,
-            options: MAKERS.map((m) => ({ label: m, value: m })),
-            placeholder: "全メーカー",
-          },
-        ].map((sel, i) => (
-          <select
-            key={i}
-            value={sel.value}
-            onChange={(e) => sel.onChange(e.target.value)}
-            style={{
-              background: C.surfaceHigh,
-              border: `1px solid ${C.border}`,
-              borderRadius: 6,
-              padding: "9px 14px",
-              color: C.text,
-              fontFamily: C.font,
-              fontSize: 12,
-              outline: "none",
-            }}
-          >
-            {sel.options.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        ))}
+        <select
+          value={makerFilter}
+          onChange={(e) => setMakerFilter(e.target.value)}
+          style={{
+            background: C.surfaceHigh,
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            padding: "9px 14px",
+            color: C.text,
+            fontFamily: C.font,
+            fontSize: 12,
+            outline: "none",
+          }}
+        >
+          {MAKERS.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+
+        <select
+          value={ccFilter}
+          onChange={(e) => setCcFilter(e.target.value)}
+          style={{
+            background: C.surfaceHigh,
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            padding: "9px 14px",
+            color: C.text,
+            fontFamily: C.font,
+            fontSize: 12,
+            outline: "none",
+          }}
+        >
+          {["全て", "〜50cc", "51〜125cc", "126〜250cc", "251〜400cc"].map((v) => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
 
         <select
           value={condFilter}
@@ -638,13 +655,15 @@ export default function MarketPricesContent() {
                   [
                     ["maker", "メーカー"],
                     ["model", "車種"],
-                    ["year", "年式"],
+                    ["cc", "排気量"],
                     ["condition", "状態"],
                     ["source", "ソース"],
                     ["avg_price", "平均相場"],
                     ["min_price", "最低"],
                     ["max_price", "最高"],
                     ["sample_count", "件数"],
+                    ["shipping_cost", "送料"],
+                    ["avg_days_to_sell", "売却日数"],
                     ["trend", "トレンド"],
                     ["updated_at", "更新日"],
                   ] as [keyof MarketPrice, string][]
@@ -727,11 +746,12 @@ export default function MarketPricesContent() {
                     <td
                       style={{
                         ...tdStyle,
+                        fontFamily: C.font,
+                        fontSize: 11,
                         color: C.textSub,
-                        fontSize: 12,
                       }}
                     >
-                      {r.year}
+                      {(r as Record<string, unknown>).cc ? `${(r as Record<string, unknown>).cc}cc` : "—"}
                     </td>
                     <td style={tdStyle}>
                       <span
@@ -806,6 +826,12 @@ export default function MarketPricesContent() {
                     >
                       {r.sample_count}
                     </td>
+                    <td style={{ ...tdStyle, fontFamily: C.font, fontSize: 12, color: C.textSub }}>
+                      {(r as Record<string, unknown>).shipping_cost ? fmt((r as Record<string, unknown>).shipping_cost as number) : "—"}
+                    </td>
+                    <td style={{ ...tdStyle, fontFamily: C.font, fontSize: 12, color: (r as Record<string, unknown>).avg_days_to_sell && ((r as Record<string, unknown>).avg_days_to_sell as number) <= 7 ? C.green : C.textSub }}>
+                      {(r as Record<string, unknown>).avg_days_to_sell ? `${(r as Record<string, unknown>).avg_days_to_sell}日` : "—"}
+                    </td>
                     <td style={tdStyle}>
                       <span
                         style={{
@@ -867,7 +893,7 @@ export default function MarketPricesContent() {
               {filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={13}
+                    colSpan={15}
                     style={{
                       padding: 48,
                       textAlign: "center",
@@ -925,6 +951,7 @@ export default function MarketPricesContent() {
                 setSelectedIds(new Set())
                 setSearch("")
                 setMakerFilter("全メーカー")
+                setCcFilter("全て")
                 setCondFilter("all")
                 setSrcFilter("all")
               }}
