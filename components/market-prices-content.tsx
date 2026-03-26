@@ -995,6 +995,97 @@ export default function MarketPricesContent() {
         </div>
       </div>
 
+      {/* 比較パネル */}
+      {selectedIds.size >= 2 && (() => {
+        const selected = data.filter((r) => selectedIds.has(r.id))
+        const maxAvg = Math.max(...selected.map((r) => r.avg_price))
+        return (
+          <div style={{
+            background: C.surface,
+            border: `1px solid ${C.orange}40`,
+            borderRadius: 10,
+            padding: 20,
+            marginTop: 16,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <span style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: 14, color: C.orange }}>
+                比較（{selected.length}台）
+              </span>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                style={{
+                  padding: "4px 12px",
+                  background: "none",
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  color: C.textSub,
+                  fontFamily: C.font,
+                  fontSize: 11,
+                  cursor: "pointer",
+                }}
+              >
+                選択解除
+              </button>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <div style={{ display: "flex", gap: 12, minWidth: selected.length * 180 }}>
+                {selected
+                  .sort((a, b) => b.avg_price - a.avg_price)
+                  .map((r) => {
+                    const ext = r as Record<string, unknown>
+                    const barPct = maxAvg > 0 ? (r.avg_price / maxAvg) * 100 : 0
+                    return (
+                      <div
+                        key={r.id}
+                        style={{
+                          flex: "0 0 170px",
+                          background: C.surfaceHigh,
+                          border: `1px solid ${C.border}`,
+                          borderRadius: 8,
+                          padding: 14,
+                        }}
+                      >
+                        <div style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: 13, color: C.text, marginBottom: 2 }}>
+                          {r.model}
+                        </div>
+                        <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, marginBottom: 10 }}>
+                          {r.maker} {ext.cc ? `/ ${ext.cc}cc` : ""}
+                        </div>
+                        {/* 相場バー */}
+                        <div style={{ height: 6, background: C.border, borderRadius: 3, marginBottom: 10 }}>
+                          <div style={{ height: 6, background: C.orange, borderRadius: 3, width: `${barPct}%` }} />
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ fontFamily: C.font, fontSize: 9, color: C.textMuted }}>平均</span>
+                            <span style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: 13, color: C.orange }}>{fmt(r.avg_price)}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ fontFamily: C.font, fontSize: 9, color: C.textMuted }}>最低</span>
+                            <span style={{ fontFamily: C.font, fontSize: 11, color: C.textSub }}>{fmt(r.min_price)}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ fontFamily: C.font, fontSize: 9, color: C.textMuted }}>最高</span>
+                            <span style={{ fontFamily: C.font, fontSize: 11, color: C.textSub }}>{fmt(r.max_price)}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ fontFamily: C.font, fontSize: 9, color: C.textMuted }}>件数</span>
+                            <span style={{ fontFamily: C.font, fontSize: 11, color: C.textSub }}>{r.sample_count}件</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ fontFamily: C.font, fontSize: 9, color: C.textMuted }}>状態</span>
+                            <span style={{ fontFamily: C.font, fontSize: 11, color: condColor[r.condition] }}>{r.condition}ランク</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       <PriceModal
         key={modal.entry?.id ?? "new"}
         open={modal.open}
