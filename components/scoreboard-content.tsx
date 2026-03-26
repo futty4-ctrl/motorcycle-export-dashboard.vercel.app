@@ -177,6 +177,7 @@ export default function ScoreboardContent() {
   const displayedResults = results.filter((r) => {
     if (!matchCC(r.cc, filterCC)) return false
     if (filterMaker !== "全て" && r.maker !== filterMaker) return false
+    if (showMissing && dbModelSet.has(r.label)) return false
     return true
   })
 
