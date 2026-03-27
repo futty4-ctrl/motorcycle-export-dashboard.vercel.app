@@ -37,7 +37,7 @@ const newItem = (): LineItem => ({
   price: 0,
 })
 
-const UNITS = ["式", "時間", "個", "件", "月", "日", "枚", "台"]
+const UNITS = ["式", "時間", "個", "件", "月", "日", "枚", "台", "人"]
 
 const fmtYen = (n: number) => `¥${n.toLocaleString()}`
 
@@ -911,15 +911,18 @@ export default function InvoiceEditor({
                   }
                   style={inputStyle()}
                 />
-                <select
+                <input
+                  list="unit-options"
                   value={item.unit}
                   onChange={(e) => updateItem(item.id, "unit", e.target.value)}
-                  style={inputStyle()}
-                >
+                  placeholder="単位"
+                  style={{ ...inputStyle(), width: 60 }}
+                />
+                <datalist id="unit-options">
                   {UNITS.map((u) => (
-                    <option key={u}>{u}</option>
+                    <option key={u} value={u} />
                   ))}
-                </select>
+                </datalist>
                 <input
                   type="number"
                   value={item.price}
