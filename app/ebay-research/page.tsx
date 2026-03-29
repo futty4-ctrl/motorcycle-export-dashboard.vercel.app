@@ -91,6 +91,20 @@ export default function EbayResearchPage() {
     setLoading(false)
   }
 
+  const PRESETS = [
+    { label: "G-SHOCK", queries: ["G-SHOCK DW-5600", "G-SHOCK DW-6900", "G-SHOCK GA-2100", "G-SHOCK Japan limited", "G-SHOCK vintage"] },
+    { label: "レトロゲーム", queries: ["Super Famicom game", "Game Boy Japanese", "Pokemon game Japanese", "Nintendo 64 Japanese", "Sega Saturn Japanese"] },
+    { label: "トレカ", queries: ["Pokemon card Japanese", "Yugioh Japanese ultimate rare", "Pokemon card vintage Japanese", "Yugioh Japanese lot"] },
+    { label: "カメラレンズ", queries: ["Nikon lens vintage Japan", "Canon FD lens", "Pentax lens Japan", "Olympus lens Japan"] },
+    { label: "トミカ", queries: ["Tomica Japan limited", "Tomica car lot Japan", "Tomica vintage"] },
+    { label: "フィギュア", queries: ["Dragon Ball figure Japan", "One Piece figure prize", "Anime figure Japan lot", "Gundam figure Japan"] },
+    { label: "文房具", queries: ["Japanese stationery lot", "Pilot pen Japan", "Uni Jetstream Japan", "Japanese eraser"] },
+    { label: "Zippo", queries: ["Zippo Japan limited", "Zippo Japanese vintage", "Zippo anime Japan"] },
+  ]
+
+  const ebayNewURL = (q: string) => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}&_sop=10&rt=nc`
+  const ebaySoldURL = (q: string) => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}&_sop=13&LH_Complete=1&LH_Sold=1&rt=nc`
+
   const inputStyle = {
     background: C.surfaceHigh,
     border: `1px solid ${C.border}`,
@@ -147,6 +161,80 @@ export default function EbayResearchPage() {
         >
           {loading ? "検索中..." : "eBay検索"}
         </button>
+      </div>
+
+      {/* プリセットリスト */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
+        <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, letterSpacing: "0.1em", marginBottom: 12 }}>
+          ジャンル別クイック検索
+        </div>
+        {PRESETS.map((preset) => (
+          <div key={preset.label} style={{ marginBottom: 12 }}>
+            <div style={{ fontFamily: C.fontSans, fontWeight: 600, fontSize: 12, color: C.orange, marginBottom: 6 }}>
+              {preset.label}
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {preset.queries.map((q) => (
+                <div key={q} style={{ display: "flex", gap: 2 }}>
+                  <button
+                    onClick={() => { setQuery(q); setTimeout(() => handleSearch(), 100) }}
+                    style={{
+                      padding: "4px 10px",
+                      background: C.surfaceHigh,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: "6px 0 0 6px",
+                      color: C.textSub,
+                      fontFamily: C.font,
+                      fontSize: 11,
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = C.surfaceHover; e.currentTarget.style.color = C.text }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = C.surfaceHigh; e.currentTarget.style.color = C.textSub }}
+                  >
+                    {q}
+                  </button>
+                  <a
+                    href={ebaySoldURL(q)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: "4px 8px",
+                      background: C.green + "20",
+                      border: `1px solid ${C.green}40`,
+                      color: C.green,
+                      fontFamily: C.font,
+                      fontSize: 9,
+                      textDecoration: "none",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    Sold
+                  </a>
+                  <a
+                    href={ebayNewURL(q)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: "4px 8px",
+                      background: C.blue + "20",
+                      border: `1px solid ${C.blue}40`,
+                      borderRadius: "0 6px 6px 0",
+                      color: C.blue,
+                      fontFamily: C.font,
+                      fontSize: 9,
+                      textDecoration: "none",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    New
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* エラー */}
@@ -248,8 +336,12 @@ export default function EbayResearchPage() {
 
           {/* 売り切れ一覧 */}
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
-            <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.border}`, background: C.surfaceHigh, fontFamily: C.fontSans, fontWeight: 600, fontSize: 13, color: C.text }}>
-              売り切れ商品（{results.length}件）「{searched}」
+            <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.border}`, background: C.surfaceHigh, fontFamily: C.fontSans, fontWeight: 600, fontSize: 13, color: C.text, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>売り切れ商品（{results.length}件）「{searched}」</span>
+              <span style={{ display: "flex", gap: 8 }}>
+                <a href={ebaySoldURL(searched)} target="_blank" rel="noopener noreferrer" style={{ padding: "3px 10px", background: C.green + "20", border: `1px solid ${C.green}40`, borderRadius: 4, color: C.green, fontFamily: C.font, fontSize: 10, textDecoration: "none" }}>Sold一覧</a>
+                <a href={ebayNewURL(searched)} target="_blank" rel="noopener noreferrer" style={{ padding: "3px 10px", background: C.blue + "20", border: `1px solid ${C.blue}40`, borderRadius: 4, color: C.blue, fontFamily: C.font, fontSize: 10, textDecoration: "none" }}>New一覧</a>
+              </span>
             </div>
             {results.map((item, i) => {
               const profit = costPrice > 0 ? calcProfit(item.price) : null
