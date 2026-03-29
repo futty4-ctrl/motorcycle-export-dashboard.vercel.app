@@ -38,6 +38,7 @@ const NAV = [
       { href: "/bds-simulator", label: "BDSシミュレーター", icon: "⟳" },
       { href: "/profit-forecast", label: "在庫×期待利益", icon: "📊" },
       { href: "/monthly-progress", label: "月次進捗", icon: "📈" },
+      { href: "/ebay-research", label: "eBayリサーチ", icon: "🌍" },
     ],
   },
   {
