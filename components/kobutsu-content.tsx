@@ -672,18 +672,36 @@ export function KobutsuContent() {
                     </span>
                   )}
                 </div>
-                <div style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, color: C.textSub }}>種類：</span>
-                  <select
-                    style={{ ...inp, maxWidth: 220 }}
-                    value={certVehicleType}
-                    onChange={(e) => setCertVehicleType(e.target.value)}
+                  {VEHICLE_TYPES.map((t) => (
+                    <label
+                      key={t}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        cursor: "pointer",
+                        color: certVehicleType === t ? C.orange : C.textSub,
+                        fontSize: 12,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="cert_vehicle_type"
+                        checked={certVehicleType === t}
+                        onChange={() => setCertVehicleType(certVehicleType === t ? "" : t)}
+                        style={{ accentColor: C.orange }}
+                      />
+                      {t}
+                    </label>
+                  ))}
+                  <button
+                    onClick={() => setCertVehicleType("")}
+                    style={{ ...btn("ghost"), padding: "2px 8px", fontSize: 11 }}
                   >
-                    <option value="">（自動判定）</option>
-                    {VEHICLE_TYPES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+                    クリア
+                  </button>
                 </div>
               </>
             )}
@@ -730,7 +748,18 @@ export function KobutsuContent() {
               >
                 <tbody>
                   <CertRow label="車　名" value={certEntry ? `${certEntry.maker} ${certEntry.model}` : ""} label2="車台番号" value2={certEntry?.frame_no || ""} />
-                  <CertRow label="型　式" value={certEntry?.katashiki || ""} label2="種　類" value2={certVehicleType} />
+                  <tr>
+                    <td style={certLabelCell}>型　式</td>
+                    <td style={certValueCell}>{certEntry?.katashiki || ""}</td>
+                    <td style={certLabelCell}>種　類</td>
+                    <td style={{ ...certValueCell, fontSize: 11, lineHeight: 1.6 }}>
+                      {VEHICLE_TYPES.map((t) => (
+                        <span key={t} style={{ marginRight: 8, whiteSpace: "nowrap" }}>
+                          {certVehicleType === t ? "☑" : "☐"} {t}
+                        </span>
+                      ))}
+                    </td>
+                  </tr>
                   <tr>
                     <td style={certLabelCell}>販売年月日</td>
                     <td style={certValueCell}>
