@@ -188,25 +188,6 @@ export function KobutsuContent() {
       const x1 = (pageWidth - imgWidth) / 2
       pdf.addImage(canvas1.toDataURL("image/jpeg", 0.95), "JPEG", x1, 0, imgWidth, imgHeight)
 
-      // Page 2: license image (if exists)
-      const page2El = document.querySelector(".kobutsu-cert-page2") as HTMLElement
-      if (page2El) {
-        pdf.addPage()
-        const canvas2 = await html2canvas(page2El, {
-          scale: 2,
-          backgroundColor: "#ffffff",
-          useCORS: true,
-        })
-        const ratio2 = canvas2.height / canvas2.width
-        let img2W = pageWidth
-        let img2H = img2W * ratio2
-        if (img2H > pageHeight) {
-          img2H = pageHeight
-          img2W = img2H / ratio2
-        }
-        const x2 = (pageWidth - img2W) / 2
-        pdf.addImage(canvas2.toDataURL("image/jpeg", 0.95), "JPEG", x2, 0, img2W, img2H)
-      }
 
       const fileName = `販売証明書_${certEntry.maker}_${certEntry.model}_${certEntry.transaction_date}.pdf`
       pdf.save(fileName)
@@ -799,33 +780,19 @@ export function KobutsuContent() {
                   （印）
                 </div>
               </div>
-            </div>
 
-            {/* Page 2: License image */}
-            {settings?.license_image_url && (
-              <div
-                className="kobutsu-cert-page2"
-                style={{
-                  background: "#fff",
-                  color: "#000",
-                  padding: "48px 56px",
-                  borderRadius: 8,
-                  marginTop: 16,
-                  maxWidth: 720,
-                  textAlign: "center",
-                }}
-              >
-                <p style={{ fontSize: 14, fontWeight: "bold", marginBottom: 24, fontFamily: "'Yu Mincho', 'Hiragino Mincho ProN', serif" }}>
-                  添付：古物商許可証写し
-                </p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={settings.license_image_url}
-                  alt="古物商許可証"
-                  style={{ maxWidth: "100%", maxHeight: 800, objectFit: "contain" }}
-                />
-              </div>
-            )}
+              {settings?.license_image_url && (
+                <div style={{ marginTop: 24, borderTop: "1px solid #ccc", paddingTop: 16, textAlign: "center" }}>
+                  <p style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>古物商許可証写し</p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={settings.license_image_url}
+                    alt="古物商許可証"
+                    style={{ maxWidth: 240, maxHeight: 180, objectFit: "contain" }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
