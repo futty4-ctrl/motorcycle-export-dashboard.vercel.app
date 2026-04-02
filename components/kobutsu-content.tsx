@@ -69,6 +69,7 @@ export function KobutsuContent() {
   const [editId, setEditId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [certEntry, setCertEntry] = useState<KobutsuEntry | null>(null)
+  const [certVehicleType, setCertVehicleType] = useState("")
   const [settings, setSettings] = useState<KobutsuSettings | null>(null)
   const printRef = useRef<HTMLDivElement>(null)
 
@@ -138,6 +139,7 @@ export function KobutsuContent() {
 
   const handleCert = (entry: KobutsuEntry) => {
     setCertEntry(entry)
+    setCertVehicleType(entry.displacement ? getVehicleType(entry.displacement) : "")
     setTab("cert")
   }
 
@@ -670,6 +672,19 @@ export function KobutsuContent() {
                     </span>
                   )}
                 </div>
+                <div style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: C.textSub }}>種類：</span>
+                  <select
+                    style={{ ...inp, maxWidth: 220 }}
+                    value={certVehicleType}
+                    onChange={(e) => setCertVehicleType(e.target.value)}
+                  >
+                    <option value="">（自動判定）</option>
+                    {VEHICLE_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
               </>
             )}
 
@@ -689,14 +704,10 @@ export function KobutsuContent() {
                 display: certEntry || tab === "cert" ? "block" : "none",
               }}
             >
-              <div style={{ textAlign: "right", marginBottom: 24 }}>
-                {certEntry ? toWareki(certEntry.transaction_date) : "令和　　年　　月　　日"}
-              </div>
-
               <h2
                 style={{
                   textAlign: "center",
-                  fontSize: 22,
+                  fontSize: 20,
                   fontWeight: "bold",
                   letterSpacing: "0.3em",
                   marginBottom: 32,
@@ -706,58 +717,49 @@ export function KobutsuContent() {
                   width: "100%",
                 }}
               >
-                販 売 証 明 書
+                原動機付自転車販売証明書
               </h2>
-
-              <p style={{ marginBottom: 24 }}>
-                下記車両を販売したことを証明いたします。
-              </p>
 
               <table
                 style={{
                   width: "100%",
                   borderCollapse: "collapse",
-                  marginBottom: 8,
+                  marginBottom: 24,
                   border: "2px solid #000",
                 }}
               >
                 <tbody>
+                  <CertRow label="車　名" value={certEntry ? `${certEntry.maker} ${certEntry.model}` : ""} label2="車台番号" value2={certEntry?.frame_no || ""} />
+                  <CertRow label="型　式" value={certEntry?.katashiki || ""} label2="種　類" value2={certVehicleType} />
                   <tr>
-                    <td colSpan={4} style={certSectionHeader}>車両情報</td>
+                    <td style={certLabelCell}>販売年月日</td>
+                    <td style={certValueCell}>
+                      {certEntry ? toWareki(certEntry.transaction_date) : "令和　　年　　月　　日"}
+                    </td>
+                    <td style={certLabelCell}>排気量</td>
+                    <td style={certValueCell}>{certEntry?.displacement || ""}</td>
                   </tr>
-                  <CertRow label="車名" value={certEntry?.maker || ""} label2="型式" value2={certEntry?.katashiki || ""} />
-                  <CertRow label="車種名" value={certEntry?.model || ""} label2="年式" value2={certEntry?.model_year || ""} />
-                  <CertRow label="車台番号" value={certEntry?.frame_no || ""} label2="エンジン番号" value2={certEntry?.engine_no || ""} />
-                  <CertRow label="排気量" value={certEntry?.displacement || ""} label2="車体色" value2={certEntry?.body_color || ""} />
                   <tr>
-                    <td style={certLabelCell}>販売金額</td>
-                    <td colSpan={3} style={{ ...certValueCell, fontWeight: "bold", fontSize: 16 }}>
-                      {certEntry ? `¥${(certEntry.price || 0).toLocaleString()}` : ""}
+                    <td rowSpan={2} style={{ ...certLabelCell, verticalAlign: "top" }}>購入者</td>
+                    <td colSpan={3} style={{ ...certValueCell, minHeight: 32 }}>
+                      住所：{certEntry?.counterparty_address || ""}
                     </td>
                   </tr>
                   <tr>
-                    <td colSpan={4} style={certSectionHeader}>購入者情報</td>
+                    <td colSpan={3} style={{ ...certValueCell, minHeight: 32 }}>
+                      氏名：{certEntry?.counterparty_name || ""}
+                    </td>
                   </tr>
                   <tr>
-                    <td style={certLabelCell}>氏名</td>
-                    <td colSpan={3} style={certValueCell}>{certEntry?.counterparty_name || ""}</td>
-                  </tr>
-                  <tr>
-                    <td style={certLabelCell}>住所</td>
-                    <td colSpan={3} style={certValueCell}>{certEntry?.counterparty_address || ""}</td>
-                  </tr>
-                  <tr>
-                    <td style={certLabelCell}>電話番号</td>
-                    <td colSpan={3} style={certValueCell}>{certEntry?.counterparty_tel || ""}</td>
+                    <td style={certLabelCell}>備　考</td>
+                    <td colSpan={3} style={{ ...certValueCell, minHeight: 40 }}>
+                      {certEntry?.notes || ""}
+                    </td>
                   </tr>
                 </tbody>
               </table>
 
-              <p style={{ marginTop: 32, marginBottom: 40 }}>
-                上記の通り相違ないことを証明いたします。
-              </p>
-
-              <div style={{ textAlign: "right", lineHeight: 2.2, fontSize: 13 }}>
+              <div style={{ textAlign: "right", lineHeight: 2.2, fontSize: 13, marginTop: 24 }}>
                 <div>販売店名：{settings?.shop_name || "（未設定）"}</div>
                 <div>住所：{settings?.address || "（未設定）"}</div>
                 <div>TEL：{settings?.tel || "（未設定）"}</div>
@@ -768,13 +770,6 @@ export function KobutsuContent() {
                   （印）
                 </div>
               </div>
-
-              <p style={{ fontSize: 11, color: "#666", marginTop: 24, borderTop: "1px solid #ccc", paddingTop: 8 }}>
-                {settings?.license_image_url
-                  ? "※ 本証明書には古物商許可証の写しを添付しております。"
-                  : "※ 古物商許可証の写しを別途添付してください。"
-                }
-              </p>
             </div>
 
             {/* Page 2: License image */}
@@ -931,3 +926,19 @@ function CertRow({
     </tr>
   )
 }
+
+function getVehicleType(displacement: string): string {
+  const cc = parseInt(displacement.replace(/[^0-9]/g, ""), 10)
+  if (isNaN(cc)) return ""
+  if (cc <= 50) return "第一種（50cc）"
+  if (cc <= 90) return "第二種乙（～90cc）"
+  return "第二種甲（～125cc）"
+}
+
+const VEHICLE_TYPES = [
+  "第一種（50cc）",
+  "第二種乙（～90cc）",
+  "第二種甲（～125cc）",
+  "ミニカー",
+  "小型特殊",
+]
