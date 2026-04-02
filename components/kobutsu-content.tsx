@@ -170,15 +170,21 @@ export function KobutsuContent() {
       const pageWidth = 210
       const pageHeight = 297
 
-      // Page 1: certificate
+      // Page 1: certificate — scale to fit A4
       const canvas1 = await html2canvas(printRef.current, {
         scale: 2,
         backgroundColor: "#ffffff",
         useCORS: true,
       })
-      const imgWidth = pageWidth
-      const imgHeight = (canvas1.height * imgWidth) / canvas1.width
-      pdf.addImage(canvas1.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, imgWidth, Math.min(imgHeight, pageHeight))
+      const ratio1 = canvas1.height / canvas1.width
+      let imgWidth = pageWidth
+      let imgHeight = imgWidth * ratio1
+      if (imgHeight > pageHeight) {
+        imgHeight = pageHeight
+        imgWidth = imgHeight / ratio1
+      }
+      const x1 = (pageWidth - imgWidth) / 2
+      pdf.addImage(canvas1.toDataURL("image/jpeg", 0.95), "JPEG", x1, 0, imgWidth, imgHeight)
 
       // Page 2: license image (if exists)
       const page2El = document.querySelector(".kobutsu-cert-page2") as HTMLElement
@@ -189,8 +195,15 @@ export function KobutsuContent() {
           backgroundColor: "#ffffff",
           useCORS: true,
         })
-        const img2Height = (canvas2.height * imgWidth) / canvas2.width
-        pdf.addImage(canvas2.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, imgWidth, Math.min(img2Height, pageHeight))
+        const ratio2 = canvas2.height / canvas2.width
+        let img2W = pageWidth
+        let img2H = img2W * ratio2
+        if (img2H > pageHeight) {
+          img2H = pageHeight
+          img2W = img2H / ratio2
+        }
+        const x2 = (pageWidth - img2W) / 2
+        pdf.addImage(canvas2.toDataURL("image/jpeg", 0.95), "JPEG", x2, 0, img2W, img2H)
       }
 
       const fileName = `販売証明書_${certEntry.maker}_${certEntry.model}_${certEntry.transaction_date}.pdf`
@@ -227,9 +240,15 @@ export function KobutsuContent() {
         backgroundColor: "#ffffff",
         useCORS: true,
       })
-      const imgWidth = pageWidth
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, imgWidth, Math.min(imgHeight, pageHeight))
+      const ratio = canvas.height / canvas.width
+      let bW = pageWidth
+      let bH = bW * ratio
+      if (bH > pageHeight) {
+        bH = pageHeight
+        bW = bH / ratio
+      }
+      const bX = (pageWidth - bW) / 2
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", bX, 0, bW, bH)
 
       pdf.save("販売証明書_空テンプレート.pdf")
     } catch (err) {
