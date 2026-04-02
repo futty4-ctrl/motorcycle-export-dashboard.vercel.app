@@ -769,29 +769,30 @@ export function KobutsuContent() {
                 </tbody>
               </table>
 
-              <div style={{ textAlign: "right", lineHeight: 2.2, fontSize: 13, marginTop: 24 }}>
-                <div>販売店名：{settings?.shop_name || "（未設定）"}</div>
-                <div>住所：{settings?.address || "（未設定）"}</div>
-                <div>TEL：{settings?.tel || "（未設定）"}</div>
-                <div>氏名：{settings?.owner_name || "（未設定）"}</div>
-                <div>古物商許可番号：第{settings?.license_number || "○○○○○○"}号</div>
-                <div>{settings?.public_safety_commission || "○○公安委員会"}</div>
-                <div style={{ marginTop: 16, borderTop: "1px solid #000", display: "inline-block", paddingTop: 4, minWidth: 160, textAlign: "center" }}>
-                  （印）
+              <div style={{ display: "flex", gap: 24, marginTop: 24, alignItems: "flex-start" }}>
+                {settings?.license_image_url && (
+                  <div style={{ flex: "0 0 auto" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={settings.license_image_url}
+                      alt="古物商許可証"
+                      style={{ width: 220, objectFit: "contain", border: "1px solid #ccc" }}
+                    />
+                    <p style={{ fontSize: 10, color: "#666", marginTop: 4, textAlign: "center" }}>古物商許可証写し</p>
+                  </div>
+                )}
+                <div style={{ flex: 1, textAlign: "right", lineHeight: 2.2, fontSize: 13 }}>
+                  <div>販売店名：{settings?.shop_name || "（未設定）"}</div>
+                  <div>住所：{settings?.address || "（未設定）"}</div>
+                  <div>TEL：{settings?.tel || "（未設定）"}</div>
+                  <div>氏名：{settings?.owner_name || "（未設定）"}</div>
+                  <div>古物商許可番号：第{settings?.license_number || "○○○○○○"}号</div>
+                  <div>{settings?.public_safety_commission || "○○公安委員会"}</div>
+                  <div style={{ marginTop: 16, borderTop: "1px solid #000", display: "inline-block", paddingTop: 4, minWidth: 160, textAlign: "center" }}>
+                    （印）
+                  </div>
                 </div>
               </div>
-
-              {settings?.license_image_url && (
-                <div style={{ marginTop: 24, borderTop: "1px solid #ccc", paddingTop: 16, textAlign: "center" }}>
-                  <p style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>古物商許可証写し</p>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={settings.license_image_url}
-                    alt="古物商許可証"
-                    style={{ maxWidth: 240, maxHeight: 180, objectFit: "contain" }}
-                  />
-                </div>
-              )}
             </div>
           </div>
         )}
