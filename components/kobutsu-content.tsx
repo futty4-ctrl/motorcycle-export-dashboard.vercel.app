@@ -70,6 +70,7 @@ export function KobutsuContent() {
   const [saving, setSaving] = useState(false)
   const [certEntry, setCertEntry] = useState<KobutsuEntry | null>(null)
   const [certVehicleType, setCertVehicleType] = useState("")
+  const [certMode, setCertMode] = useState<"sales" | "transfer">("sales")
   const [settings, setSettings] = useState<KobutsuSettings | null>(null)
   const printRef = useRef<HTMLDivElement>(null)
 
@@ -189,7 +190,8 @@ export function KobutsuContent() {
       pdf.addImage(canvas1.toDataURL("image/jpeg", 0.95), "JPEG", x1, 0, imgWidth, imgHeight)
 
 
-      const fileName = `販売証明書_${certEntry.maker}_${certEntry.model}_${certEntry.transaction_date}.pdf`
+      const prefix = certMode === "sales" ? "販売証明書" : "譲渡証明書"
+      const fileName = `${prefix}_${certEntry.maker}_${certEntry.model}_${certEntry.transaction_date}.pdf`
       pdf.save(fileName)
     } catch (err) {
       console.error("PDF generation failed:", err)
@@ -233,7 +235,8 @@ export function KobutsuContent() {
       const bX = (pageWidth - bW) / 2
       pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", bX, 0, bW, bH)
 
-      pdf.save("販売証明書_空テンプレート.pdf")
+      const blankPrefix = certMode === "sales" ? "販売証明書" : "譲渡証明書"
+      pdf.save(`${blankPrefix}_空テンプレート.pdf`)
     } catch (err) {
       console.error("PDF generation failed:", err)
       alert("PDF生成に失敗しました")
@@ -613,6 +616,28 @@ export function KobutsuContent() {
         {/* Tab: Certificate */}
         {tab === "cert" && (
           <div>
+            {/* Sales / Transfer toggle */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
+              {(["sales", "transfer"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setCertMode(m)}
+                  style={{
+                    padding: "6px 16px",
+                    borderRadius: 6,
+                    border: `1px solid ${certMode === m ? C.orange : C.border}`,
+                    background: certMode === m ? `${C.orange}18` : "transparent",
+                    color: certMode === m ? C.orange : C.textSub,
+                    fontSize: 12,
+                    fontWeight: certMode === m ? "bold" : "normal",
+                    cursor: "pointer",
+                  }}
+                >
+                  {m === "sales" ? "販売証明書" : "譲渡証明書"}
+                </button>
+              ))}
+            </div>
+
             {!certEntry ? (
               <div style={{ ...card(), textAlign: "center", padding: 40 }}>
                 <p style={{ color: C.textMuted, fontSize: 13, marginBottom: 16 }}>
@@ -624,7 +649,7 @@ export function KobutsuContent() {
                   disabled={pdfGenerating}
                   style={{ ...btn("ghost"), opacity: pdfGenerating ? 0.6 : 1 }}
                 >
-                  {pdfGenerating ? "PDF生成中..." : "空の販売証明書をPDF出力"}
+                  {pdfGenerating ? "PDF生成中..." : `空の${certMode === "sales" ? "販売" : "譲渡"}証明書をPDF出力`}
                 </button>
               </div>
             ) : (
@@ -716,8 +741,14 @@ export function KobutsuContent() {
                   width: "100%",
                 }}
               >
-                原動機付自転車販売証明書
+                {certMode === "sales" ? "原動機付自転車販売証明書" : "譲 渡 証 明 書"}
               </h2>
+
+              {certMode === "transfer" && (
+                <p style={{ marginBottom: 20, fontSize: 13 }}>
+                  下記の原動機付自転車を譲渡したことを証明します。
+                </p>
+              )}
 
               <table
                 style={{
@@ -728,44 +759,103 @@ export function KobutsuContent() {
                 }}
               >
                 <tbody>
-                  <CertRow label="車　名" value={certEntry ? `${certEntry.maker} ${certEntry.model}` : ""} label2="車台番号" value2={certEntry?.frame_no || ""} />
-                  <tr>
-                    <td style={certLabelCell}>型　式</td>
-                    <td style={certValueCell}>{certEntry?.katashiki || ""}</td>
-                    <td style={certLabelCell}>種　類</td>
-                    <td style={{ ...certValueCell, fontSize: 11, lineHeight: 1.6 }}>
-                      {VEHICLE_TYPES.map((t) => (
-                        <span key={t} style={{ marginRight: 8, whiteSpace: "nowrap" }}>
-                          {certVehicleType === t ? "☑" : "☐"} {t}
-                        </span>
-                      ))}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={certLabelCell}>販売年月日</td>
-                    <td style={certValueCell}>
-                      {certEntry ? toWareki(certEntry.transaction_date) : "令和　　年　　月　　日"}
-                    </td>
-                    <td style={certLabelCell}>排気量</td>
-                    <td style={certValueCell}>{certEntry?.displacement || ""}</td>
-                  </tr>
-                  <tr>
-                    <td rowSpan={2} style={{ ...certLabelCell, verticalAlign: "top" }}>購入者</td>
-                    <td colSpan={3} style={{ ...certValueCell, minHeight: 32 }}>
-                      住所：{certEntry?.counterparty_address || ""}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td colSpan={3} style={{ ...certValueCell, minHeight: 32 }}>
-                      氏名：{certEntry?.counterparty_name || ""}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={certLabelCell}>備　考</td>
-                    <td colSpan={3} style={{ ...certValueCell, minHeight: 40 }}>
-                      {certEntry?.notes || ""}
-                    </td>
-                  </tr>
+                  {certMode === "sales" ? (
+                    <>
+                      <CertRow label="車　名" value={certEntry ? `${certEntry.maker} ${certEntry.model}` : ""} label2="車台番号" value2={certEntry?.frame_no || ""} />
+                      <tr>
+                        <td style={certLabelCell}>型　式</td>
+                        <td style={certValueCell}>{certEntry?.katashiki || ""}</td>
+                        <td style={certLabelCell}>種　類</td>
+                        <td style={{ ...certValueCell, fontSize: 11, lineHeight: 1.6 }}>
+                          {VEHICLE_TYPES.map((t) => (
+                            <span key={t} style={{ marginRight: 8, whiteSpace: "nowrap" }}>
+                              {certVehicleType === t ? "☑" : "☐"} {t}
+                            </span>
+                          ))}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={certLabelCell}>販売年月日</td>
+                        <td style={certValueCell}>
+                          {certEntry ? toWareki(certEntry.transaction_date) : "令和　　年　　月　　日"}
+                        </td>
+                        <td style={certLabelCell}>排気量</td>
+                        <td style={certValueCell}>{certEntry?.displacement || ""}</td>
+                      </tr>
+                      <tr>
+                        <td rowSpan={2} style={{ ...certLabelCell, verticalAlign: "top" }}>購入者</td>
+                        <td colSpan={3} style={{ ...certValueCell, minHeight: 32 }}>
+                          住所：{certEntry?.counterparty_address || ""}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan={3} style={{ ...certValueCell, minHeight: 32 }}>
+                          氏名：{certEntry?.counterparty_name || ""}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={certLabelCell}>備　考</td>
+                        <td colSpan={3} style={{ ...certValueCell, minHeight: 40 }}>
+                          {certEntry?.notes || ""}
+                        </td>
+                      </tr>
+                    </>
+                  ) : (
+                    <>
+                      <tr>
+                        <td colSpan={4} style={certSectionHeader}>車両情報</td>
+                      </tr>
+                      <CertRow label="車　名" value={certEntry ? `${certEntry.maker} ${certEntry.model}` : ""} label2="車台番号" value2={certEntry?.frame_no || ""} />
+                      <CertRow label="型　式" value={certEntry?.katashiki || ""} label2="排気量" value2={certEntry?.displacement || ""} />
+                      <tr>
+                        <td style={certLabelCell}>種　類</td>
+                        <td style={{ ...certValueCell, fontSize: 11, lineHeight: 1.6 }} colSpan={3}>
+                          {VEHICLE_TYPES.map((t) => (
+                            <span key={t} style={{ marginRight: 8, whiteSpace: "nowrap" }}>
+                              {certVehicleType === t ? "☑" : "☐"} {t}
+                            </span>
+                          ))}
+                        </td>
+                      </tr>
+                      <CertRow label="標識番号" value="" label2="譲渡年月日" value2={certEntry ? toWareki(certEntry.transaction_date) : "令和　　年　　月　　日"} />
+                      <tr>
+                        <td colSpan={4} style={certSectionHeader}>譲渡人（旧所有者）</td>
+                      </tr>
+                      <tr>
+                        <td style={certLabelCell}>住所</td>
+                        <td colSpan={3} style={{ ...certValueCell, minHeight: 32 }}>
+                          {settings?.address || ""}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={certLabelCell}>氏名</td>
+                        <td style={certValueCell}>{settings?.owner_name || ""}</td>
+                        <td style={certLabelCell}>電話番号</td>
+                        <td style={certValueCell}>{settings?.tel || ""}</td>
+                      </tr>
+                      <tr>
+                        <td colSpan={4} style={certSectionHeader}>譲受人（新所有者）</td>
+                      </tr>
+                      <tr>
+                        <td style={certLabelCell}>住所</td>
+                        <td colSpan={3} style={{ ...certValueCell, minHeight: 32 }}>
+                          {certEntry?.counterparty_address || ""}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={certLabelCell}>氏名</td>
+                        <td style={certValueCell}>{certEntry?.counterparty_name || ""}</td>
+                        <td style={certLabelCell}>電話番号</td>
+                        <td style={certValueCell}>{certEntry?.counterparty_tel || ""}</td>
+                      </tr>
+                      <tr>
+                        <td style={certLabelCell}>備　考</td>
+                        <td colSpan={3} style={{ ...certValueCell, minHeight: 40 }}>
+                          {certEntry?.notes || ""}
+                        </td>
+                      </tr>
+                    </>
+                  )}
                 </tbody>
               </table>
 
