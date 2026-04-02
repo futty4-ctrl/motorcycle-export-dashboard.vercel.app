@@ -203,6 +203,45 @@ export function KobutsuContent() {
     }
   }
 
+  const handleBlankPdf = async () => {
+    if (!printRef.current) return
+    setPdfGenerating(true)
+
+    // Temporarily clear certEntry to render blank template
+    const prevEntry = certEntry
+    setCertEntry(null)
+
+    // Wait for re-render
+    await new Promise((r) => setTimeout(r, 100))
+
+    try {
+      const html2canvas = (await import("html2canvas-pro")).default
+      const { jsPDF } = await import("jspdf")
+
+      const pdf = new jsPDF("p", "mm", "a4")
+      const pageWidth = 210
+      const pageHeight = 297
+
+      const canvas = await html2canvas(printRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+      })
+      const imgWidth = pageWidth
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, imgWidth, Math.min(imgHeight, pageHeight))
+
+      pdf.save("販売証明書_空テンプレート.pdf")
+    } catch (err) {
+      console.error("PDF generation failed:", err)
+      alert("PDF生成に失敗しました")
+    } finally {
+      // Restore previous entry
+      setCertEntry(prevEntry)
+      setPdfGenerating(false)
+    }
+  }
+
   const setField = (key: string, value: string | number) =>
     setForm((prev) => ({ ...prev, [key]: value }))
 
@@ -574,9 +613,17 @@ export function KobutsuContent() {
           <div>
             {!certEntry ? (
               <div style={{ ...card(), textAlign: "center", padding: 40 }}>
-                <p style={{ color: C.textMuted, fontSize: 13 }}>
+                <p style={{ color: C.textMuted, fontSize: 13, marginBottom: 16 }}>
                   台帳一覧から「証明書」ボタンで表示するレコードを選択してください
                 </p>
+                <p style={{ color: C.textMuted, fontSize: 12, marginBottom: 16 }}>または</p>
+                <button
+                  onClick={handleBlankPdf}
+                  disabled={pdfGenerating}
+                  style={{ ...btn("ghost"), opacity: pdfGenerating ? 0.6 : 1 }}
+                >
+                  {pdfGenerating ? "PDF生成中..." : "空の販売証明書をPDF出力"}
+                </button>
               </div>
             ) : (
               <>
@@ -591,142 +638,150 @@ export function KobutsuContent() {
                   <button onClick={handlePrint} style={btn("ghost")}>
                     印刷
                   </button>
+                  <button
+                    onClick={handleBlankPdf}
+                    disabled={pdfGenerating}
+                    style={{ ...btn("ghost"), opacity: pdfGenerating ? 0.6 : 1 }}
+                  >
+                    空の証明書
+                  </button>
                   {certEntry.cert_issued && (
                     <span style={{ ...badge(C.green), alignSelf: "center" }}>
                       発行済み {certEntry.cert_issued_at ? toWareki(certEntry.cert_issued_at) : ""}
                     </span>
                   )}
                 </div>
-
-                {/* Print preview */}
-                <div
-                  ref={printRef}
-                  className="kobutsu-cert"
-                  style={{
-                    background: "#fff",
-                    color: "#000",
-                    padding: "48px 56px",
-                    borderRadius: 8,
-                    fontFamily: "'Yu Mincho', 'Hiragino Mincho ProN', serif",
-                    fontSize: 14,
-                    lineHeight: 1.8,
-                    maxWidth: 720,
-                  }}
-                >
-                  <div style={{ textAlign: "right", marginBottom: 24 }}>
-                    {toWareki(certEntry.transaction_date)}
-                  </div>
-
-                  <h2
-                    style={{
-                      textAlign: "center",
-                      fontSize: 22,
-                      fontWeight: "bold",
-                      letterSpacing: "0.3em",
-                      marginBottom: 32,
-                      borderBottom: "3px double #000",
-                      paddingBottom: 8,
-                      display: "inline-block",
-                      width: "100%",
-                    }}
-                  >
-                    販 売 証 明 書
-                  </h2>
-
-                  <p style={{ marginBottom: 24 }}>
-                    下記車両を販売したことを証明いたします。
-                  </p>
-
-                  <table
-                    style={{
-                      width: "100%",
-                      borderCollapse: "collapse",
-                      marginBottom: 8,
-                      border: "2px solid #000",
-                    }}
-                  >
-                    <tbody>
-                      <tr>
-                        <td colSpan={4} style={certSectionHeader}>車両情報</td>
-                      </tr>
-                      <CertRow label="車名" value={certEntry.maker} label2="型式" value2={certEntry.katashiki} />
-                      <CertRow label="車種名" value={certEntry.model} label2="年式" value2={certEntry.model_year} />
-                      <CertRow label="車台番号" value={certEntry.frame_no} label2="エンジン番号" value2={certEntry.engine_no} />
-                      <CertRow label="排気量" value={certEntry.displacement} label2="車体色" value2={certEntry.body_color} />
-                      <tr>
-                        <td style={certLabelCell}>販売金額</td>
-                        <td colSpan={3} style={{ ...certValueCell, fontWeight: "bold", fontSize: 16 }}>
-                          ¥{(certEntry.price || 0).toLocaleString()}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td colSpan={4} style={certSectionHeader}>購入者情報</td>
-                      </tr>
-                      <tr>
-                        <td style={certLabelCell}>氏名</td>
-                        <td colSpan={3} style={certValueCell}>{certEntry.counterparty_name}</td>
-                      </tr>
-                      <tr>
-                        <td style={certLabelCell}>住所</td>
-                        <td colSpan={3} style={certValueCell}>{certEntry.counterparty_address}</td>
-                      </tr>
-                      <tr>
-                        <td style={certLabelCell}>電話番号</td>
-                        <td colSpan={3} style={certValueCell}>{certEntry.counterparty_tel}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-
-                  <p style={{ marginTop: 32, marginBottom: 40 }}>
-                    上記の通り相違ないことを証明いたします。
-                  </p>
-
-                  <div style={{ textAlign: "right", lineHeight: 2.2, fontSize: 13 }}>
-                    <div>販売店名：{settings?.shop_name || "（未設定）"}</div>
-                    <div>住所：{settings?.address || "（未設定）"}</div>
-                    <div>TEL：{settings?.tel || "（未設定）"}</div>
-                    <div>氏名：{settings?.owner_name || "（未設定）"}</div>
-                    <div>古物商許可番号：第{settings?.license_number || "○○○○○○"}号</div>
-                    <div>{settings?.public_safety_commission || "○○公安委員会"}</div>
-                    <div style={{ marginTop: 16, borderTop: "1px solid #000", display: "inline-block", paddingTop: 4, minWidth: 160, textAlign: "center" }}>
-                      （印）
-                    </div>
-                  </div>
-
-                  <p style={{ fontSize: 11, color: "#666", marginTop: 24, borderTop: "1px solid #ccc", paddingTop: 8 }}>
-                    {settings?.license_image_url
-                      ? "※ 本証明書には古物商許可証の写しを添付しております。"
-                      : "※ 古物商許可証の写しを別途添付してください。"
-                    }
-                  </p>
-                </div>
-
-                {/* Page 2: License image */}
-                {settings?.license_image_url && (
-                  <div
-                    className="kobutsu-cert-page2"
-                    style={{
-                      background: "#fff",
-                      color: "#000",
-                      padding: "48px 56px",
-                      borderRadius: 8,
-                      marginTop: 16,
-                      maxWidth: 720,
-                      textAlign: "center",
-                    }}
-                  >
-                    <p style={{ fontSize: 14, fontWeight: "bold", marginBottom: 24, fontFamily: "'Yu Mincho', 'Hiragino Mincho ProN', serif" }}>
-                      添付：古物商許可証写し
-                    </p>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={settings.license_image_url}
-                      alt="古物商許可証"
-                      style={{ maxWidth: "100%", maxHeight: 800, objectFit: "contain" }}
-                    />
-                  </div>
-                )}
               </>
+            )}
+
+            {/* Certificate preview (shared for filled & blank) */}
+            <div
+              ref={printRef}
+              className="kobutsu-cert"
+              style={{
+                background: "#fff",
+                color: "#000",
+                padding: "48px 56px",
+                borderRadius: 8,
+                fontFamily: "'Yu Mincho', 'Hiragino Mincho ProN', serif",
+                fontSize: 14,
+                lineHeight: 1.8,
+                maxWidth: 720,
+                display: certEntry || tab === "cert" ? "block" : "none",
+              }}
+            >
+              <div style={{ textAlign: "right", marginBottom: 24 }}>
+                {certEntry ? toWareki(certEntry.transaction_date) : "令和　　年　　月　　日"}
+              </div>
+
+              <h2
+                style={{
+                  textAlign: "center",
+                  fontSize: 22,
+                  fontWeight: "bold",
+                  letterSpacing: "0.3em",
+                  marginBottom: 32,
+                  borderBottom: "3px double #000",
+                  paddingBottom: 8,
+                  display: "inline-block",
+                  width: "100%",
+                }}
+              >
+                販 売 証 明 書
+              </h2>
+
+              <p style={{ marginBottom: 24 }}>
+                下記車両を販売したことを証明いたします。
+              </p>
+
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  marginBottom: 8,
+                  border: "2px solid #000",
+                }}
+              >
+                <tbody>
+                  <tr>
+                    <td colSpan={4} style={certSectionHeader}>車両情報</td>
+                  </tr>
+                  <CertRow label="車名" value={certEntry?.maker || ""} label2="型式" value2={certEntry?.katashiki || ""} />
+                  <CertRow label="車種名" value={certEntry?.model || ""} label2="年式" value2={certEntry?.model_year || ""} />
+                  <CertRow label="車台番号" value={certEntry?.frame_no || ""} label2="エンジン番号" value2={certEntry?.engine_no || ""} />
+                  <CertRow label="排気量" value={certEntry?.displacement || ""} label2="車体色" value2={certEntry?.body_color || ""} />
+                  <tr>
+                    <td style={certLabelCell}>販売金額</td>
+                    <td colSpan={3} style={{ ...certValueCell, fontWeight: "bold", fontSize: 16 }}>
+                      {certEntry ? `¥${(certEntry.price || 0).toLocaleString()}` : ""}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan={4} style={certSectionHeader}>購入者情報</td>
+                  </tr>
+                  <tr>
+                    <td style={certLabelCell}>氏名</td>
+                    <td colSpan={3} style={certValueCell}>{certEntry?.counterparty_name || ""}</td>
+                  </tr>
+                  <tr>
+                    <td style={certLabelCell}>住所</td>
+                    <td colSpan={3} style={certValueCell}>{certEntry?.counterparty_address || ""}</td>
+                  </tr>
+                  <tr>
+                    <td style={certLabelCell}>電話番号</td>
+                    <td colSpan={3} style={certValueCell}>{certEntry?.counterparty_tel || ""}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p style={{ marginTop: 32, marginBottom: 40 }}>
+                上記の通り相違ないことを証明いたします。
+              </p>
+
+              <div style={{ textAlign: "right", lineHeight: 2.2, fontSize: 13 }}>
+                <div>販売店名：{settings?.shop_name || "（未設定）"}</div>
+                <div>住所：{settings?.address || "（未設定）"}</div>
+                <div>TEL：{settings?.tel || "（未設定）"}</div>
+                <div>氏名：{settings?.owner_name || "（未設定）"}</div>
+                <div>古物商許可番号：第{settings?.license_number || "○○○○○○"}号</div>
+                <div>{settings?.public_safety_commission || "○○公安委員会"}</div>
+                <div style={{ marginTop: 16, borderTop: "1px solid #000", display: "inline-block", paddingTop: 4, minWidth: 160, textAlign: "center" }}>
+                  （印）
+                </div>
+              </div>
+
+              <p style={{ fontSize: 11, color: "#666", marginTop: 24, borderTop: "1px solid #ccc", paddingTop: 8 }}>
+                {settings?.license_image_url
+                  ? "※ 本証明書には古物商許可証の写しを添付しております。"
+                  : "※ 古物商許可証の写しを別途添付してください。"
+                }
+              </p>
+            </div>
+
+            {/* Page 2: License image */}
+            {settings?.license_image_url && (
+              <div
+                className="kobutsu-cert-page2"
+                style={{
+                  background: "#fff",
+                  color: "#000",
+                  padding: "48px 56px",
+                  borderRadius: 8,
+                  marginTop: 16,
+                  maxWidth: 720,
+                  textAlign: "center",
+                }}
+              >
+                <p style={{ fontSize: 14, fontWeight: "bold", marginBottom: 24, fontFamily: "'Yu Mincho', 'Hiragino Mincho ProN', serif" }}>
+                  添付：古物商許可証写し
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={settings.license_image_url}
+                  alt="古物商許可証"
+                  style={{ maxWidth: "100%", maxHeight: 800, objectFit: "contain" }}
+                />
+              </div>
             )}
           </div>
         )}
