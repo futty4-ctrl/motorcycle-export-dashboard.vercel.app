@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from "react"
 import { MODEL_CODES, getCCRange } from "@/lib/model-codes"
+import { insertInventoryItem } from "@/lib/inventory-supabase"
+import { createEntry } from "@/lib/kobutsu"
 
 const C = {
   surface: "#111111",
@@ -72,6 +74,8 @@ type CartItem = {
   label: string
   maker: string
   cc: number
+  katashiki: string
+  chassisNumber: string
   bdsBid: number
   bdsFee: number
   shipping: number
@@ -79,6 +83,7 @@ type CartItem = {
   medianPrice: number
   profit: number
   profitMedian: number
+  venue: string
   memo: string
 }
 
@@ -88,10 +93,13 @@ export default function CheckContent() {
   const [filterCC, setFilterCC] = useState("全て")
   const [selectedModel, setSelectedModel] = useState<typeof MODEL_CODES[0] | null>(null)
   const [bdsBid, setBdsBid] = useState<number>(0)
+  const [chassisNumber, setChassisNumber] = useState("")
   const [venue, setVenue] = useState("大阪")
   const [checks, setChecks] = useState<Record<string, boolean>>({})
   const [memo, setMemo] = useState("")
   const [scanning, setScanning] = useState(false)
+  const [registering, setRegistering] = useState(false)
+  const [registerMsg, setRegisterMsg] = useState("")
   const [marketPrice, setMarketPrice] = useState<number | null>(null)
   const [medianPrice, setMedianPrice] = useState<number | null>(null)
   const [sampleCount, setSampleCount] = useState<number>(0)
@@ -129,6 +137,7 @@ export default function CheckContent() {
     setSelectedModel(model)
     setSearch(model.label)
     setBdsBid(0)
+    setChassisNumber("")
     setChecks({})
     setMemo("")
     setMarketPrice(null)
@@ -298,7 +307,7 @@ export default function CheckContent() {
             ) : null}
           </div>
 
-          {/* BDS入札・会場 */}
+          {/* BDS入札・会場・車台番号 */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
             <div>
               <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, marginBottom: 6, letterSpacing: "0.08em" }}>
@@ -322,6 +331,17 @@ export default function CheckContent() {
                 <option value="九州">九州</option>
               </select>
             </div>
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontFamily: C.font, fontSize: 10, color: C.textMuted, marginBottom: 6, letterSpacing: "0.08em" }}>
+              車台番号（落札後に入力）
+            </div>
+            <input
+              value={chassisNumber}
+              onChange={(e) => setChassisNumber(e.target.value)}
+              placeholder="例: AF27-4037504"
+              style={inputStyle}
+            />
           </div>
 
           {/* 利益判定 */}
@@ -458,6 +478,8 @@ export default function CheckContent() {
                     label: selectedModel.label,
                     maker: selectedModel.maker,
                     cc: selectedModel.cc,
+                    katashiki: selectedModel.katashiki[0] || "",
+                    chassisNumber,
                     bdsBid,
                     bdsFee,
                     shipping,
@@ -465,11 +487,13 @@ export default function CheckContent() {
                     medianPrice: medianPrice ?? 0,
                     profit: profit ?? 0,
                     profitMedian: profitMedian ?? 0,
+                    venue,
                     memo,
                   }])
                   setSearch("")
                   setSelectedModel(null)
                   setBdsBid(0)
+                  setChassisNumber("")
                   setChecks({})
                   setMemo("")
                   setMarketPrice(null)
@@ -604,6 +628,99 @@ export default function CheckContent() {
               </div>
             </div>
           </div>
+
+          {/* 仕入れ確定ボタン */}
+          <button
+            onClick={async () => {
+              if (!confirm(`${cart.length}台を在庫登録＋古物台帳に登録します。よろしいですか？`)) return
+              setRegistering(true)
+              setRegisterMsg("")
+              const today = new Date().toISOString().split("T")[0]
+              let ok = 0
+              let fail = 0
+              for (const item of cart) {
+                try {
+                  // 在庫登録
+                  const { error: invErr } = await insertInventoryItem({
+                    purchase_date: today,
+                    category: "車体",
+                    maker: item.maker,
+                    model_name: item.label,
+                    model_type: item.katashiki,
+                    chassis_number: item.chassisNumber || null,
+                    purchase_price: item.bdsBid + item.bdsFee + item.shipping,
+                    condition_memo: item.memo || null,
+                    seller_name: `BDS（${item.venue}会場）`,
+                  })
+                  if (invErr) { fail++; continue }
+
+                  // 古物台帳登録
+                  await createEntry({
+                    transaction_date: today,
+                    transaction_type: "受入",
+                    price: item.bdsBid,
+                    maker: item.maker,
+                    model: item.label,
+                    katashiki: item.katashiki,
+                    frame_no: item.chassisNumber || "",
+                    engine_no: "",
+                    displacement: `${item.cc}cc`,
+                    model_year: "",
+                    body_color: "",
+                    counterparty_name: `BDS（${item.venue}会場）`,
+                    counterparty_address: item.venue === "関東" ? "千葉県柏市金山770" : item.venue === "九州" ? "福岡県太宰府市水城6-33-40" : "大阪府堺市西区草部1114",
+                    counterparty_tel: item.venue === "関東" ? "04-7190-0640" : item.venue === "九州" ? "092-928-8150" : "072-271-6141",
+                    counterparty_occupation: "古物市場主",
+                    id_type: "不要（古物市場取引）",
+                    id_number: "",
+                    notes: `BDS落札 ${fmtFull(item.bdsBid)} + 手数料 ${fmtFull(item.bdsFee)} + 送料 ${fmtFull(item.shipping)}`,
+                  })
+                  ok++
+                } catch {
+                  fail++
+                }
+              }
+              setRegistering(false)
+              if (fail === 0) {
+                setRegisterMsg(`✅ ${ok}台を在庫＋古物台帳に登録しました`)
+                setCart([])
+              } else {
+                setRegisterMsg(`${ok}台成功、${fail}台失敗`)
+              }
+              setTimeout(() => setRegisterMsg(""), 5000)
+            }}
+            disabled={registering}
+            style={{
+              width: "100%",
+              padding: 14,
+              marginTop: 12,
+              background: registering ? C.surfaceHigh : C.green,
+              border: "none",
+              borderRadius: 10,
+              color: "#fff",
+              fontFamily: C.fontSans,
+              fontWeight: 700,
+              fontSize: 15,
+              cursor: registering ? "default" : "pointer",
+              opacity: registering ? 0.6 : 1,
+            }}
+          >
+            {registering ? "登録中..." : `仕入れ確定（${cart.length}台を在庫＋古物台帳に登録）`}
+          </button>
+          {registerMsg && (
+            <div style={{
+              marginTop: 8,
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: registerMsg.includes("✅") ? `${C.green}18` : `${C.red}18`,
+              color: registerMsg.includes("✅") ? C.green : C.red,
+              fontFamily: C.fontSans,
+              fontSize: 13,
+              textAlign: "center",
+            }}>
+              {registerMsg}
+            </div>
+          )}
         </div>
       )}
 
