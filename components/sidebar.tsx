@@ -25,17 +25,21 @@ const NAV = [
     ],
   },
   {
+    group: "仕入れ判断",
+    items: [
+      { href: "/bidding", label: "入札判断", icon: "⚡" },
+      { href: "/auction-day", label: "オークション当日", icon: "🏁" },
+      { href: "/bidding-analytics", label: "振り返り分析", icon: "📊" },
+    ],
+  },
+  {
     group: "分析",
     items: [
-      { href: "/analytics", label: "アナリティクス", icon: "◎" },
       { href: "/market", label: "市場価格", icon: "▲" },
-      { href: "/research", label: "相場リサーチ", icon: "🔍" },
       { href: "/scoreboard", label: "利益スコアボード", icon: "🏆" },
       { href: "/performance", label: "売却実績", icon: "📉" },
       { href: "/recommendation", label: "仕入れ推薦", icon: "🎯" },
       { href: "/check", label: "仕入れチェック", icon: "✅" },
-      { href: "/bds-border", label: "入札ボーダー計算", icon: "🎯" },
-      { href: "/bds-simulator", label: "BDSシミュレーター", icon: "⟳" },
       { href: "/profit-forecast", label: "在庫×期待利益", icon: "📊" },
       { href: "/monthly-progress", label: "月次進捗", icon: "📈" },
       { href: "/cashflow", label: "資金繰りシミュ", icon: "💰" },

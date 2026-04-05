@@ -43,7 +43,11 @@ export type VehicleInsert = {
 
 export type VehicleUpdate = Partial<Omit<VehicleInsert, "id">>
 
-// ========== evaluations: AI査定結果 ==========
+// ========== evaluations: AI査定結果 + 入札判断 ==========
+export type VehicleCategory = "4ミニ" | "ネイキッド" | "オフ車" | "その他"
+export type ConditionRank = "A" | "B" | "C" | "D"
+export type BidDecision = "GO" | "NO GO" | "見送り"
+
 export type EvaluationRow = {
   id: string
   vehicle_id: string
@@ -51,6 +55,20 @@ export type EvaluationRow = {
   negative_items: string[]
   created_at: string
   updated_at: string
+  // 入札判断ロジック用（トリガーで自動算出されるカラム含む）
+  vehicle_category: VehicleCategory | null
+  condition_rank: ConditionRank | null
+  estimated_sale_price: number | null
+  transport_cost: number | null
+  auction_fee_rate: number | null
+  yahoo_fee_rate: number | null
+  ad_cost: number | null
+  target_profit: number | null
+  bid_limit_best: number | null
+  bid_limit_min: number | null
+  bid_decision: BidDecision | null
+  decision_reason: string | null
+  sale_price_source: string | null
 }
 
 export type EvaluationInsert = {
@@ -60,9 +78,46 @@ export type EvaluationInsert = {
   negative_items?: string[]
   created_at?: string
   updated_at?: string
+  vehicle_category?: VehicleCategory | null
+  condition_rank?: ConditionRank | null
+  estimated_sale_price?: number | null
+  transport_cost?: number | null
+  auction_fee_rate?: number | null
+  yahoo_fee_rate?: number | null
+  ad_cost?: number | null
+  target_profit?: number | null
+  bid_limit_best?: number | null
+  bid_limit_min?: number | null
+  bid_decision?: BidDecision | null
+  decision_reason?: string | null
+  sale_price_source?: string | null
 }
 
 export type EvaluationUpdate = Partial<Omit<EvaluationInsert, "id" | "vehicle_id">>
+
+// ========== inventory_items: 出品〜結果トラッキング用の追加型 ==========
+// ※ 基本の InventoryItemRow は lib/inventory-supabase.ts を参照。
+// ここでは仕入れロジックSQLで追加された実績カラム用の enum と update 型のみ定義。
+export type AuctionSource = "BDS" | "JBA" | "OMC" | "ヤフオク" | "その他"
+export type ListingEndDay = "月" | "火" | "水" | "木" | "金" | "土" | "日"
+
+export type InventoryActualsUpdate = {
+  photo_count?: number | null
+  has_video?: boolean | null
+  listing_ad_cost?: number | null
+  listing_start_price?: number | null
+  listing_end_day?: ListingEndDay | null
+  listing_end_time?: string | null
+  listing_duration_days?: number | null
+  watch_count?: number | null
+  bid_count?: number | null
+  bidder_count?: number | null
+  auction_source?: AuctionSource | null
+  transport_cost_actual?: number | null
+  bds_fee_actual?: number | null
+  sold_price?: number | null
+  sold_date?: string | null
+}
 
 // ========== scenarios: 利益計算結果 ==========
 export type ScenarioRow = {

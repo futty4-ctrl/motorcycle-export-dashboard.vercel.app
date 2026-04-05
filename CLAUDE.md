@@ -95,3 +95,94 @@
 - 常にこのビジネスコンテキストを前提に回答すること
 - 数字が絡む質問は必ず `bds-border-content.tsx` を確認してから答えること
 - 社長（ふっちー）の意思決定をサポートする立場で動くこと
+
+---
+
+## BDS仕入れロジック（入札判断システム）
+
+### テーブル構造の変更点
+
+#### evaluations テーブル（追加カラム）
+| カラム | 型 | デフォルト | 用途 |
+|---|---|---|---|
+| vehicle_category | text | - | 4ミニ/ネイキッド/オフ車/その他 |
+| condition_rank | text | - | A/B/C/D（状態評価ランク） |
+| estimated_sale_price | numeric | - | 想定売価（オークファン中央値） |
+| transport_cost | numeric | 20000 | 陸送費 |
+| auction_fee_rate | numeric | 0.10 | BDS手数料率 |
+| yahoo_fee_rate | numeric | 0.088 | ヤフオク手数料率 |
+| ad_cost | numeric | 700 | 広告費（100円×7日） |
+| target_profit | numeric | 50000 | 目標利益 |
+| bid_limit_best | numeric | 自動算出 | 入札上限（利益5万） |
+| bid_limit_min | numeric | 自動算出 | 入札上限（利益2万） |
+| bid_decision | text | - | GO/NO GO/見送り |
+| decision_reason | text | - | 判断理由メモ |
+| sale_price_source | text | - | 想定売価の根拠URL等 |
+
+#### inventory_items テーブル（追加カラム）
+| カラム | 型 | デフォルト | 用途 |
+|---|---|---|---|
+| photo_count | integer | - | 出品写真枚数 |
+| has_video | boolean | false | 動画有無 |
+| listing_ad_cost | numeric | 700 | 広告費実績 |
+| listing_start_price | integer | 1 | 開始価格（1円 or その他） |
+| listing_end_day | text | - | 終了曜日（月〜日） |
+| listing_end_time | text | - | 終了時間帯 |
+| listing_duration_days | integer | 7 | 出品期間（日数） |
+| watch_count | integer | - | ウォッチ数 |
+| bid_count | integer | - | 入札数 |
+| bidder_count | integer | - | 入札者数（ユニーク） |
+| days_in_stock | integer | 自動算出 | 在庫日数（仕入れ→売却） |
+| actual_profit | numeric | 自動算出 | 実利益 |
+| auction_source | text | - | 仕入れ元（BDS/JBA/OMC/ヤフオク/その他） |
+| transport_cost_actual | numeric | - | 陸送費実績 |
+| bds_fee_actual | numeric | - | BDS手数料実績 |
+
+### 入札上限の算出式
+
+```
+bid_limit = (estimated_sale_price × (1 - yahoo_fee_rate) - transport_cost - repair_cost_estimate - ad_cost - target_profit) / (1 + auction_fee_rate)
+```
+
+- bid_limit_best: target_profit = 50,000 で算出
+- bid_limit_min: target_profit = 20,000 で算出
+- 15万円キャップ: LEAST(計算値, 150000) を適用
+- トリガー関数 `calc_bid_limits()` が INSERT/UPDATE 時に自動算出
+
+### 仕入れ判断4軸（絶対ルール）
+
+1. **車種可否**
+   - 4ミニ（モンキー・ゴリラ・ダックス・シャリー）→ 常にGO
+   - ネイキッド・オフ車 → ヤフオク落札相場が直近3ヶ月で5件以上あるもののみ
+   - それ以外 → 見送り
+
+2. **入札上限を超えないか**
+   - bid_limit_min を超えたら絶対に入札しない
+   - 仕入れ上限キャップ: 15万円（計算上余裕があっても）
+
+3. **整備費の見積もり**
+   - エンジン始動OK・外装並 → ¥0
+   - エンジン始動OK・外装難あり → ¥10,000
+   - エンジン不動・その他良好 → ¥30,000
+   - エンジン不動・外装難あり → 見送り
+
+4. **想定売価の根拠**
+   - オークファンで同車種・同程度の直近3ヶ月落札相場の中央値を採用
+   - 「高く売れるかも」は禁止。中央値以上で計算しない
+
+### 実利益の自動算出
+
+トリガー関数 `calc_actual_profit()` が inventory_items の UPDATE 時に自動算出:
+```
+actual_profit = sold_price - purchase_price - bds_fee_actual - transport_cost_actual - listing_ad_cost - (sold_price × 0.088)
+```
+days_in_stock = sold_date - purchase_date
+
+### データ分析の目的
+
+最初の20〜30台のデータで以下を検証する:
+- 車種カテゴリ別の平均利益
+- 動画あり/なしの落札額差分
+- 終了曜日・時間帯と入札数の相関
+- 広告効果（ウォッチ数・入札数への影響）
+- 在庫日数と利益率の関係
