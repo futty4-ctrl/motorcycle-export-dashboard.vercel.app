@@ -15,6 +15,7 @@ import {
   lbl,
   badge,
 } from "@/components/ui-system"
+import { BiddingSummaryCards } from "@/components/bidding-summary-cards"
 
 const GOAL = 1000000
 const fmt = (n: number) => `¥${n.toLocaleString()}`
@@ -97,6 +98,8 @@ export function DashboardContent() {
           </span>
         </div>
       </div>
+
+      <BiddingSummaryCards />
 
       <div
         style={{

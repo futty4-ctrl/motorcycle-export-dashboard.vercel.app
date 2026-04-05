@@ -6,6 +6,7 @@ import {
   listBiddingEvaluations,
 } from "@/app/actions/bidding"
 import { getOwnMarketStats, type OwnMarketStats } from "@/app/actions/own-market-stats"
+import { analyzeCondition, type ConditionAiResult } from "@/app/actions/condition-ai"
 import { previewBidLimits } from "@/lib/bidding-calc"
 import type {
   EvaluationRow,
@@ -142,6 +143,10 @@ export default function BiddingContent() {
   const [sortBy, setSortBy] = useState<"date" | "price_asc" | "price_desc" | "bids_desc">("date")
   // 自社実績
   const [ownStats, setOwnStats] = useState<OwnMarketStats | null>(null)
+  // AI状態判定
+  const [analyzing, setAnalyzing] = useState(false)
+  const [aiResult, setAiResult] = useState<ConditionAiResult | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
   const [fetchingMarket, setFetchingMarket] = useState(false)
   const [marketStats, setMarketStats] = useState<{
     count: number
@@ -390,6 +395,43 @@ export default function BiddingContent() {
 
   const applyMarketPrice = (price: number) => {
     setSalePrice(String(price))
+  }
+
+  const handlePhotoUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setAnalyzing(true)
+    setAiError(null)
+    setAiResult(null)
+    try {
+      const images = await Promise.all(
+        Array.from(files).map(
+          (file) =>
+            new Promise<{ base64: string; mimeType: string }>((resolve, reject) => {
+              const reader = new FileReader()
+              reader.onload = () => {
+                const result = reader.result as string
+                const base64 = result.split(",")[1] ?? ""
+                resolve({ base64, mimeType: file.type })
+              }
+              reader.onerror = () => reject(new Error("ファイル読み込み失敗"))
+              reader.readAsDataURL(file)
+            })
+        )
+      )
+      const res = await analyzeCondition(images)
+      if (res.success && res.result) {
+        setAiResult(res.result)
+        // フォームに反映
+        setRank(res.result.rank)
+        setRepairCost(String(res.result.repairCostEstimate))
+      } else {
+        setAiError(res.error ?? "判定に失敗しました")
+      }
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "アップロードに失敗しました")
+    } finally {
+      setAnalyzing(false)
+    }
   }
 
   const handleReset = () => {
@@ -1095,6 +1137,172 @@ export default function BiddingContent() {
           >
             # NEW_EVALUATION
           </h2>
+
+          {/* 写真AI状態判定 */}
+          <div
+            style={{
+              padding: 12,
+              background: C.surfaceHigh,
+              border: `1px dashed ${C.border}`,
+              borderRadius: 8,
+              marginBottom: 14,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                flexWrap: "wrap",
+                marginBottom: aiResult || aiError ? 10 : 0,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontFamily: C.font,
+                    fontSize: 10,
+                    color: C.blue,
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  📸 写真AI状態判定
+                </div>
+                <div
+                  style={{
+                    fontFamily: C.font,
+                    fontSize: 10,
+                    color: C.textMuted,
+                    marginTop: 2,
+                  }}
+                >
+                  複数写真アップロード → AIが A/B/C/D ランク + 整備費を判定
+                </div>
+              </div>
+              <label
+                style={{
+                  ...btnStyle,
+                  background: C.blue,
+                  color: "#000",
+                  opacity: analyzing ? 0.6 : 1,
+                  cursor: analyzing ? "wait" : "pointer",
+                  display: "inline-block",
+                }}
+              >
+                {analyzing ? "判定中..." : "写真を選択"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => handlePhotoUpload(e.target.files)}
+                  disabled={analyzing}
+                  style={{ display: "none" }}
+                />
+              </label>
+            </div>
+
+            {aiError && (
+              <div
+                style={{
+                  padding: 8,
+                  background: "rgba(239,68,68,0.1)",
+                  color: C.red,
+                  borderRadius: 6,
+                  fontSize: 11,
+                }}
+              >
+                {aiError}
+              </div>
+            )}
+
+            {aiResult && (
+              <div
+                style={{
+                  padding: 10,
+                  background: "rgba(59,130,246,0.08)",
+                  border: `1px solid ${C.blue}`,
+                  borderRadius: 6,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    marginBottom: 6,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontFamily: C.font,
+                        fontSize: 9,
+                        color: C.textSub,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      AI判定ランク
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: C.font,
+                        fontSize: 28,
+                        fontWeight: 700,
+                        color: C.blue,
+                        lineHeight: 1,
+                      }}
+                    >
+                      {aiResult.rank}
+                    </div>
+                  </div>
+                  <div>
+                    <div
+                      style={{
+                        fontFamily: C.font,
+                        fontSize: 9,
+                        color: C.textSub,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      整備費見積
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: C.font,
+                        fontSize: 18,
+                        fontWeight: 700,
+                        color: C.text,
+                      }}
+                    >
+                      {fmt(aiResult.repairCostEstimate)}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: C.textSub,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {aiResult.reasoning}
+                </div>
+                {aiResult.negativeItems.length > 0 && (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 10,
+                      color: C.textMuted,
+                    }}
+                  >
+                    指摘: {aiResult.negativeItems.join(" / ")}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div
             style={{
