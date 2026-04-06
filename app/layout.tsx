@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "MotoExport",
+    title: "MotoExport Pro",
   },
   viewport: {
     width: "device-width",
