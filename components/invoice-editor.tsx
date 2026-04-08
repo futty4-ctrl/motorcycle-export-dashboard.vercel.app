@@ -128,7 +128,7 @@ export default function InvoiceEditor({
   const [myZip, setMyZip] = useState(SENDER_DEFAULTS.zip)
   const [myAddress, setMyAddress] = useState(SENDER_DEFAULTS.address)
   const [myTel, setMyTel] = useState(SENDER_DEFAULTS.tel)
-  const [sealImageDataUrl, setSealImageDataUrl] = useState("")
+  const [sealImageDataUrl, setSealImageDataUrl] = useState("/seal.svg")
   const sealInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -830,8 +830,26 @@ export default function InvoiceEditor({
                         cursor: "pointer",
                       }}
                     >
-                      削除
+                      外す
                     </button>
+                    {sealImageDataUrl !== "/seal.svg" && (
+                      <button
+                        type="button"
+                        onClick={() => setSealImageDataUrl("/seal.svg")}
+                        style={{
+                          padding: "7px 14px",
+                          background: "none",
+                          border: `1px solid ${C.border}`,
+                          borderRadius: 6,
+                          color: C.textSub,
+                          fontFamily: C.fontSans,
+                          fontSize: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        デフォルトに戻す
+                      </button>
+                    )}
                     <img
                       src={sealImageDataUrl}
                       alt="印鑑"
