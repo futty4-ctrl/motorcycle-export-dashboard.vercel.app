@@ -18,12 +18,14 @@ import {
   Flag,
   LineChart,
   FileText,
+  History,
 } from "lucide-react"
 
 const navItems = [
   { label: "ダッシュボード", href: "/", icon: LayoutDashboard },
   { label: "入札判断", href: "/bidding", icon: Zap },
   { label: "オークション当日", href: "/auction-day", icon: Flag },
+  { label: "オークション履歴", href: "/auction-history", icon: History },
   { label: "振り返り分析", href: "/bidding-analytics", icon: LineChart },
   { label: "BDS個票査定", href: "/assess", icon: FileCheck },
   { label: "相場比較", href: "/market", icon: TrendingUp },

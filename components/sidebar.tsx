@@ -29,6 +29,7 @@ const NAV = [
     items: [
       { href: "/bidding", label: "入札判断", icon: "⚡" },
       { href: "/auction-day", label: "オークション当日", icon: "🏁" },
+      { href: "/auction-history", label: "オークション履歴", icon: "📚" },
       { href: "/bidding-analytics", label: "振り返り分析", icon: "📊" },
     ],
   },
