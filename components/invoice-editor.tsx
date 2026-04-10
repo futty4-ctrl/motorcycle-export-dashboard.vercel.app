@@ -128,7 +128,7 @@ export default function InvoiceEditor({
   const [myZip, setMyZip] = useState(SENDER_DEFAULTS.zip)
   const [myAddress, setMyAddress] = useState(SENDER_DEFAULTS.address)
   const [myTel, setMyTel] = useState(SENDER_DEFAULTS.tel)
-  const [sealImageDataUrl, setSealImageDataUrl] = useState("/seal.svg")
+  const [sealImageDataUrl, setSealImageDataUrl] = useState("/seal.png")
   const sealInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -297,8 +297,7 @@ export default function InvoiceEditor({
         </div>
       </div>
       <div style="text-align:right;font-size:7.5pt;line-height:1.6;min-width:48mm;margin-left:6mm;position:relative">
-        ${sealImageDataUrl ? `<img src="${sealImageDataUrl}" style="position:absolute;top:0;right:0;width:18mm;height:18mm;object-fit:contain;opacity:0.85" />` : ""}
-        <div style="font-weight:700;font-size:9pt;padding-right:${sealImageDataUrl ? "20mm" : "0"}">${myName}</div>
+        <div style="font-weight:700;font-size:9pt;position:relative;display:inline-block">${myName}${sealImageDataUrl ? `<img src="${sealImageDataUrl}" style="position:absolute;top:50%;right:-16mm;transform:translateY(-50%);width:16mm;height:16mm;object-fit:contain;opacity:0.8" />` : ""}</div>
         <div>${myZip}</div>
         <div>${myAddress}</div>
         <div>TEL：${myTel}</div>
@@ -832,10 +831,10 @@ export default function InvoiceEditor({
                     >
                       外す
                     </button>
-                    {sealImageDataUrl !== "/seal.svg" && (
+                    {sealImageDataUrl !== "/seal.png" && (
                       <button
                         type="button"
-                        onClick={() => setSealImageDataUrl("/seal.svg")}
+                        onClick={() => setSealImageDataUrl("/seal.png")}
                         style={{
                           padding: "7px 14px",
                           background: "none",
@@ -1295,28 +1294,30 @@ function PrintPreview({
             position: "relative",
           }}
         >
-          {sealImageDataUrl && (
-            <img
-              src={sealImageDataUrl}
-              alt="印鑑"
-              style={{
-                position: "absolute",
-                top: 0,
-                right: 0,
-                width: "18mm",
-                height: "18mm",
-                objectFit: "contain",
-                opacity: 0.85,
-              }}
-            />
-          )}
           <div
             style={{
               fontWeight: 700,
               fontSize: "11pt",
-              paddingRight: sealImageDataUrl ? "20mm" : 0,
+              position: "relative",
+              display: "inline-block",
             }}
           >
+            {sealImageDataUrl && (
+              <img
+                src={sealImageDataUrl}
+                alt="印鑑"
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  right: "-18mm",
+                  transform: "translateY(-50%)",
+                  width: "16mm",
+                  height: "16mm",
+                  objectFit: "contain",
+                  opacity: 0.8,
+                }}
+              />
+            )}
             {myName}
           </div>
           <div>{myZip}</div>

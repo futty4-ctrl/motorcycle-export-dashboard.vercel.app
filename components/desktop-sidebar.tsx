@@ -17,6 +17,7 @@ import {
   Zap,
   Flag,
   LineChart,
+  FileText,
 } from "lucide-react"
 
 const navItems = [
@@ -27,6 +28,7 @@ const navItems = [
   { label: "BDS個票査定", href: "/assess", icon: FileCheck },
   { label: "相場比較", href: "/market", icon: TrendingUp },
   { label: "見積・請求", href: "/documents", icon: Calculator },
+  { label: "帳票発行", href: "/doc-generator", icon: FileText },
   { label: "在庫管理", href: "/inventory", icon: Package },
   { label: "eBay出品", href: "/ebay", icon: ShoppingBag },
   { label: "取扱説明書", href: "/manual", icon: BookOpen },

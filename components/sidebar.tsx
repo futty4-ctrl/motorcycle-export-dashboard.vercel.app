@@ -51,6 +51,7 @@ const NAV = [
     items: [
       { href: "/yahoo-template", label: "出品テンプレ", icon: "📝" },
       { href: "/invoices", label: "請求書・見積書", icon: "🧾" },
+      { href: "/doc-generator", label: "帳票発行", icon: "📄" },
       { href: "/kobutsu", label: "古物台帳", icon: "📋" },
       { href: "/documents", label: "ドキュメント", icon: "◻" },
       { href: "/settings", label: "設定", icon: "⚙" },
