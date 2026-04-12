@@ -17,8 +17,9 @@ import { AuctionFilters } from "./components/AuctionFilters"
 import { AuctionTable } from "./components/AuctionTable"
 import { AuctionCharts } from "./components/AuctionCharts"
 import { AuctionDetailModal } from "./components/AuctionDetailModal"
+import { AuctionImport } from "./components/AuctionImport"
 
-type Tab = "list" | "charts"
+type Tab = "list" | "charts" | "import"
 
 export default function AuctionHistoryPage() {
   const [rows, setRows] = useState<AuctionHistoryRecord[]>([])
@@ -109,6 +110,7 @@ export default function AuctionHistoryPage() {
           [
             { key: "list", label: "一覧" },
             { key: "charts", label: "分析" },
+            { key: "import", label: "BDS取込" },
           ] as { key: Tab; label: string }[]
         ).map((t) => {
           const active = tab === t.key
@@ -153,6 +155,7 @@ export default function AuctionHistoryPage() {
 
       {tab === "list" && <AuctionTable rows={rows} onRowClick={setSelected} />}
       {tab === "charts" && <AuctionCharts rows={rows} />}
+      {tab === "import" && <AuctionImport onImported={loadData} />}
 
       <AuctionDetailModal
         record={selected}
