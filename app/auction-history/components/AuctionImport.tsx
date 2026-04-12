@@ -212,6 +212,13 @@ function parseBdsTextV2(text: string): ParsedRow[] {
         continue
       }
 
+      // 車台番号: 英字+数字-数字パターン (C50-0617, NC47-1003, JA10-1006, AA01-1765*)
+      // ★ 排気量やスコアより先に判定する（数字を含むが-がある）
+      if (/^[A-Z][A-Z0-9]*-[\d*]+/.test(p) && !chassis_number) {
+        chassis_number = p
+        continue
+      }
+
       // 排気量: 数字cc
       if (/^\d+cc$/.test(p)) {
         displacement_cc = parseInt(p, 10)
@@ -257,12 +264,6 @@ function parseBdsTextV2(text: string): ParsedRow[] {
           start_price = n
           continue
         }
-      }
-
-      // 車台番号: 英数字-数字パターン
-      if (/^[A-Z]{2,}\d{2,}-\d+/.test(p) && !chassis_number) {
-        chassis_number = p
-        continue
       }
 
       // 車名: maker_code設定済み & model_nameまだ
