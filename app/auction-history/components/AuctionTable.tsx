@@ -1,8 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import type { AuctionHistoryRecord } from "@/types/auction-history"
+import type { AuctionHistoryRecord, AuctionTypeKind } from "@/types/auction-history"
 import { C, badge, table, th, td } from "@/components/ui-system"
+import { estimatedProfit, isBuyCandidate } from "@/lib/auction-profit"
 
 interface Props {
   rows: AuctionHistoryRecord[]
@@ -16,8 +17,11 @@ type SortKey =
   | "mileage_km"
   | "start_price"
   | "sold_price"
+  | "estimated_profit"
   | "result_status"
   | "region"
+
+type SubTab = "all" | "蚤の市" | "定例"
 
 const PAGE_SIZE = 20
 
@@ -47,12 +51,22 @@ export function AuctionTable({ rows, onRowClick }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("auction_date")
   const [sortAsc, setSortAsc] = useState(false)
   const [page, setPage] = useState(0)
+  const [subTab, setSubTab] = useState<SubTab>("all")
+  const [candidateOnly, setCandidateOnly] = useState(false)
+
+  const filtered = useMemo(() => {
+    return rows.filter((r) => {
+      if (subTab !== "all" && r.auction_type !== (subTab as AuctionTypeKind)) return false
+      if (candidateOnly && !isBuyCandidate(r)) return false
+      return true
+    })
+  }, [rows, subTab, candidateOnly])
 
   const sorted = useMemo(() => {
-    const copy = [...rows]
+    const copy = [...filtered]
     copy.sort((a, b) => {
-      const av = a[sortKey]
-      const bv = b[sortKey]
+      const av = sortKey === "estimated_profit" ? estimatedProfit(a) : a[sortKey]
+      const bv = sortKey === "estimated_profit" ? estimatedProfit(b) : b[sortKey]
       if (av == null && bv == null) return 0
       if (av == null) return 1
       if (bv == null) return -1
@@ -64,7 +78,12 @@ export function AuctionTable({ rows, onRowClick }: Props) {
       return sortAsc ? as.localeCompare(bs) : bs.localeCompare(as)
     })
     return copy
-  }, [rows, sortKey, sortAsc])
+  }, [filtered, sortKey, sortAsc])
+
+  const candidateCount = useMemo(
+    () => filtered.filter((r) => isBuyCandidate(r)).length,
+    [filtered]
+  )
 
   const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
   const current = Math.min(page, pageCount - 1)
@@ -93,6 +112,12 @@ export function AuctionTable({ rows, onRowClick }: Props) {
     </th>
   )
 
+  const subTabs: { key: SubTab; label: string }[] = [
+    { key: "all", label: "全て" },
+    { key: "蚤の市", label: "蚤の市" },
+    { key: "定例", label: "定例" },
+  ]
+
   return (
     <div
       style={{
@@ -102,6 +127,69 @@ export function AuctionTable({ rows, onRowClick }: Props) {
         overflow: "hidden",
       }}
     >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "10px 14px",
+          borderBottom: `1px solid ${C.border}`,
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", gap: 4 }}>
+          {subTabs.map((t) => {
+            const active = subTab === t.key
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => {
+                  setSubTab(t.key)
+                  setPage(0)
+                }}
+                style={{
+                  padding: "6px 14px",
+                  background: active ? C.orange : "transparent",
+                  border: `1px solid ${active ? C.orange : C.border}`,
+                  color: active ? "#000" : C.textSub,
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: "bold",
+                }}
+              >
+                {t.label}
+              </button>
+            )
+          })}
+        </div>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 12,
+            color: C.textSub,
+            cursor: "pointer",
+            userSelect: "none",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={candidateOnly}
+            onChange={(e) => {
+              setCandidateOnly(e.target.checked)
+              setPage(0)
+            }}
+          />
+          仕入候補のみ（≤15万 & 予測利益≥3万）
+          <span style={{ color: C.orange, fontFamily: "monospace" }}>
+            {candidateCount}件
+          </span>
+        </label>
+      </div>
       <div style={{ overflowX: "auto" }}>
         <table style={table}>
           <thead>
@@ -112,6 +200,7 @@ export function AuctionTable({ rows, onRowClick }: Props) {
               {headerCell("mileage_km", "走行", "right")}
               {headerCell("start_price", "開始", "right")}
               {headerCell("sold_price", "落札", "right")}
+              {headerCell("estimated_profit", "予測利益", "right")}
               {headerCell("result_status", "結果")}
               <th style={th}>種別</th>
               {headerCell("region", "地域")}
@@ -122,27 +211,32 @@ export function AuctionTable({ rows, onRowClick }: Props) {
             {pageRows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={10}
+                  colSpan={11}
                   style={{ ...td, textAlign: "center", padding: 40, color: C.textMuted }}
                 >
                   データがありません
                 </td>
               </tr>
             ) : (
-              pageRows.map((r) => (
+              pageRows.map((r) => {
+                const profit = estimatedProfit(r)
+                const candidate = isBuyCandidate(r)
+                const baseBg = candidate ? "rgba(34,197,94,0.08)" : "transparent"
+                return (
                 <tr
                   key={r.id}
                   style={{
                     cursor: "pointer",
                     transition: "background 0.1s",
+                    background: baseBg,
+                    borderLeft: candidate ? `3px solid ${C.green}` : "3px solid transparent",
                   }}
                   onMouseEnter={(e) => {
                     ;(e.currentTarget as HTMLTableRowElement).style.background =
                       "rgba(245,114,10,0.08)"
                   }}
                   onMouseLeave={(e) => {
-                    ;(e.currentTarget as HTMLTableRowElement).style.background =
-                      "transparent"
+                    ;(e.currentTarget as HTMLTableRowElement).style.background = baseBg
                   }}
                   onClick={() => onRowClick(r)}
                 >
@@ -168,12 +262,31 @@ export function AuctionTable({ rows, onRowClick }: Props) {
                   >
                     {formatPrice(r.sold_price)}
                   </td>
+                  <td
+                    style={{
+                      ...td,
+                      textAlign: "right",
+                      fontFamily: "monospace",
+                      color:
+                        profit == null
+                          ? C.textMuted
+                          : profit >= 30000
+                            ? C.green
+                            : profit >= 0
+                              ? C.textSub
+                              : C.red,
+                      fontWeight: profit != null && profit >= 30000 ? "bold" : "normal",
+                    }}
+                  >
+                    {profit == null ? "-" : formatPrice(profit)}
+                  </td>
                   <td style={td}>{resultBadge(r.result_status)}</td>
                   <td style={td}>{typeBadge(r.record_type)}</td>
                   <td style={td}>{r.region || "-"}</td>
                   <td style={td}>{r.auction_type || "-"}</td>
                 </tr>
-              ))
+                )
+              })
             )}
           </tbody>
         </table>
