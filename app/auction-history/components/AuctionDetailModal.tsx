@@ -11,16 +11,62 @@ interface Props {
   onUpdated: () => void
 }
 
-function calcBidLimit(r: AuctionHistoryRecord): number | null {
+function calcBidLimitAt(r: AuctionHistoryRecord, targetProfit: number): number | null {
   if (!r.market_min_price || !r.market_max_price) return null
   const assumedSale = (r.market_min_price + r.market_max_price) / 2
   const yahooTakeHome = assumedSale * 0.912
-  return Math.max(0, Math.round((yahooTakeHome - 20000 - 700 - 30000) / 1.1))
+  return Math.max(0, Math.round((yahooTakeHome - 20000 - 700 - targetProfit) / 1.1))
 }
 
 function formatPrice(n: number | null): string {
   if (!n) return "-"
   return `¥${n.toLocaleString()}`
+}
+
+// parts_included "総5 E5 F5 外3 R5 電5 車5" を 7項目スコアに分解
+const SCORE_KEYS = ["総", "E", "F", "外", "R", "電", "車"] as const
+const SCORE_LABELS: Record<string, string> = {
+  総: "総合", E: "ｴﾝｼﾞﾝ", F: "F足", 外: "外装", R: "R足", 電: "電装", 車: "車台",
+}
+function parseScores(parts: string | null): Record<string, number | null> {
+  const out: Record<string, number | null> = {}
+  for (const k of SCORE_KEYS) out[k] = null
+  if (!parts) return out
+  for (const k of SCORE_KEYS) {
+    const m = parts.match(new RegExp(`${k}(\\d+)`))
+    if (m) out[k] = parseInt(m[1], 10)
+  }
+  return out
+}
+
+// notes を [出品店申告]/[BDS報告]/[検査]/その他 に分解
+function parseNotes(notes: string): {
+  seller: string
+  bds: string
+  inspection: string[]
+  other: string
+} {
+  const res = { seller: "", bds: "", inspection: [] as string[], other: "" }
+  if (!notes) return res
+  const sections = notes.split(/\n(?=\[)/)
+  const otherParts: string[] = []
+  for (const s of sections) {
+    if (s.startsWith("[出品店申告]")) res.seller = s.replace(/^\[出品店申告\]\s*/, "").trim()
+    else if (s.startsWith("[BDS報告]")) res.bds = s.replace(/^\[BDS報告\]\s*/, "").trim()
+    else if (s.startsWith("[検査]")) {
+      res.inspection = s.replace(/^\[検査\]\s*/, "").split("|").map((x) => x.trim()).filter(Boolean)
+    } else otherParts.push(s.trim())
+  }
+  res.other = otherParts.filter(Boolean).join("\n")
+  return res
+}
+
+function scoreColor(n: number | null): string {
+  if (n == null) return "#525252"
+  if (n >= 7) return "#22c55e"
+  if (n >= 5) return "#f5f5f5"
+  if (n >= 4) return "#f97316"
+  return "#ef4444"
 }
 
 export function AuctionDetailModal({ record, onClose, onUpdated }: Props) {
@@ -39,7 +85,12 @@ export function AuctionDetailModal({ record, onClose, onUpdated }: Props) {
 
   if (!record) return null
 
-  const bidLimit = calcBidLimit(record)
+  const bidLimit2 = calcBidLimitAt(record, 20000)
+  const bidLimit3 = calcBidLimitAt(record, 30000)
+  const bidLimit5 = calcBidLimitAt(record, 50000)
+  const scores = parseScores(record.parts_included)
+  const hasScores = Object.values(scores).some((v) => v != null)
+  const noteSections = parseNotes(record.notes || "")
 
   const handleSave = async () => {
     setSaving(true)
@@ -199,8 +250,41 @@ export function AuctionDetailModal({ record, onClose, onUpdated }: Props) {
           <Field label="車検" value={record.inspection} />
           <Field label="車台番号" value={record.chassis_number} mono />
           <Field label="エンジン型式" value={record.engine_model} mono />
-          <Field label="付属品" value={record.parts_included} span={3} />
         </div>
+
+        {/* 7項目スコア */}
+        {hasScores && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7, 1fr)",
+              gap: 8,
+              marginBottom: 20,
+              padding: 14,
+              background: C.surface,
+              borderRadius: 8,
+              border: `1px solid ${C.border}`,
+            }}
+          >
+            {SCORE_KEYS.map((k) => (
+              <div key={k} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: 0.5 }}>
+                  {SCORE_LABELS[k]}
+                </div>
+                <div
+                  style={{
+                    fontSize: 22,
+                    fontFamily: "monospace",
+                    fontWeight: "bold",
+                    color: scoreColor(scores[k]),
+                  }}
+                >
+                  {scores[k] ?? "-"}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 価格情報 */}
         <div
@@ -229,13 +313,13 @@ export function AuctionDetailModal({ record, onClose, onUpdated }: Props) {
           />
         </div>
 
-        {/* 相場情報 + 入札上限 */}
+        {/* 相場情報 */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
+            gridTemplateColumns: "repeat(3, 1fr)",
             gap: 14,
-            marginBottom: 20,
+            marginBottom: 12,
             padding: 16,
             background: C.surface,
             borderRadius: 8,
@@ -245,13 +329,127 @@ export function AuctionDetailModal({ record, onClose, onUpdated }: Props) {
           <Field label="相場サンプル数" value={record.market_sold_count?.toString() ?? null} />
           <Field label="相場・最低" value={formatPrice(record.market_min_price)} mono />
           <Field label="相場・最高" value={formatPrice(record.market_max_price)} mono />
-          <Field
-            label="入札上限（計算）"
-            value={bidLimit != null ? `¥${bidLimit.toLocaleString()}` : "-"}
-            mono
-            highlight={C.orange}
-          />
         </div>
+
+        {/* 入札上限 3段階 */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 10,
+            marginBottom: 20,
+          }}
+        >
+          {[
+            { label: "利益 2万", v: bidLimit2, color: C.green },
+            { label: "利益 3万", v: bidLimit3, color: C.orange },
+            { label: "利益 5万", v: bidLimit5, color: C.red },
+          ].map((t) => (
+            <div
+              key={t.label}
+              style={{
+                padding: "14px 16px",
+                background: C.surface,
+                borderRadius: 8,
+                border: `1px solid ${t.color}40`,
+                borderLeft: `3px solid ${t.color}`,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  color: t.color,
+                  letterSpacing: 1.5,
+                  fontWeight: "bold",
+                  marginBottom: 6,
+                }}
+              >
+                {t.label}で落とすなら
+              </div>
+              <div
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: 22,
+                  fontWeight: "bold",
+                  color: t.v != null && t.v > 0 ? t.color : C.textMuted,
+                }}
+              >
+                {t.v != null && t.v > 0 ? `¥${t.v.toLocaleString()}` : "不可"}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* 出品店申告 / BDS報告 / 検査詳細 */}
+        {(noteSections.seller || noteSections.bds || noteSections.inspection.length > 0) && (
+          <div style={{ marginBottom: 20, display: "grid", gap: 12 }}>
+            {noteSections.seller && (
+              <div
+                style={{
+                  padding: 14,
+                  background: C.surface,
+                  borderRadius: 8,
+                  borderLeft: `3px solid ${C.green}`,
+                }}
+              >
+                <div style={{ fontSize: 10, color: C.green, letterSpacing: 1.5, fontWeight: "bold", marginBottom: 6 }}>
+                  出品店申告
+                </div>
+                <div style={{ fontSize: 14, color: C.text, lineHeight: 1.6 }}>
+                  {noteSections.seller}
+                </div>
+              </div>
+            )}
+            {noteSections.bds && (
+              <div
+                style={{
+                  padding: 14,
+                  background: C.surface,
+                  borderRadius: 8,
+                  borderLeft: `3px solid ${C.orange}`,
+                }}
+              >
+                <div style={{ fontSize: 10, color: C.orange, letterSpacing: 1.5, fontWeight: "bold", marginBottom: 6 }}>
+                  BDS報告
+                </div>
+                <div style={{ fontSize: 14, color: C.text, lineHeight: 1.6 }}>
+                  {noteSections.bds}
+                </div>
+              </div>
+            )}
+            {noteSections.inspection.length > 0 && (
+              <div
+                style={{
+                  padding: 14,
+                  background: C.surface,
+                  borderRadius: 8,
+                  borderLeft: `3px solid ${C.textSub}`,
+                }}
+              >
+                <div style={{ fontSize: 10, color: C.textSub, letterSpacing: 1.5, fontWeight: "bold", marginBottom: 10 }}>
+                  検査詳細（{noteSections.inspection.length}項目）
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  {noteSections.inspection.map((item, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        fontSize: 12,
+                        color: C.text,
+                        padding: "6px 10px",
+                        background: C.bg,
+                        borderRadius: 4,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ユーザー入力エリア */}
         <div
