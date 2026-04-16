@@ -55,7 +55,7 @@ export default function AuctionHistoryPage() {
   }, [])
 
   return (
-    <div style={{ padding: "32px 40px", maxWidth: 1400, margin: "0 auto" }}>
+    <div style={{ padding: "clamp(14px, 3vw, 32px) clamp(12px, 3vw, 40px)", maxWidth: 1400, margin: "0 auto" }}>
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
           <h1

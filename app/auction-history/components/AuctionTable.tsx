@@ -53,14 +53,21 @@ export function AuctionTable({ rows, onRowClick }: Props) {
   const [page, setPage] = useState(0)
   const [subTab, setSubTab] = useState<SubTab>("all")
   const [candidateOnly, setCandidateOnly] = useState(false)
+  const [enrichedOnly, setEnrichedOnly] = useState(false)
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       if (subTab !== "all" && r.auction_type !== (subTab as AuctionTypeKind)) return false
       if (candidateOnly && !isBuyCandidate(r)) return false
+      if (enrichedOnly && r.market_max_price == null) return false
       return true
     })
-  }, [rows, subTab, candidateOnly])
+  }, [rows, subTab, candidateOnly, enrichedOnly])
+
+  const enrichedCount = useMemo(
+    () => filtered.filter((r) => r.market_max_price != null).length,
+    [filtered]
+  )
 
   const sorted = useMemo(() => {
     const copy = [...filtered]
@@ -165,30 +172,56 @@ export function AuctionTable({ rows, onRowClick }: Props) {
             )
           })}
         </div>
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 12,
-            color: C.textSub,
-            cursor: "pointer",
-            userSelect: "none",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={candidateOnly}
-            onChange={(e) => {
-              setCandidateOnly(e.target.checked)
-              setPage(0)
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              color: C.textSub,
+              cursor: "pointer",
+              userSelect: "none",
             }}
-          />
-          仕入候補のみ（≤15万 & 予測利益≥3万）
-          <span style={{ color: C.orange, fontFamily: "monospace" }}>
-            {candidateCount}件
-          </span>
-        </label>
+          >
+            <input
+              type="checkbox"
+              checked={enrichedOnly}
+              onChange={(e) => {
+                setEnrichedOnly(e.target.checked)
+                setPage(0)
+              }}
+            />
+            肉付き済みのみ
+            <span style={{ color: C.blue, fontFamily: "monospace" }}>
+              {enrichedCount}件
+            </span>
+          </label>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              color: C.textSub,
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={candidateOnly}
+              onChange={(e) => {
+                setCandidateOnly(e.target.checked)
+                setPage(0)
+              }}
+            />
+            仕入候補のみ（≤15万 & 予測利益≥3万）
+            <span style={{ color: C.orange, fontFamily: "monospace" }}>
+              {candidateCount}件
+            </span>
+          </label>
+        </div>
       </div>
       <div style={{ overflowX: "auto" }}>
         <table style={table}>
@@ -242,7 +275,22 @@ export function AuctionTable({ rows, onRowClick }: Props) {
                 >
                   <td style={td}>{r.auction_date || "-"}</td>
                   <td style={{ ...td, fontFamily: "monospace", fontSize: 12 }}>
-                    {r.bds_lot_number || "-"}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      {r.market_max_price != null && (
+                        <span
+                          title="詳細データあり（相場/写真/スコア）"
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: C.blue,
+                            display: "inline-block",
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+                      {r.bds_lot_number || "-"}
+                    </span>
                   </td>
                   <td style={{ ...td, fontWeight: "bold" }}>{r.model_name || "-"}</td>
                   <td style={{ ...td, textAlign: "right", fontFamily: "monospace" }}>

@@ -127,15 +127,16 @@ export function AuctionDetailModal({ record, onClose, onUpdated }: Props) {
       onClick={onClose}
     >
       <div
+        className="auction-detail-modal"
         style={{
           background: C.bg,
           border: `1px solid ${C.border}`,
           borderRadius: 12,
           maxWidth: 1000,
           width: "100%",
-          padding: 28,
-          marginTop: 40,
-          marginBottom: 40,
+          padding: "clamp(14px, 3vw, 28px)",
+          marginTop: 20,
+          marginBottom: 20,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -233,7 +234,7 @@ export function AuctionDetailModal({ record, onClose, onUpdated }: Props) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
             gap: 14,
             marginBottom: 20,
           }}
@@ -257,7 +258,7 @@ export function AuctionDetailModal({ record, onClose, onUpdated }: Props) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(7, 1fr)",
+              gridTemplateColumns: "repeat(auto-fit, minmax(55px, 1fr))",
               gap: 8,
               marginBottom: 20,
               padding: 14,
@@ -290,7 +291,7 @@ export function AuctionDetailModal({ record, onClose, onUpdated }: Props) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
             gap: 14,
             marginBottom: 20,
             padding: 16,
@@ -317,7 +318,7 @@ export function AuctionDetailModal({ record, onClose, onUpdated }: Props) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
             gap: 14,
             marginBottom: 12,
             padding: 16,
@@ -335,7 +336,7 @@ export function AuctionDetailModal({ record, onClose, onUpdated }: Props) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
             gap: 10,
             marginBottom: 20,
           }}
@@ -476,7 +477,7 @@ export function AuctionDetailModal({ record, onClose, onUpdated }: Props) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
               gap: 14,
               marginBottom: 14,
             }}
