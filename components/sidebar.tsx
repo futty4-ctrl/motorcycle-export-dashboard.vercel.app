@@ -83,6 +83,17 @@ export function Sidebar() {
     setOpen(false)
   }, [pathname])
 
+  // Lock body scroll when sidebar is open on mobile
+  useEffect(() => {
+    if (isMobile && open) {
+      const prev = document.body.style.overflow
+      document.body.style.overflow = "hidden"
+      return () => {
+        document.body.style.overflow = prev
+      }
+    }
+  }, [isMobile, open])
+
   return (
     <>
       {/* Mobile hamburger button */}
@@ -145,30 +156,58 @@ export function Sidebar() {
           style={{
             padding: "24px 20px 20px",
             borderBottom: `1px solid ${C.border}`,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
           }}
         >
-          <div
-            style={{
-              fontFamily: C.fontSans,
-              fontWeight: 800,
-              fontSize: 16,
-              color: C.text,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Moto<span style={{ color: C.orange }}>Export</span>
+          <div>
+            <div
+              style={{
+                fontFamily: C.fontSans,
+                fontWeight: 800,
+                fontSize: 16,
+                color: C.text,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Moto<span style={{ color: C.orange }}>Export</span>
+            </div>
+            <div
+              style={{
+                fontFamily: C.font,
+                fontSize: 9,
+                color: C.textMuted,
+                letterSpacing: "0.15em",
+                marginTop: 3,
+              }}
+            >
+              DASHBOARD v2
+            </div>
           </div>
-          <div
-            style={{
-              fontFamily: C.font,
-              fontSize: 9,
-              color: C.textMuted,
-              letterSpacing: "0.15em",
-              marginTop: 3,
-            }}
-          >
-            DASHBOARD v2
-          </div>
+          {isMobile && (
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="閉じる"
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 6,
+                background: "transparent",
+                border: `1px solid ${C.border}`,
+                color: C.textSub,
+                fontSize: 16,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         <nav
@@ -198,6 +237,7 @@ export function Sidebar() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    onClick={() => isMobile && setOpen(false)}
                     style={{
                       display: "flex",
                       alignItems: "center",
