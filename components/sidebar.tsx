@@ -30,7 +30,7 @@ const NAV = [
       { href: "/bidding", label: "入札判断", icon: "⚡" },
       { href: "/auction-day", label: "オークション当日", icon: "🏁" },
       { href: "/auction-history", label: "オークション履歴", icon: "📚" },
-      { href: "/bidding-analytics", label: "振り返り分析", icon: "📊" },
+      { href: "/bidding-analytics", label: "入札振り返り", icon: "📊" },
     ],
   },
   {
@@ -38,11 +38,11 @@ const NAV = [
     items: [
       { href: "/market", label: "市場価格", icon: "▲" },
       { href: "/scoreboard", label: "利益スコアボード", icon: "🏆" },
-      { href: "/performance", label: "売却実績", icon: "📉" },
+      { href: "/performance", label: "損益レポート", icon: "📉" },
       { href: "/recommendation", label: "仕入れ推薦", icon: "🎯" },
       { href: "/check", label: "仕入れチェック", icon: "✅" },
       { href: "/profit-forecast", label: "在庫×期待利益", icon: "📊" },
-      { href: "/monthly-progress", label: "月次進捗", icon: "📈" },
+      { href: "/monthly-progress", label: "今月の目標進捗", icon: "📈" },
       { href: "/cashflow", label: "資金繰りシミュ", icon: "💰" },
       { href: "/ebay-research", label: "eBayリサーチ", icon: "🌍" },
     ],
@@ -51,7 +51,6 @@ const NAV = [
     group: "管理",
     items: [
       { href: "/yahoo-template", label: "出品テンプレ", icon: "📝" },
-      { href: "/invoices", label: "請求書・見積書", icon: "🧾" },
       { href: "/doc-generator", label: "帳票発行", icon: "📄" },
       { href: "/kobutsu", label: "古物台帳", icon: "📋" },
       { href: "/documents", label: "ドキュメント", icon: "◻" },
