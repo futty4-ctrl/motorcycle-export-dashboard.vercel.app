@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import {
   C,
   font,
@@ -8,482 +9,464 @@ import {
   pageTitle,
   pageSub,
   card,
+  lbl,
+  inp,
+  btn,
 } from "@/components/ui-system"
 
-// ── 定数 ───────────────────────────────────────────────────────────────────
-const CONDITIONS = ["良好", "普通", "難あり", "ジャンク"] as const
-const VENUES = ["大阪", "関東", "九州", "名古屋"] as const
-const SHIP_OPTIONS = [
-  "直接引き渡しのみ（発送不可）",
-  "バイク便発送可（着払い）",
-  "陸送手配可（要相談）",
-] as const
+/* ── 選択肢 ── */
 const REASONS = [
   "乗り換えのため",
-  "保管スペースの都合",
+  "引っ越しで保管場所がなくなるため",
+  "しばらく乗る機会��なくなったため",
+  "体調の都合で乗れなくなったため",
   "諸事情により手放すことになりました",
-  "買い替えに伴い",
-  "長期不動のため",
 ] as const
-const STORAGE_OPTIONS = [
-  "屋内（ガレージ）保管",
-  "屋根付き駐輪場保管",
-  "屋外・カバーあり保管",
-  "屋外保管",
+
+const STORAGES = [
+  "自宅ガレージ（屋内）",
+  "屋根付き駐輪場",
+  "屋外・カバーあり",
+  "屋外保��",
 ] as const
-const CHECK_ITEMS = [
-  "エンジン始動動画あり",
-  "走行可能（自走確認済）",
+
+const CHECKS = [
+  "エンジン始動確認済み",
+  "走行確認済み（自走可）",
   "自走不可（押し引き可）",
   "書類あり（名義変更可）",
-  "廃車済（譲渡証あり）",
-  "ナンバー付き",
+  "廃車済み（譲渡証あり）",
+  "ナ��バー付き",
   "オイル漏れなし",
-  "ライト類点灯確認済",
-  "ブレーキ前後効きあり",
-  "キー・メインスイッチあり",
+  "灯火類すべて点灯確認済み",
+  "前後ブレーキ効き確認済み",
+  "キー・メインスイッチ正常",
+  "セル始動OK",
+  "キック始動OK",
+  "タイヤ残溝あ���",
 ] as const
 
-function fmtNum(s: string) {
-  const n = parseInt(s.replace(/,/g, ""))
-  return isNaN(n) ? s : n.toLocaleString()
-}
+const ENGINE_PRESETS = [
+  "一発始動、アイドリング安定しています。異音・白煙なし。",
+  "始動確認済み。暖機後はアイドリング安定します。",
+  "セル・キックともに始動OK。走行に問題ありません。",
+  "長期不動のためエンジン未確認です。",
+] as const
 
+const EXTERIOR_PRESETS = [
+  "年式相応の小傷・くすみはありますが、目立つ大きな傷やへこみはありません。",
+  "全体的にきれいな状態です。細かい傷は写真でご確認ください。",
+  "転倒歴あり。傷の箇所は写真に載せています。走行には支障ありません。",
+  "サビ・傷が目立ちます。写真で必ずご確認ください。",
+] as const
+
+/* ── テンプレ生成 ── */
 function buildTemplate(p: {
-  maker: string; model: string; frame: string; year: string
-  cc: string; km: string; reason: string; storage: string
-  cond: string; scratch: string; engineNote: string
-  buynow: string; venue: string; ship: string; extra: string
-  checks: string[]; youtubeUrl: string
+  maker: string; model: string; modelType: string
+  year: string; cc: string; km: string
+  reason: string; storage: string
+  engineNote: string; exteriorNote: string
+  extra: string; youtubeUrl: string
+  checks: string[]
 }) {
-  const sep = "━━━━━━━━━━━━━━━━━━━━\n"
+  const s = "━━━━━━━━━━━━━━━━━━━━\n"
   let t = ""
 
-  t += "数ある出品の中からご覧いただきありがとうございます。\n"
-  t += "状態・取引ともに誠実に対応いたしますので、どうぞよろしくお願いいたします。\n\n"
+  // 冒頭（固定）
+  t += "ご覧いただきありがとうございます。\n\n"
+  t += `${p.reason}、出品いたします。\n`
+  t += `${p.storage}で保管しておりました。\n`
+  t += "状態は写真と動画でご確認ください。\n\n"
 
-  t += "【出品理由】\n"
-  t += `${p.reason}、出品することになりました。\n\n`
+  // 車両スペック
+  t += s + "■ 車両スペック\n" + s
+  t += `メーカー　：${p.maker || "－"}\n`
+  t += `車名　　　：${p.model || "－"}\n`
+  t += `型式　　　：${p.modelType || "－"}\n`
+  t += `年式　　　：${p.year || "－"}\n`
+  t += `排気量　　：${p.cc ? p.cc + "cc" : "－"}\n`
+  t += `走行距離　：${p.km ? Number(p.km.replace(/,/g, "")).toLocaleString() + "km" : "－"}\n\n`
 
-  t += sep + "■ 車両情報\n" + sep
-  t += `メーカー　　：${p.maker || "－"}\n`
-  t += `車名　　　　：${p.model || "－"}\n`
-  t += `型式　　　　：${p.frame || "－"}\n`
-  t += `年式　　　　：${p.year || "－"}\n`
-  t += `排気量　　　：${p.cc ? p.cc + "cc" : "－"}\n`
-  t += `走行距離　　：${p.km ? fmtNum(p.km) + "km" : "－"}\n`
-  t += `保管状況　　：${p.storage}\n\n`
+  // 車両の状態
+  t += s + "■ 車両の状態\n" + s
+  t += "【エンジン・機関】\n"
+  t += (p.engineNote || "始動確認済み。詳細は動画をご覧ください。") + "\n\n"
+  t += "【外装】\n"
+  t += (p.exteriorNote || "年式相応の使用感があります。写真でご確認ください。") + "\n\n"
 
-  t += sep + "■ 車両の状態について\n" + sep
-  t += `全体的な状態：${p.cond}\n\n`
-  if (p.scratch) t += `【外装・傷・サビ】\n${p.scratch}\n\n`
-  if (p.engineNote) t += `【エンジン・機関系】\n${p.engineNote}\n\n`
-  if (!p.scratch && !p.engineNote) {
-    t += "状態詳細は写真・動画にてご確認ください。\n"
-    t += "気になる点はご入札前にお気軽にご質問ください。\n\n"
+  if (p.extra) {
+    t += "【その他・カスタム】\n"
+    t += p.extra + "\n\n"
   }
 
-  t += sep + "■ 車両動画（YouTube）\n" + sep
-  t += `実際の車両状態を動画でご確認いただけます。\n`
-  t += `${p.youtubeUrl || "※ 動画URL準備中"}\n\n`
-
+  // 確認済み項目
   if (p.checks.length > 0) {
-    t += sep + "■ 動作確認済み項目\n" + sep
-    p.checks.forEach((c) => { t += `✔ ${c}\n` })
+    t += s + "■ 確認済み項目\n" + s
+    p.checks.forEach((c) => { t += `  ${c}\n` })
     t += "\n"
   }
 
-  if (p.extra) {
-    t += sep + "■ 特記事項・変更点\n" + sep
-    t += `${p.extra}\n\n`
+  // 動画（固定コピー＋URL）
+  t += s + "■ 動画で実車を確認できます\n" + s
+  t += "エンジン始動の様子や各部の状態を撮影しています。\n"
+  t += "ぜひご確認の上、ご入札をご検討ください。\n"
+  if (p.youtubeUrl) {
+    t += `▶ <a href="${p.youtubeUrl}" target="_blank" rel="noopener">${p.youtubeUrl}</a>\n\n`
+  } else {
+    t += "※ 動画準備中\n\n"
   }
 
-  t += sep + "■ 取引について\n" + sep
-  t += "・1円スタートにて出品しております\n"
-  if (p.buynow) t += `・即決価格：${fmtNum(p.buynow)}円でのご落札も可能です\n`
-  t += `・${p.venue}からの出品です\n`
-  t += `・引き渡し方法：${p.ship}\n`
-  t += "・落札後24時間以内にご連絡ください\n"
-  t += "・お支払い確認後、速やかに手配いたします\n\n"
+  // 取引条件（固定）
+  t += s + "■ お取引について\n" + s
+  t += "・1円スタートです\n"
+  t += "・大阪府守口市からの出品です\n"
+  t += "・引き渡し：現地引き取り、または陸送手配（落札者様にてお願いいたします）\n"
+  t += "・落札後48時間以内のご連絡をお願いいたします\n"
+  t += "・お支払い確認後、速やかにお引き渡しの段取りをいたします\n"
+  t += "・名義変更は落札者様にてお願いいたします\n\n"
 
-  t += sep + "■ ご購入前にご確認ください\n" + sep
-  t += "・中古車のため、経年による傷・汚れ・サビがある場合があります\n"
-  t += "・素人による保管・点検のため、見落としがある場合もございます\n"
-  t += "・現車確認をご希望の方は、入札前にご相談ください\n"
-  t += "・ノークレーム・ノーリターンにてお願いいたします\n"
-  t += "・写真・動画をよくご確認の上、ご不明な点は入札前にご質問ください\n\n"
+  // 注意事項（固定・5大免責文）
+  t += s + "■ ご入札前に必ずお読みください\n" + s
+  t += "・素人の判断ですので、見落としている箇所がある可能性があります\n"
+  t += "・中古車にご理解のある方のみ、ご入札をお願いいたします\n"
+  t += "・神経質な方はご入札をお控えください\n"
+  t += "・現車確認も歓迎です。ご希望の方は入札前にご連絡ください\n"
+  t += "・ノークレーム・ノーリターンでお願いいたします\n\n"
 
-  t += "ご質問はお気軽にどうぞ。誠実に対応いたします。\n"
-  t += "ご縁がありましたら、よろしくお願いいたします。\n"
+  // 締め（固定）
+  t += "写真・動画をよくご確認の上、\n"
+  t += "ご不明な点があればお気軽にご質問ください。\n"
+  t += "気持ちの良いお取引ができるよう、誠実に対応いたします。\n"
+  t += "よろしくお願いいたします。\n"
 
   return t
 }
 
-// ── スタイル ─────────────────────────────────────────────────────────────────
-const sectionTitle = {
-  fontSize: 13,
-  fontWeight: 700,
-  color: "#f97316",
-  marginBottom: 16,
-  letterSpacing: "0.03em",
-} as const
+/* ── タイトル生成 ── */
+function buildTitle(p: {
+  maker: string; model: string; year: string; cc: string; km: string
+  hasVideo: boolean; checks: string[]
+}) {
+  const parts: string[] = []
+  if (p.year) parts.push(p.year)
+  if (p.maker) parts.push(p.maker)
+  if (p.model) parts.push(p.model)
+  if (p.cc) parts.push(p.cc + "cc")
+  if (p.km) parts.push("走行" + Number(p.km.replace(/,/g, "")).toLocaleString() + "km")
 
-const formLabel = {
-  fontSize: 11,
-  color: "#888",
-  marginBottom: 5,
-  display: "block",
-  letterSpacing: "0.05em",
-} as const
+  const tags: string[] = []
+  if (p.checks.includes("エンジン始動確認済み")) tags.push("始動確認済")
+  if (p.hasVideo) tags.push("動画あり")
+  if (p.checks.includes("走行確認済み（自走可）")) tags.push("自走OK")
 
-const inputBase = {
-  background: "#222",
-  border: "1px solid #2e2e2e",
-  borderRadius: 6,
-  padding: "9px 12px",
-  color: "#f0f0f0",
-  fontFamily: "inherit",
-  fontSize: 13,
-  width: "100%",
-  outline: "none",
-  boxSizing: "border-box" as const,
-  transition: "border-color 0.15s",
+  const title = parts.join(" ")
+  const tagStr = tags.length > 0 ? " " + tags.join("/") : ""
+  return title + tagStr
 }
 
-const toggleBtn = (active: boolean) => ({
-  padding: "7px 14px",
-  borderRadius: 6,
-  border: `1px solid ${active ? "#f97316" : "#2e2e2e"}`,
-  background: active ? "#f97316" : "#222",
-  color: active ? "#fff" : "#888",
-  cursor: "pointer",
-  fontSize: 13,
-  fontFamily: "inherit",
-  transition: "all 0.15s",
-  fontWeight: active ? 600 : 400,
-} as const)
+/* ── スタイル ── */
+const sectionCard = {
+  background: "#111113",
+  border: `1px solid ${C.border}`,
+  borderRadius: 8,
+  padding: 20,
+  marginBottom: 12,
+} as const
 
-// ── コンポーネント ─────────────────────────────────────────────────────────────
+const sectionTitle = (text: string, sub?: string) => (
+  <div style={{ fontSize: 13, fontWeight: 700, color: C.orange, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+    {text}
+    {sub && <span style={{ color: C.textMuted, fontSize: 11, fontWeight: 400 }}>{sub}</span>}
+  </div>
+)
+
+const presetBtn = (active: boolean) => ({
+  padding: "6px 12px",
+  borderRadius: 6,
+  border: `1px solid ${active ? C.orange : C.border}`,
+  background: active ? `${C.orange}15` : "transparent",
+  color: active ? C.orange : C.textSub,
+  cursor: "pointer" as const,
+  fontSize: 12,
+  fontFamily: font,
+  textAlign: "left" as const,
+  lineHeight: 1.5,
+})
+
+const checkBox = (checked: boolean) => ({
+  display: "flex",
+  alignItems: "center" as const,
+  gap: 8,
+  padding: "7px 10px",
+  background: checked ? `${C.orange}08` : "#0a0a0b",
+  border: `1px solid ${checked ? C.orange + "40" : C.border}`,
+  borderRadius: 6,
+  cursor: "pointer" as const,
+})
+
+/* ── コンポーネント ── */
 export function YahooTemplateContent() {
+  const searchParams = useSearchParams()
+
+  // 車両情報（在庫ページから引き継ぎ可能）
   const [maker, setMaker] = useState("")
   const [model, setModel] = useState("")
-  const [frame, setFrame] = useState("")
+  const [modelType, setModelType] = useState("")
   const [year, setYear] = useState("")
   const [cc, setCc] = useState("")
   const [km, setKm] = useState("")
+
+  // 選択式
   const [reason, setReason] = useState<string>(REASONS[0])
-  const [storage, setStorage] = useState<string>(STORAGE_OPTIONS[0])
-  const [cond, setCond] = useState<string>("良好")
-  const [scratch, setScratch] = useState("")
-  const [engineNote, setEngineNote] = useState("")
-  const [buynow, setBuynow] = useState("")
-  const [venue, setVenue] = useState<string>("大阪")
-  const [ship, setShip] = useState<string>(SHIP_OPTIONS[0])
+  const [storage, setStorage] = useState<string>(STORAGES[0])
+
+  // 状態（プリセット＋自由記述）
+  const [engineNote, setEngineNote] = useState(ENGINE_PRESETS[0])
+  const [exteriorNote, setExteriorNote] = useState(EXTERIOR_PRESETS[0])
   const [extra, setExtra] = useState("")
-  const [youtubeUrl, setYoutubeUrl] = useState("")
+
+  // チェック
   const [checks, setChecks] = useState<Record<string, boolean>>({
-    "エンジン始動動画あり": true,
-    "走行可能（自走確認済）": true,
+    "エンジン始動確認済み": true,
+    "走行確認済み（自走可）": true,
+    "書類あり（名義変更可）": true,
+    "キー・メインスイッチ正常": true,
   })
-  const [copied, setCopied] = useState(false)
+
+  // YouTube
+  const [youtubeUrl, setYoutubeUrl] = useState("")
+
+  // コピー
+  const [copiedBody, setCopiedBody] = useState(false)
+  const [copiedTitle, setCopiedTitle] = useState(false)
+
+  // URLパラメータから在庫データ読み込み
+  useEffect(() => {
+    const m = searchParams.get("maker")
+    const n = searchParams.get("model")
+    const t = searchParams.get("type")
+    if (m) setMaker(m)
+    if (n) setModel(n)
+    if (t) setModelType(t)
+  }, [searchParams])
 
   const toggleCheck = (item: string) => {
     setChecks((prev) => ({ ...prev, [item]: !prev[item] }))
   }
 
-  const checkedItems = CHECK_ITEMS.filter((c) => checks[c])
-  const charCount = scratch.length + engineNote.length
+  const checkedItems = CHECKS.filter((c) => checks[c])
 
   const template = buildTemplate({
-    maker, model, frame, year, cc, km, reason, storage,
-    cond, scratch, engineNote, buynow, venue, ship, extra,
-    checks: checkedItems, youtubeUrl,
+    maker, model, modelType, year, cc, km,
+    reason, storage, engineNote, exteriorNote, extra, youtubeUrl,
+    checks: checkedItems,
   })
 
-  const handleCopy = () => {
+  const title = buildTitle({
+    maker, model, year, cc, km,
+    hasVideo: !!youtubeUrl,
+    checks: checkedItems,
+  })
+
+  const handleCopyBody = () => {
     navigator.clipboard.writeText(template).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setCopiedBody(true)
+      setTimeout(() => setCopiedBody(false), 2000)
+    })
+  }
+
+  const handleCopyTitle = () => {
+    navigator.clipboard.writeText(title).then(() => {
+      setCopiedTitle(true)
+      setTimeout(() => setCopiedTitle(false), 2000)
     })
   }
 
   return (
-    <div
-      style={{
-        fontFamily: "'Hiragino Sans','Yu Gothic','Meiryo',sans-serif",
-        color: "#f0f0f0",
-        padding: "24px 32px",
-        maxWidth: 1400,
-      }}
-    >
-      <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>ヤフオク出品テンプレ生成</div>
-      <div style={{ fontSize: 12, color: "#888", display: "flex", gap: 12, marginBottom: 24 }}>
-        <span>1円スタート</span>
-        <span style={{ color: "#555" }}>/</span>
-        <span>7日間</span>
-        <span style={{ color: "#555" }}>/</span>
-        <span>広告100円×7日</span>
+    <div style={{ ...pageWrapper, maxWidth: 1300 }}>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{
+          ...pageTitle,
+          background: `linear-gradient(135deg, ${C.text} 60%, ${C.orange})`,
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+        }}>
+          出品テンプレート
+        </div>
+        <div style={pageSub}>
+          個人出品風 · 1円スタート · 大阪府守口市 · 動画必須
+        </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 420px", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 400px", gap: 16 }}>
 
         {/* ── LEFT: フォーム ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
 
           {/* 車両情報 */}
-          <div style={{ background: "#1a1a1a", border: "1px solid #2e2e2e", borderRadius: 8, padding: 20 }}>
-            <div style={sectionTitle}>車両情報</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={sectionCard}>
+            {sectionTitle("車両スペック", "在庫から自動入力 or 手入力")}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
               {[
-                { label: "メーカー", placeholder: "Honda", value: maker, set: setMaker },
-                { label: "車名", placeholder: "モンキー", value: model, set: setModel },
-                { label: "型式", placeholder: "AB27", value: frame, set: setFrame },
-                { label: "年式", placeholder: "1998年式", value: year, set: setYear },
-                { label: "排気量（CC）", placeholder: "50", value: cc, set: setCc },
-                { label: "走行距離（KM）", placeholder: "12000", value: km, set: setKm },
-              ].map(({ label, placeholder, value, set }) => (
+                { label: "メーカー", ph: "ホンダ", val: maker, set: setMaker },
+                { label: "車名", ph: "スーパーカブ110", val: model, set: setModel },
+                { label: "型式", ph: "JA10", val: modelType, set: setModelType },
+                { label: "年式", ph: "2015年式", val: year, set: setYear },
+                { label: "排気量", ph: "110", val: cc, set: setCc },
+                { label: "走行距離(km)", ph: "12000", val: km, set: setKm },
+              ].map(({ label, ph, val, set }) => (
                 <div key={label}>
-                  <label style={formLabel}>{label}</label>
-                  <input
-                    style={inputBase}
-                    placeholder={placeholder}
-                    value={value}
-                    onChange={(e) => set(e.target.value)}
-                  />
+                  <label style={{ ...lbl, marginBottom: 3, fontSize: 9 }}>{label}</label>
+                  <input style={{ ...inp, padding: "7px 10px", fontSize: 13 }}
+                    placeholder={ph} value={val} onChange={(e) => set(e.target.value)} />
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 出品背景 */}
-          <div style={{ background: "#1a1a1a", border: "1px solid #2e2e2e", borderRadius: 8, padding: 20 }}>
-            <div style={sectionTitle}>
-              出品背景{" "}
-              <span style={{ color: "#888", fontSize: 11, fontWeight: 400 }}>— 入札者の信頼感を上げる重要項目</span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={formLabel}>
-                  出品理由{" "}
-                  <span style={{ color: "#f97316", fontSize: 10, marginLeft: 4 }}>▲ 信頼感に直結</span>
-                </label>
-                <select
-                  style={{ ...inputBase, cursor: "pointer" }}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                >
-                  {REASONS.map((r) => (
-                    <option key={r} value={r} style={{ background: "#222" }}>{r}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={formLabel}>
-                  保管状況{" "}
-                  <span style={{ color: "#f97316", fontSize: 10, marginLeft: 4 }}>▲ 状態の根拠になる</span>
-                </label>
-                <select
-                  style={{ ...inputBase, cursor: "pointer" }}
-                  value={storage}
-                  onChange={(e) => setStorage(e.target.value)}
-                >
-                  {STORAGE_OPTIONS.map((s) => (
-                    <option key={s} value={s} style={{ background: "#222" }}>{s}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* 車両状態 */}
-          <div style={{ background: "#1a1a1a", border: "1px solid #2e2e2e", borderRadius: 8, padding: 20 }}>
-            <div style={sectionTitle}>車両状態</div>
+          {/* 出品理由・保管 */}
+          <div style={sectionCard}>
+            {sectionTitle("出品背景", "個人感を出す重要ポイント")}
             <div style={{ marginBottom: 12 }}>
-              <label style={formLabel}>全体的な状態</label>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const }}>
-                {CONDITIONS.map((c) => (
-                  <button key={c} style={toggleBtn(cond === c)} onClick={() => setCond(c)}>{c}</button>
+              <label style={{ ...lbl, marginBottom: 6, fontSize: 9 }}>出品理由</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {REASONS.map((r) => (
+                  <button key={r} onClick={() => setReason(r)} style={presetBtn(reason === r)}>{r}</button>
                 ))}
               </div>
             </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={formLabel}>
-                外装の傷・サビ状況{" "}
-                <span style={{ color: "#555", fontSize: 10, marginLeft: 4 }}>（正直に書くほど信頼↑）</span>
-              </label>
-              <textarea
-                style={{ ...inputBase, minHeight: 72, resize: "vertical", lineHeight: 1.6 }}
-                placeholder="例：右サイドカバーに小傷あり。タンクは目立つ傷なし。フロントフォークに薄いサビあり（走行に支障なし）"
-                value={scratch}
-                onChange={(e) => setScratch(e.target.value)}
-              />
-            </div>
             <div>
-              <label style={formLabel}>
-                エンジン・機関系の補足{" "}
-                <span style={{ color: "#555", fontSize: 10, marginLeft: 4 }}>（任意）</span>
-              </label>
-              <textarea
-                style={{ ...inputBase, minHeight: 56, resize: "vertical", lineHeight: 1.6 }}
-                placeholder="例：エンジン一発始動確認済み。アイドリング安定。オイル漏れなし。"
-                value={engineNote}
-                onChange={(e) => setEngineNote(e.target.value)}
-              />
-              <div style={{ fontSize: 11, color: "#555", textAlign: "right", marginTop: 3 }}>
-                {charCount}文字
+              <label style={{ ...lbl, marginBottom: 6, fontSize: 9 }}>保管方法</label>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {STORAGES.map((s) => (
+                  <button key={s} onClick={() => setStorage(s)} style={presetBtn(storage === s)}>{s}</button>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* 動作確認チェック */}
-          <div style={{ background: "#1a1a1a", border: "1px solid #2e2e2e", borderRadius: 8, padding: 20 }}>
-            <div style={sectionTitle}>動作確認チェック</div>
+          {/* エンジン状態 */}
+          <div style={sectionCard}>
+            {sectionTitle("エンジン・機関の状態")}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+              {ENGINE_PRESETS.map((p) => (
+                <button key={p} onClick={() => setEngineNote(p)} style={presetBtn(engineNote === p)}>{p}</button>
+              ))}
+            </div>
+            <textarea
+              style={{ ...inp, minHeight: 56, resize: "vertical", lineHeight: 1.6, fontSize: 13 }}
+              value={engineNote} onChange={(e) => setEngineNote(e.target.value)}
+              placeholder="自由に編集OK" />
+          </div>
+
+          {/* 外装状態 */}
+          <div style={sectionCard}>
+            {sectionTitle("外装の状態")}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+              {EXTERIOR_PRESETS.map((p) => (
+                <button key={p} onClick={() => setExteriorNote(p)} style={presetBtn(exteriorNote === p)}>{p}</button>
+              ))}
+            </div>
+            <textarea
+              style={{ ...inp, minHeight: 56, resize: "vertical", lineHeight: 1.6, fontSize: 13 }}
+              value={exteriorNote} onChange={(e) => setExteriorNote(e.target.value)}
+              placeholder="自由に編集OK" />
+          </div>
+
+          {/* 確認チェック */}
+          <div style={sectionCard}>
+            {sectionTitle("動作確認チェック", "該当するものだけONに")}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              {CHECK_ITEMS.map((item) => {
+              {CHECKS.map((item) => {
                 const checked = !!checks[item]
                 return (
-                  <div
-                    key={item}
-                    onClick={() => toggleCheck(item)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "7px 10px",
-                      background: "#222",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      transition: "background 0.12s",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => {}}
-                      style={{ accentColor: "#f97316", width: 14, height: 14, cursor: "pointer", flexShrink: 0 }}
-                    />
-                    <label style={{ fontSize: 12, color: checked ? "#f0f0f0" : "#888", cursor: "pointer" }}>
-                      {item}
-                    </label>
+                  <div key={item} onClick={() => toggleCheck(item)} style={checkBox(checked)}>
+                    <input type="checkbox" checked={checked} onChange={() => {}}
+                      style={{ accentColor: C.orange, width: 14, height: 14, cursor: "pointer", flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: checked ? C.text : C.textMuted, cursor: "pointer" }}>{item}</span>
                   </div>
                 )
               })}
             </div>
           </div>
 
-          {/* 取引情報 */}
-          <div style={{ background: "#1a1a1a", border: "1px solid #2e2e2e", borderRadius: 8, padding: 20 }}>
-            <div style={sectionTitle}>取引情報</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={formLabel}>即決価格（円 / 任意）</label>
-                <input
-                  style={inputBase}
-                  placeholder="例：150000"
-                  value={buynow}
-                  onChange={(e) => setBuynow(e.target.value)}
-                />
-              </div>
-              <div>
-                <label style={formLabel}>出品地域</label>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const }}>
-                  {VENUES.map((v) => (
-                    <button key={v} style={toggleBtn(venue === v)} onClick={() => setVenue(v)}>{v}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div>
-              <label style={formLabel}>引き渡し方法</label>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const }}>
-                {SHIP_OPTIONS.map((s) => (
-                  <button key={s} style={toggleBtn(ship === s)} onClick={() => setShip(s)}>{s}</button>
-                ))}
-              </div>
+          {/* YouTube */}
+          <div style={{ ...sectionCard, borderColor: C.orange + "60" }}>
+            {sectionTitle("YouTube動画URL", "★ 必須 — 落札額に直結")}
+            <input
+              style={{ ...inp, borderColor: C.orange + "40", fontSize: 14 }}
+              placeholder="https://youtu.be/xxxxxxxxxxxx"
+              value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} />
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 6, lineHeight: 1.6 }}>
+              不動車でも必ず撮影してください。エンジン始動→アイドリング→外装グルっと→灯火類の順がベスト。
             </div>
           </div>
 
-          {/* YouTube動画URL */}
-          <div style={{ background: "#1a1a1a", border: "1px solid #f97316", borderRadius: 8, padding: 20 }}>
-            <div style={sectionTitle}>
-              YouTube 動画URL{" "}
-              <span style={{ color: "#f97316", fontSize: 11, fontWeight: 700 }}>★ 必須</span>
-            </div>
-            <div style={{ marginBottom: 8 }}>
-              <input
-                style={{ ...inputBase, borderColor: "#f97316" }}
-                placeholder="https://youtu.be/xxxxxxxxxxxx"
-                value={youtubeUrl}
-                onChange={(e) => setYoutubeUrl(e.target.value)}
-              />
-            </div>
-            <div style={{ fontSize: 11, color: "#888", lineHeight: 1.7 }}>
-              不動車・エンジン不動でも必ず載せてください。動画がない場合は「準備中」と表示されます。
-            </div>
-          </div>
-
-          {/* 特記事項 */}
-          <div style={{ background: "#1a1a1a", border: "1px solid #2e2e2e", borderRadius: 8, padding: 20 }}>
-            <div style={sectionTitle}>
-              特記事項・変更点{" "}
-              <span style={{ color: "#888", fontSize: 11, fontWeight: 400 }}>（カスタム・整備歴・気になる点など）</span>
-            </div>
+          {/* カス��ム・特記 */}
+          <div style={sectionCard}>
+            {sectionTitle("その他・カスタム・特記事項", "任意")}
             <textarea
-              style={{ ...inputBase, minHeight: 72, resize: "vertical", lineHeight: 1.6 }}
-              placeholder="例：純正マフラーから社外品に交換済み。先月キャブのOH実施。メーター周りのゴム類は劣化あり。"
-              value={extra}
-              onChange={(e) => setExtra(e.target.value)}
-            />
+              style={{ ...inp, minHeight: 64, resize: "vertical", lineHeight: 1.6, fontSize: 13 }}
+              value={extra} onChange={(e) => setExtra(e.target.value)}
+              placeholder="例：社外マフラーに交換済み。純正マフラーも付属します。" />
           </div>
         </div>
 
-        {/* ── RIGHT: プレビュー ── */}
-        <div style={{ position: "sticky", top: 0, alignSelf: "start" }}>
-          <div style={{ background: "#1a1a1a", border: "1px solid #2e2e2e", borderRadius: 8, padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>プレビュー</span>
-              <button
-                onClick={handleCopy}
-                style={{
-                  padding: "9px 20px",
-                  background: copied ? "#22c55e" : "#f97316",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  fontFamily: "inherit",
-                  transition: "background 0.2s",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {copied ? "コピー完了 ✓" : "クリップボードにコピー"}
+        {/* ── RIGHT: プレビュー（sticky） ── */}
+        <div style={{ position: "sticky", top: 12, alignSelf: "start" }}>
+
+          {/* タイトル */}
+          <div style={{ ...sectionCard, borderColor: C.orange + "40" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: C.orange, fontWeight: 700 }}>出品タイトル</span>
+              <button onClick={handleCopyTitle}
+                style={{ ...btn("ghost"), padding: "4px 12px", fontSize: 11, background: copiedTitle ? `${C.green}20` : "transparent", color: copiedTitle ? C.green : C.textSub }}>
+                {copiedTitle ? "コピー済" : "コピー"}
               </button>
             </div>
-            <pre
-              style={{
-                background: "#222",
-                border: "1px solid #2e2e2e",
-                borderRadius: 6,
-                padding: 16,
-                fontSize: 13,
-                lineHeight: 2,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                minHeight: 520,
-                color: "#f0f0f0",
-                overflowY: "auto",
-                maxHeight: 700,
-                margin: 0,
-                fontFamily: "inherit",
-              }}
-            >
+            <div style={{
+              background: "#0a0a0b", border: `1px solid ${C.border}`, borderRadius: 6,
+              padding: "10px 14px", fontSize: 14, fontWeight: 700, color: C.text,
+              lineHeight: 1.5, wordBreak: "break-all",
+            }}>
+              {title || "車両情報を入力するとタイトルが生成されます"}
+            </div>
+            <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4, textAlign: "right" }}>
+              {title.length}/65文字
+            </div>
+          </div>
+
+          {/* 本文プレビュー */}
+          <div style={sectionCard}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <span style={{ fontSize: 11, color: C.orange, fontWeight: 700 }}>出品文プレビュー</span>
+              <button onClick={handleCopyBody}
+                style={{
+                  padding: "8px 20px", borderRadius: 6, border: "none", cursor: "pointer",
+                  fontSize: 13, fontWeight: 700, fontFamily: font,
+                  background: copiedBody ? C.green : C.orange,
+                  color: "#fff", transition: "background 0.2s",
+                }}>
+                {copiedBody ? "コピー完了" : "出品文をコピー"}
+              </button>
+            </div>
+            <pre style={{
+              background: "#0a0a0b", border: `1px solid ${C.border}`, borderRadius: 6,
+              padding: 16, fontSize: 12.5, lineHeight: 1.9, whiteSpace: "pre-wrap",
+              wordBreak: "break-word", color: C.text, maxHeight: "70vh", overflowY: "auto",
+              margin: 0, fontFamily: "'Hiragino Sans','Yu Gothic','Meiryo',sans-serif",
+            }}>
               {template}
             </pre>
           </div>
-        </div>
 
+          {/* 固��部分の説明 */}
+          <div style={{ padding: "12px 16px", background: `${C.yellow}08`, border: `1px solid ${C.yellow}20`, borderRadius: 8, fontSize: 11, color: C.textMuted, lineHeight: 1.7 }}>
+            <span style={{ color: C.yellow, fontWeight: 700 }}>固定コピー：</span>
+            取引条件（1円スタート/堺市/引き取り or 陸送）と注意事項（5大免責文）は固定です。
+            業者ワードは一切入っていません。
+          </div>
+        </div>
       </div>
     </div>
   )

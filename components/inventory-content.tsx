@@ -27,8 +27,12 @@ import {
   td,
 } from "@/components/ui-system"
 
+/* ── 定数 ── */
 const STATUSES = ["未処理", "出品準備中", "ヤフオク出品中", "売約済み"] as const
 const CATEGORIES = ["車体", "パーツ"] as const
+const MAKERS = ["ホンダ", "ヤマハ", "スズキ", "カワサキ", "その他"] as const
+const VENUES = ["大阪", "関東", "九州"] as const
+const CC_RANGES = ["50cc", "90cc", "125cc", "250cc", "400cc", "750cc以上"] as const
 const SC: Record<string, string> = {
   未処理: C.yellow,
   出品準備中: C.blue,
@@ -42,31 +46,187 @@ const getDisplayName = (item: InventoryItemRow) => {
   return parts.length > 0 ? parts.join(" ") : "（未入力）"
 }
 
+/* ── 型式→メーカー・車種マッピング（よく出る型式） ── */
+const MODEL_MAP: Record<string, { maker: string; model: string; cc: string }> = {
+  "CF4MA": { maker: "スズキ", model: "アドレスV125S", cc: "125cc" },
+  "CF46A": { maker: "スズキ", model: "アドレスV125G", cc: "125cc" },
+  "CF4EA": { maker: "スズキ", model: "アドレスV125SS", cc: "125cc" },
+  "SED7J": { maker: "ヤマハ", model: "アクシスZ125", cc: "125cc" },
+  "SEA5J": { maker: "ヤマハ", model: "NMAX125", cc: "125cc" },
+  "SE86J": { maker: "ヤマハ", model: "シグナスX", cc: "125cc" },
+  "JF81": { maker: "ホンダ", model: "PCX125", cc: "125cc" },
+  "JK05": { maker: "ホンダ", model: "PCX125(4型)", cc: "125cc" },
+  "JF84": { maker: "ホンダ", model: "リード125", cc: "125cc" },
+  "JF45": { maker: "ホンダ", model: "Dio110", cc: "110cc" },
+  "JA10": { maker: "ホンダ", model: "スーパーカブ110", cc: "110cc" },
+  "JA07": { maker: "ホンダ", model: "スーパーカブ110", cc: "110cc" },
+  "JA44": { maker: "ホンダ", model: "スーパーカブ125", cc: "125cc" },
+  "AA09": { maker: "ホンダ", model: "スーパーカブ50", cc: "50cc" },
+  "C50": { maker: "ホンダ", model: "スーパーカブ50", cc: "50cc" },
+  "AB27": { maker: "ホンダ", model: "モンキー", cc: "50cc" },
+  "AB28": { maker: "ホンダ", model: "ゴリラ", cc: "50cc" },
+  "Z50J": { maker: "ホンダ", model: "モンキー", cc: "50cc" },
+  "ST50": { maker: "ホンダ", model: "ダックス", cc: "50cc" },
+  "CF50": { maker: "ホンダ", model: "シャリー", cc: "50cc" },
+  "MC41": { maker: "ホンダ", model: "CB400SF", cc: "400cc" },
+  "NC42": { maker: "ホンダ", model: "CB400SF REVO", cc: "400cc" },
+  "MC22": { maker: "ホンダ", model: "CBR250RR", cc: "250cc" },
+  "MC51": { maker: "ホンダ", model: "CBR250RR(2017-)", cc: "250cc" },
+  "MD38": { maker: "ホンダ", model: "CRF250L", cc: "250cc" },
+  "MC49": { maker: "ホンダ", model: "CB250R", cc: "250cc" },
+  "BA41A": { maker: "スズキ", model: "GSX250R", cc: "250cc" },
+  "RG43J": { maker: "ヤマハ", model: "YZF-R25", cc: "250cc" },
+  "B0G": { maker: "ヤマハ", model: "セロー250", cc: "250cc" },
+  "DG31J": { maker: "ヤマハ", model: "セロー250(FI)", cc: "250cc" },
+}
+
+/* ── BDS請求書パーサー ── */
+type ParsedVehicle = {
+  chassis_number: string
+  model_type: string
+  purchase_price: number
+  bds_fee: number
+  maker: string
+  model_name: string
+  cc_range: string
+}
+
+function parseBdsInvoiceText(text: string): ParsedVehicle[] {
+  const vehicles: ParsedVehicle[] = []
+  const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean)
+
+  for (let i = 0; i < lines.length; i++) {
+    // 車台番号パターン: アルファベット＋数字、ハイフンあり
+    const chassisMatch = lines[i].match(/^([A-Z][A-Z0-9]*-[\dA-Z*]+)$/)
+    if (!chassisMatch) continue
+
+    const chassis = chassisMatch[1]
+    // 型式を車台番号から抽出（ハイフン前の部分）
+    const modelType = chassis.split("-")[0]
+
+    // 次の行が数字（カンマ区切り）なら落札価格
+    let price = 0
+    let fee = 0
+    if (i + 1 < lines.length) {
+      const priceStr = lines[i + 1].replace(/,/g, "")
+      if (/^\d+$/.test(priceStr)) price = parseInt(priceStr)
+    }
+    if (i + 2 < lines.length) {
+      const feeStr = lines[i + 2].replace(/,/g, "")
+      if (/^\d+$/.test(feeStr)) fee = parseInt(feeStr)
+    }
+
+    if (price === 0) continue
+
+    const mapped = MODEL_MAP[modelType]
+    vehicles.push({
+      chassis_number: chassis,
+      model_type: modelType,
+      purchase_price: price,
+      bds_fee: fee,
+      maker: mapped?.maker ?? "",
+      model_name: mapped?.model ?? "",
+      cc_range: mapped?.cc ?? "",
+    })
+  }
+  return vehicles
+}
+
+/* ── ヤフオク出品テンプレ生成（在庫データから簡易版） ── */
+function generateYahooTemplate(item: InventoryItemRow): string {
+  const s = "━━━━━━━━━━━━━━━━━━━━\n"
+  let t = ""
+
+  t += "ご覧いただきありがとうございます。\n\n"
+  t += "乗り換えのため、出品いたします。\n"
+  t += "自宅ガレージ（屋内）で保管しておりました。\n"
+  t += "状態は写真と動画でご確認ください。\n\n"
+
+  t += s + "■ 車両スペック\n" + s
+  t += `メーカー　：${item.maker || "－"}\n`
+  t += `車名　　　：${item.model_name || "－"}\n`
+  t += `型式　　　：${item.model_type || "－"}\n`
+  t += "年式　　　：－\n"
+  t += "排気量　　：－\n"
+  t += "走行距離　：－\n\n"
+
+  t += s + "■ 車両の状態\n" + s
+  t += "【エンジン・機関】\n"
+  t += "始動確認済み。詳細は動画をご覧ください。\n\n"
+  t += "【外装】\n"
+  t += "年式相応の使用感があります。写真でご確認ください。\n\n"
+
+  t += s + "■ 確認済み項目\n" + s
+  t += "  エンジン始動確認済み\n"
+  t += "  書類あり（名義変更可）\n"
+  t += "  キー・メインスイッチ正常\n\n"
+
+  t += s + "■ 動画で実車を確認できます\n" + s
+  t += "エンジン始動の様子や各部の状態を撮影しています。\n"
+  t += "ぜひご確認の上、ご入札をご検討ください。\n"
+  t += '※ 動画準備中（<a href="https://youtu.be/" target="_blank" rel="noopener">YouTube</a>で公開予定）\n\n'
+
+  t += s + "■ お取引について\n" + s
+  t += "・1円スタートです\n"
+  t += "・大阪府守口市からの出品です\n"
+  t += "・引き渡し：現地引き取り、または陸送手配（落札者様にてお願いいたします）\n"
+  t += "・落札後48時間以内のご連絡をお願いいたします\n"
+  t += "・お支払い確認後、速やかにお引き渡しの段取りをいたします\n"
+  t += "・名義変更は落札者様にてお願いいたします\n\n"
+
+  t += s + "■ ご入札前に必ずお読みください\n" + s
+  t += "・素人の判断ですので、見落としている箇所がある可能性があります\n"
+  t += "・中古車にご理解のある方のみ、ご入札をお願いいたします\n"
+  t += "・神経質な方はご入札をお控えください\n"
+  t += "・現車確認も歓迎です。ご希望の方は入札前にご連絡ください\n"
+  t += "・ノークレーム・ノーリターンでお願いいたします\n\n"
+
+  t += "写真・動画をよくご確認の上、\n"
+  t += "ご不明な点があればお気軽にご質問ください。\n"
+  t += "気持ちの良いお取引ができるよう、誠実に対応いたします。\n"
+  t += "よろしくお願いいたします。\n"
+  return t
+}
+
+/* ── メインコンポーネント ── */
 export function InventoryContent() {
   const [items, setItems] = useState<InventoryItemRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [formOpen, setFormOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState("すべて")
+  const [tab, setTab] = useState<"list" | "quick" | "bds" | "template">("list")
+
+  // クイック登録
   const [submitting, setSubmitting] = useState(false)
   const [createdItem, setCreatedItem] = useState<InventoryItemRow | null>(null)
   const qrContainerRef = useRef<HTMLDivElement>(null)
-
-  const [category, setCategory] = useState<"車体" | "パーツ">("車体")
-  const [maker, setMaker] = useState("")
+  const [maker, setMaker] = useState("ホンダ")
   const [modelName, setModelName] = useState("")
   const [modelType, setModelType] = useState("")
   const [chassisNumber, setChassisNumber] = useState("")
   const [purchasePrice, setPurchasePrice] = useState("")
   const [conditionMemo, setConditionMemo] = useState("")
+  const [bdsVenue, setBdsVenue] = useState("大阪")
+  const [ccRange, setCcRange] = useState("125cc")
   const [purchaseDate, setPurchaseDate] = useState(() =>
     new Date().toISOString().slice(0, 10)
   )
+  const [showKobutsu, setShowKobutsu] = useState(false)
   const [sellerName, setSellerName] = useState("")
   const [sellerAge, setSellerAge] = useState("")
   const [sellerAddress, setSellerAddress] = useState("")
   const [sellerOccupation, setSellerOccupation] = useState("")
   const [idVerificationMethod, setIdVerificationMethod] = useState("")
+
+  // BDS取込
+  const [bdsText, setBdsText] = useState("")
+  const [parsedVehicles, setParsedVehicles] = useState<ParsedVehicle[]>([])
+  const [bdsImporting, setBdsImporting] = useState(false)
+  const [bdsVenueImport, setBdsVenueImport] = useState("大阪")
+
+  // テンプレ表示
+  const [templateItem, setTemplateItem] = useState<InventoryItemRow | null>(null)
+  const [templateCopied, setTemplateCopied] = useState(false)
 
   const loadItems = useCallback(async () => {
     setLoading(true)
@@ -78,19 +238,19 @@ export function InventoryContent() {
     setLoading(false)
   }, [])
 
-  useEffect(() => {
-    loadItems()
-  }, [loadItems])
+  useEffect(() => { loadItems() }, [loadItems])
 
-  function resetForm() {
-    setCategory("車体")
-    setMaker("")
+  function resetQuickForm() {
+    setMaker("ホンダ")
     setModelName("")
     setModelType("")
     setChassisNumber("")
     setPurchasePrice("")
     setConditionMemo("")
+    setBdsVenue("大阪")
+    setCcRange("125cc")
     setPurchaseDate(new Date().toISOString().slice(0, 10))
+    setShowKobutsu(false)
     setSellerName("")
     setSellerAge("")
     setSellerAddress("")
@@ -99,12 +259,23 @@ export function InventoryContent() {
     setCreatedItem(null)
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  // 型式から自動入力
+  function handleModelTypeChange(val: string) {
+    setModelType(val)
+    const mapped = MODEL_MAP[val.toUpperCase()]
+    if (mapped) {
+      setMaker(mapped.maker)
+      setModelName(mapped.model)
+      setCcRange(mapped.cc)
+    }
+  }
+
+  async function handleQuickSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     const { data, error: err } = await insertInventoryItem({
       purchase_date: purchaseDate,
-      category,
+      category: "車体",
       maker: maker.trim() || null,
       model_name: modelName.trim() || null,
       model_type: modelType.trim() || null,
@@ -116,12 +287,11 @@ export function InventoryContent() {
       seller_address: sellerAddress.trim() || null,
       seller_occupation: sellerOccupation.trim() || null,
       id_verification_method: idVerificationMethod.trim() || null,
+      bds_venue: bdsVenue,
+      cc_range: ccRange,
     })
     setSubmitting(false)
-    if (err) {
-      toast.error(err.message)
-      return
-    }
+    if (err) { toast.error(err.message); return }
     if (data) {
       setCreatedItem(data)
       setItems((prev) => [data, ...prev])
@@ -129,397 +299,348 @@ export function InventoryContent() {
     }
   }
 
-  async function handleStatusChange(id: string, newStatus: string) {
-    const { error: err } = await updateInventoryItemStatus(id, newStatus)
-    if (err) {
-      toast.error(err.message)
+  // BDS取込パース
+  function handleBdsParse() {
+    const vehicles = parseBdsInvoiceText(bdsText)
+    if (vehicles.length === 0) {
+      toast.error("車両データが見つかりません。請求書テキストを確認してください")
       return
     }
-    setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, status: newStatus } : i))
-    )
+    setParsedVehicles(vehicles)
+    toast.success(`${vehicles.length}台を検出しました`)
+  }
+
+  // BDS取込の各行を編集
+  function updateParsedVehicle(idx: number, field: keyof ParsedVehicle, val: string | number) {
+    setParsedVehicles(prev => prev.map((v, i) => i === idx ? { ...v, [field]: val } : v))
+  }
+
+  // BDS一括登録
+  async function handleBdsBulkImport() {
+    if (parsedVehicles.length === 0) return
+    setBdsImporting(true)
+    let successCount = 0
+    for (const v of parsedVehicles) {
+      const { data, error: err } = await insertInventoryItem({
+        purchase_date: new Date().toISOString().slice(0, 10),
+        category: "車体",
+        maker: v.maker || null,
+        model_name: v.model_name || null,
+        model_type: v.model_type || null,
+        chassis_number: v.chassis_number || null,
+        purchase_price: v.purchase_price,
+        condition_memo: `BDS落札 / 手数料¥${v.bds_fee.toLocaleString()}`,
+        bds_venue: bdsVenueImport,
+        cc_range: v.cc_range || null,
+      })
+      if (!err && data) {
+        successCount++
+        setItems((prev) => [data, ...prev])
+      }
+    }
+    setBdsImporting(false)
+    toast.success(`${successCount}台を登録しました`)
+    setParsedVehicles([])
+    setBdsText("")
+  }
+
+  // テンプレコピー
+  function handleTemplateCopy() {
+    if (!templateItem) return
+    const text = generateYahooTemplate(templateItem)
+    navigator.clipboard.writeText(text).then(() => {
+      setTemplateCopied(true)
+      setTimeout(() => setTemplateCopied(false), 2000)
+    })
+  }
+
+  async function handleStatusChange(id: string, newStatus: string) {
+    const { error: err } = await updateInventoryItemStatus(id, newStatus)
+    if (err) { toast.error(err.message); return }
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: newStatus } : i)))
     toast.success("ステータスを更新しました")
   }
 
-  async function handleCopyUrl() {
-    if (!detailUrl) return
-    try {
-      await navigator.clipboard.writeText(detailUrl)
-      toast.success("コピーしました")
-    } catch {
-      toast.error("コピーに失敗しました")
-    }
-  }
-
-  function handleDownloadQrImage() {
-    const svg = qrContainerRef.current?.querySelector("svg")
-    if (!svg || !createdItem) return
-    const svgData = new XMLSerializer().serializeToString(svg)
-    const url = URL.createObjectURL(
-      new Blob([svgData], { type: "image/svg+xml;charset=utf-8" })
-    )
-    const img = new Image()
-    img.onload = () => {
-      const canvas = document.createElement("canvas")
-      canvas.width = canvas.height = 512
-      const ctx = canvas.getContext("2d")!
-      ctx.fillStyle = "#ffffff"
-      ctx.fillRect(0, 0, 512, 512)
-      ctx.drawImage(img, 0, 0, 512, 512)
-      const a = document.createElement("a")
-      a.href = canvas.toDataURL("image/png")
-      a.download = `${createdItem.management_code}.png`
-      a.click()
-      URL.revokeObjectURL(url)
-      toast.success("画像を保存しました")
-    }
-    img.src = url
-  }
-
-  const filtered =
-    statusFilter === "すべて"
-      ? items
-      : items.filter((i) => i.status === statusFilter)
+  const filtered = statusFilter === "すべて"
+    ? items : items.filter((i) => i.status === statusFilter)
+  const counts = STATUSES.reduce(
+    (a, s) => ({ ...a, [s]: items.filter((i) => i.status === s).length }),
+    {} as Record<string, number>
+  )
   const detailUrl =
     typeof window !== "undefined" && createdItem
       ? `${window.location.origin}/inventory/${createdItem.management_code}`
       : ""
 
-  const counts = STATUSES.reduce(
-    (a, s) => ({ ...a, [s]: items.filter((i) => i.status === s).length }),
-    {} as Record<string, number>
-  )
-
   if (loading && items.length === 0)
-    return (
-      <div style={{ ...pageWrapper, color: C.textMuted }}>
-        読み込み中...
-      </div>
-    )
+    return <div style={{ ...pageWrapper, color: C.textMuted }}>読み込み中...</div>
+
+  /* ── タブボタンスタイル ── */
+  const tabBtn = (t2: typeof tab, label: string, icon: string) => ({
+    padding: "10px 18px",
+    borderRadius: "8px 8px 0 0",
+    border: `1px solid ${tab === t2 ? C.orange : C.border}`,
+    borderBottom: tab === t2 ? `2px solid ${C.orange}` : `1px solid ${C.border}`,
+    background: tab === t2 ? `${C.orange}15` : "transparent",
+    color: tab === t2 ? C.orange : C.textSub,
+    cursor: "pointer" as const,
+    fontSize: 13,
+    fontWeight: tab === t2 ? 700 : 400,
+    fontFamily: font,
+    display: "flex",
+    alignItems: "center" as const,
+    gap: 6,
+  })
+
+  /* ── 選択ボタンスタイル ── */
+  const selBtn = (active: boolean, color?: string) => ({
+    padding: "6px 14px",
+    borderRadius: 6,
+    border: `1px solid ${active ? (color ?? C.orange) : C.border}`,
+    background: active ? `${color ?? C.orange}15` : "transparent",
+    color: active ? (color ?? C.orange) : C.textSub,
+    cursor: "pointer" as const,
+    fontSize: 12,
+    fontFamily: font,
+    fontWeight: active ? 600 : 400,
+  })
 
   return (
     <div style={pageWrapper}>
-      <div style={{ marginBottom: 32 }}>
-        <div
-          style={{
-            ...pageTitle,
-            background: `linear-gradient(135deg, ${C.text} 60%, ${C.orange})`,
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-          }}
-        >
+      {/* ── ヘッダー ── */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{
+          ...pageTitle,
+          background: `linear-gradient(135deg, ${C.text} 60%, ${C.orange})`,
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+        }}>
           在庫カルテ
         </div>
-        <div style={pageSub}>
-          在庫 & 古物台帳の統合管理 · {items.length}件
-        </div>
+        <div style={pageSub}>在庫 & 古物台帳の統合管理 · {items.length}件</div>
       </div>
 
       {error && (
-        <div
-          style={{
-            padding: 14,
-            background: C.redGlow,
-            border: `1px solid ${C.red}40`,
-            borderRadius: 8,
-            color: C.red,
-            fontSize: 13,
-            marginBottom: 16,
-          }}
-        >
-          ⚠ {error}
+        <div style={{
+          padding: 14, background: C.redGlow, border: `1px solid ${C.red}40`,
+          borderRadius: 8, color: C.red, fontSize: 13, marginBottom: 16,
+        }}>
+          {error}
         </div>
       )}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 12,
-          marginBottom: 24,
-        }}
-      >
+      {/* ── KPIカード ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
         {STATUSES.map((s) => (
-          <div
-            key={s}
-            style={{ ...kpiCard(SC[s]), cursor: "pointer" }}
-            onClick={() => setStatusFilter(s)}
-          >
-            <div
-              style={{
-                position: "absolute",
-                top: -10,
-                right: -10,
-                width: 50,
-                height: 50,
-                background: `radial-gradient(circle, ${SC[s]}20 0%, transparent 70%)`,
-                pointerEvents: "none",
-              }}
-            />
+          <div key={s} style={{ ...kpiCard(SC[s]), cursor: "pointer" }} onClick={() => { setStatusFilter(s); setTab("list") }}>
             <div style={{ ...lbl, color: SC[s] }}>{s}</div>
-            <div
-              style={{
-                fontSize: 28,
-                fontWeight: "bold",
-                color: SC[s],
-              }}
-            >
-              {counts[s] ?? 0}
-            </div>
+            <div style={{ fontSize: 28, fontWeight: "bold", color: SC[s] }}>{counts[s] ?? 0}</div>
             <div style={{ fontSize: 10, color: C.textMuted }}>台</div>
           </div>
         ))}
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-          gap: 8,
-        }}
-      >
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {["すべて", ...STATUSES].map((st) => (
-            <button
-              key={st}
-              onClick={() => setStatusFilter(st)}
-              style={{
-                padding: "6px 14px",
-                borderRadius: 6,
-                border: `1px solid ${statusFilter === st ? (SC[st] ?? C.orange) : C.border}`,
-                background:
-                  statusFilter === st
-                    ? `${SC[st] ?? C.orange}15`
-                    : "transparent",
-                color:
-                  statusFilter === st ? (SC[st] ?? C.orange) : C.textSub,
-                cursor: "pointer",
-                fontSize: 12,
-                fontFamily: font,
-              }}
-            >
-              {st}
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={() => {
-            resetForm()
-            setFormOpen(true)
-          }}
-          style={{
-            ...btn("primary"),
-            boxShadow: `0 0 16px ${C.orangeGlow}`,
-          }}
-        >
-          + 新規登録
-        </button>
+      {/* ── タブ ── */}
+      <div style={{ display: "flex", gap: 4, marginBottom: -1, position: "relative", zIndex: 1 }}>
+        <button style={tabBtn("list", "在庫一覧", "▦")} onClick={() => setTab("list")}>▦ 在庫一覧</button>
+        <button style={tabBtn("quick", "クイック登録", "+")} onClick={() => { setTab("quick"); resetQuickForm() }}>+ クイック登録</button>
+        <button style={tabBtn("bds", "BDS請求書取込", "📄")} onClick={() => setTab("bds")}>📄 BDS取込</button>
       </div>
 
-      {formOpen && !createdItem && (
-        <div
-          style={{
-            ...card(C.orangeGlow),
-            borderLeft: `3px solid ${C.orange}`,
-          }}
-        >
-          <div style={lbl}>新規車両登録</div>
-          <form onSubmit={handleSubmit}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 12,
-                marginBottom: 16,
-              }}
-            >
-              {[
-                {
-                  label: "カテゴリ",
-                  el: (
-                    <select
-                      style={inp}
-                      value={category}
-                      onChange={(e) =>
-                        setCategory(e.target.value as "車体" | "パーツ")
-                      }
-                    >
-                      {CATEGORIES.map((c) => (
-                        <option key={c}>{c}</option>
-                      ))}
-                    </select>
-                  ),
-                },
-                {
-                  label: "仕入日",
-                  el: (
-                    <input
-                      style={inp}
-                      type="date"
-                      value={purchaseDate}
-                      onChange={(e) => setPurchaseDate(e.target.value)}
-                    />
-                  ),
-                },
-                {
-                  label: "メーカー",
-                  el: (
-                    <input
-                      style={inp}
-                      value={maker}
-                      onChange={(e) => setMaker(e.target.value)}
-                      placeholder="例: Honda"
-                    />
-                  ),
-                },
-                {
-                  label: "車種",
-                  el: (
-                    <input
-                      style={inp}
-                      value={modelName}
-                      onChange={(e) => setModelName(e.target.value)}
-                      placeholder="例: スーパーカブ"
-                    />
-                  ),
-                },
-                {
-                  label: "型式",
-                  el: (
-                    <input
-                      style={inp}
-                      value={modelType}
-                      onChange={(e) => setModelType(e.target.value)}
-                      placeholder="例: AA09"
-                    />
-                  ),
-                },
-                {
-                  label: "車台番号",
-                  el: (
-                    <input
-                      style={inp}
-                      value={chassisNumber}
-                      onChange={(e) => setChassisNumber(e.target.value)}
-                    />
-                  ),
-                },
-                {
-                  label: "仕入価格（円）",
-                  el: (
-                    <input
-                      style={inp}
-                      type="number"
-                      value={purchasePrice}
-                      onChange={(e) => setPurchasePrice(e.target.value)}
-                      placeholder="0"
-                    />
-                  ),
-                },
-                {
-                  label: "状態メモ",
-                  el: (
-                    <input
-                      style={inp}
-                      value={conditionMemo}
-                      onChange={(e) => setConditionMemo(e.target.value)}
-                      placeholder="例: 実働・外装キズあり"
-                    />
-                  ),
-                },
-              ].map(({ label, el }) => (
-                <div key={label}>
-                  <label style={{ ...lbl, marginBottom: 4 }}>{label}</label>
-                  {el}
-                </div>
+      {/* ══════════ TAB: 在庫一覧 ══════════ */}
+      {tab === "list" && (
+        <div style={card()}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 8 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {["すべて", ...STATUSES].map((st) => (
+                <button key={st} onClick={() => setStatusFilter(st)} style={selBtn(statusFilter === st, SC[st])}>
+                  {st}
+                </button>
               ))}
             </div>
+          </div>
+          {filtered.length === 0 ? (
+            <div style={{ fontSize: 13, color: C.textMuted, padding: "24px 0", textAlign: "center" }}>
+              データなし
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={table}>
+                <thead>
+                  <tr>
+                    {["管理番号", "車名", "仕入価格", "会場", "状態", "操作"].map((h) => (
+                      <th key={h} style={th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((item) => (
+                    <tr key={item.id}
+                      style={{ transition: "background 0.15s" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = C.surfaceHover)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      <td style={td}>
+                        <Link href={`/inventory/${item.management_code}`}
+                          style={{ color: C.orange, textDecoration: "none", fontWeight: "bold" }}>
+                          {item.management_code}
+                        </Link>
+                      </td>
+                      <td style={{ ...td, fontWeight: "bold" }}>{getDisplayName(item)}</td>
+                      <td style={{ ...td, color: C.textSub }}>{fmt(item.purchase_price)}</td>
+                      <td style={td}>
+                        {item.bds_venue ? (
+                          <span style={{ ...badge(C.blue), fontSize: 10 }}>{item.bds_venue}</span>
+                        ) : "—"}
+                      </td>
+                      <td style={td}>
+                        <select value={item.status} onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                          style={{
+                            background: `${SC[item.status] ?? C.border}15`,
+                            border: `1px solid ${SC[item.status] ?? C.border}40`,
+                            borderRadius: 4, color: SC[item.status] ?? C.textSub,
+                            padding: "4px 8px", fontSize: 12, cursor: "pointer", fontFamily: font, outline: "none",
+                          }}>
+                          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </td>
+                      <td style={td}>
+                        <button
+                          onClick={() => { setTemplateItem(item); setTab("template") }}
+                          style={{
+                            padding: "4px 10px", borderRadius: 4, border: `1px solid ${C.border}`,
+                            background: "transparent", color: C.textSub, cursor: "pointer",
+                            fontSize: 11, fontFamily: font,
+                          }}
+                        >
+                          テンプレ生成
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
-            <div
-              style={{
-                borderTop: `1px solid ${C.border}`,
-                paddingTop: 16,
-                marginBottom: 16,
-              }}
-            >
-              <div style={{ ...lbl, marginBottom: 12 }}>
-                古物台帳（受入情報）
+      {/* ══════════ TAB: クイック登録 ══════════ */}
+      {tab === "quick" && !createdItem && (
+        <div style={{ ...card(C.orangeGlow), borderTop: `3px solid ${C.orange}` }}>
+          <div style={{ ...lbl, marginBottom: 16 }}>クイック登録 — 最低限の情報で素早く登録</div>
+          <form onSubmit={handleQuickSubmit}>
+            {/* 型式入力で自動判定 */}
+            <div style={{
+              background: `${C.orange}08`, border: `1px solid ${C.orange}30`, borderRadius: 8,
+              padding: 16, marginBottom: 20,
+            }}>
+              <div style={{ fontSize: 11, color: C.orange, marginBottom: 8, fontWeight: 700 }}>
+                型式を入力すると車種を自動判定します
               </div>
-              <div
+              <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ ...lbl, marginBottom: 4 }}>型式</label>
+                  <input style={{ ...inp, borderColor: C.orange + "60", fontSize: 16 }}
+                    value={modelType} onChange={(e) => handleModelTypeChange(e.target.value)}
+                    placeholder="例: CF4MA, SED7J, AB27" />
+                </div>
+                <div style={{ fontSize: 13, color: C.textSub, paddingBottom: 10 }}>
+                  →{" "}
+                  {MODEL_MAP[modelType.toUpperCase()]
+                    ? <span style={{ color: C.green, fontWeight: 700 }}>
+                        {MODEL_MAP[modelType.toUpperCase()].maker} {MODEL_MAP[modelType.toUpperCase()].model}
+                      </span>
+                    : <span style={{ color: C.textMuted }}>手動入力</span>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>メーカー</label>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {MAKERS.map((m) => (
+                    <button key={m} type="button" onClick={() => setMaker(m)} style={selBtn(maker === m)}>{m}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>BDS会場</label>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {VENUES.map((v) => (
+                    <button key={v} type="button" onClick={() => setBdsVenue(v)} style={selBtn(bdsVenue === v)}>{v}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>車種名</label>
+                <input style={inp} value={modelName} onChange={(e) => setModelName(e.target.value)}
+                  placeholder="例: アドレスV125S" />
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>排気量</label>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {CC_RANGES.map((c) => (
+                    <button key={c} type="button" onClick={() => setCcRange(c)} style={selBtn(ccRange === c)}>{c}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>車台番号</label>
+                <input style={inp} value={chassisNumber} onChange={(e) => setChassisNumber(e.target.value)}
+                  placeholder="例: CF4MA-130842" />
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>落札価格（円）</label>
+                <input style={{ ...inp, fontSize: 16, fontWeight: "bold" }} type="number"
+                  value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)} placeholder="0" />
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>仕入日</label>
+                <input style={inp} type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>状態メモ</label>
+                <input style={inp} value={conditionMemo} onChange={(e) => setConditionMemo(e.target.value)}
+                  placeholder="例: 実働・外装キズあり" />
+              </div>
+            </div>
+
+            {/* 古物台帳（折りたたみ） */}
+            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, marginBottom: 16 }}>
+              <button type="button" onClick={() => setShowKobutsu(!showKobutsu)}
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 12,
-                }}
-              >
-                {[
-                  {
-                    label: "売主氏名",
-                    val: sellerName,
-                    set: setSellerName,
-                    ph: "山田 太郎",
-                  },
-                  {
-                    label: "年齢",
-                    val: sellerAge,
-                    set: setSellerAge,
-                    ph: "35",
-                  },
-                  {
-                    label: "住所",
-                    val: sellerAddress,
-                    set: setSellerAddress,
-                    ph: "大阪府守口市...",
-                  },
-                  {
-                    label: "職業",
-                    val: sellerOccupation,
-                    set: setSellerOccupation,
-                    ph: "会社員",
-                  },
-                  {
-                    label: "本人確認方法",
-                    val: idVerificationMethod,
-                    set: setIdVerificationMethod,
-                    ph: "運転免許証",
-                  },
-                ].map(({ label, val, set, ph }) => (
-                  <div key={label}>
-                    <label style={{ ...lbl, marginBottom: 4 }}>
-                      {label}
-                    </label>
-                    <input
-                      style={inp}
-                      value={val}
-                      onChange={(e) => set(e.target.value)}
-                      placeholder={ph}
-                    />
-                  </div>
-                ))}
-              </div>
+                  background: "transparent", border: "none", color: C.textMuted,
+                  cursor: "pointer", fontSize: 11, fontFamily: font, padding: 0,
+                }}>
+                {showKobutsu ? "▼" : "▶"} 古物台帳（売主情報）{!showKobutsu && " — クリックで展開"}
+              </button>
+              {showKobutsu && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                  {[
+                    { label: "売主氏名", val: sellerName, set: setSellerName, ph: "山田 太郎" },
+                    { label: "年齢", val: sellerAge, set: setSellerAge, ph: "35" },
+                    { label: "住所", val: sellerAddress, set: setSellerAddress, ph: "大阪府守口市..." },
+                    { label: "職業", val: sellerOccupation, set: setSellerOccupation, ph: "会社員" },
+                    { label: "本人確認方法", val: idVerificationMethod, set: setIdVerificationMethod, ph: "運転免許証" },
+                  ].map(({ label, val, set, ph }) => (
+                    <div key={label}>
+                      <label style={{ ...lbl, marginBottom: 4 }}>{label}</label>
+                      <input style={inp} value={val} onChange={(e) => set(e.target.value)} placeholder={ph} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div style={{ display: "flex", gap: 8 }}>
-              <button
-                type="submit"
-                disabled={submitting}
-                style={{
-                  ...btn("primary"),
-                  opacity: submitting ? 0.6 : 1,
-                }}
-              >
+              <button type="submit" disabled={submitting}
+                style={{ ...btn("primary"), opacity: submitting ? 0.6 : 1 }}>
                 {submitting ? "登録中..." : "登録する"}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  resetForm()
-                  setFormOpen(false)
-                }}
-                style={btn("ghost")}
-              >
+              <button type="button" onClick={() => setTab("list")} style={btn("ghost")}>
                 キャンセル
               </button>
             </div>
@@ -527,156 +648,168 @@ export function InventoryContent() {
         </div>
       )}
 
-      {createdItem && (
-        <div
-          style={{
-            ...card(C.greenGlow),
-            borderLeft: `4px solid ${C.green}`,
-            marginBottom: 16,
-          }}
-        >
-          <div style={{ ...lbl, color: C.green }}>✓ 登録完了</div>
-          <div
-            style={{
-              fontSize: 20,
-              fontWeight: "bold",
-              marginBottom: 16,
-              color: C.green,
-            }}
-          >
+      {/* ── 登録完了 ── */}
+      {tab === "quick" && createdItem && (
+        <div style={{ ...card(C.greenGlow), borderTop: `4px solid ${C.green}` }}>
+          <div style={{ ...lbl, color: C.green }}>登録完了</div>
+          <div style={{ fontSize: 20, fontWeight: "bold", marginBottom: 16, color: C.green }}>
             {createdItem.management_code}
           </div>
-          <div
-            ref={qrContainerRef}
-            style={{
-              marginBottom: 16,
-              padding: 12,
-              background: "#fff",
-              display: "inline-block",
-              borderRadius: 6,
-            }}
-          >
+          <div ref={qrContainerRef} style={{
+            marginBottom: 16, padding: 12, background: "#fff",
+            display: "inline-block", borderRadius: 6,
+          }}>
             <QRCodeSVG value={detailUrl} size={100} />
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={handleCopyUrl} style={btn("ghost")}>
-              URLコピー
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => {
+              if (!detailUrl) return
+              navigator.clipboard.writeText(detailUrl).then(() => toast.success("コピーしました"))
+            }} style={btn("ghost")}>URLコピー</button>
+            <button onClick={() => { resetQuickForm() }} style={btn("primary")}>
+              続けて登録
             </button>
-            <button onClick={handleDownloadQrImage} style={btn("ghost")}>
-              QR保存
-            </button>
-            <button
-              onClick={() => {
-                resetForm()
-                setFormOpen(false)
-              }}
-              style={btn("primary")}
-            >
-              閉じる
+            <button onClick={() => { resetQuickForm(); setTab("list") }} style={btn("ghost")}>
+              一覧に戻る
             </button>
           </div>
         </div>
       )}
 
-      <div style={card()}>
-        <div style={{ ...lbl, marginBottom: 16 }}>
-          在庫一覧（{filtered.length}件）
-        </div>
-        {filtered.length === 0 ? (
-          <div
-            style={{
-              fontSize: 13,
-              color: C.textMuted,
-              padding: "24px 0",
-              textAlign: "center",
-            }}
-          >
-            データなし
+      {/* ══════════ TAB: BDS請求書取込 ══════════ */}
+      {tab === "bds" && (
+        <div style={{ ...card(C.blueGlow), borderTop: `3px solid ${C.blue}` }}>
+          <div style={{ ...lbl, marginBottom: 16 }}>
+            BDS請求書テキスト取込 — 請求書のテキストを貼り付けて一括登録
           </div>
-        ) : (
-          <table style={table}>
-            <thead>
-              <tr>
-                {["管理番号", "車名", "仕入価格", "状態", "ステータス"].map(
-                  (h) => (
-                    <th key={h} style={th}>
-                      {h}
-                    </th>
-                  )
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((item) => (
-                <tr
-                  key={item.id}
-                  style={{ transition: "background 0.15s" }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = C.surfaceHover)
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "transparent")
-                  }
-                >
-                  <td style={td}>
-                    <Link
-                      href={`/inventory/${item.management_code}`}
-                      style={{
-                        color: C.orange,
-                        textDecoration: "none",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {item.management_code}
-                    </Link>
-                  </td>
-                  <td style={{ ...td, fontWeight: "bold" }}>
-                    {getDisplayName(item)}
-                  </td>
-                  <td style={{ ...td, color: C.textSub }}>
-                    {fmt(item.purchase_price)}
-                  </td>
-                  <td style={td}>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        color: C.textMuted,
-                      }}
-                    >
-                      {item.condition_memo?.slice(0, 12) ?? "—"}
-                    </span>
-                  </td>
-                  <td style={td}>
-                    <select
-                      value={item.status}
-                      onChange={(e) =>
-                        handleStatusChange(item.id, e.target.value)
-                      }
-                      style={{
-                        background: `${SC[item.status] ?? C.border}15`,
-                        border: `1px solid ${SC[item.status] ?? C.border}40`,
-                        borderRadius: 4,
-                        color: SC[item.status] ?? C.textSub,
-                        padding: "4px 8px",
-                        fontSize: 12,
-                        cursor: "pointer",
-                        fontFamily: font,
-                        outline: "none",
-                      }}
-                    >
-                      {STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                </tr>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ ...lbl, marginBottom: 4 }}>BDS会場</label>
+            <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
+              {VENUES.map((v) => (
+                <button key={v} onClick={() => setBdsVenueImport(v)} style={selBtn(bdsVenueImport === v)}>{v}</button>
               ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+            </div>
+            <textarea
+              style={{
+                ...inp, minHeight: 200, resize: "vertical", lineHeight: 1.6,
+                fontFamily: "'Courier New', monospace", fontSize: 12,
+              }}
+              value={bdsText}
+              onChange={(e) => setBdsText(e.target.value)}
+              placeholder={`BDS請求書のテキストをここに貼り付けてください。\n\n（PDFを開いて全選択→コピー→ここに貼付）\n\n自動的に車台番号・落札価格・手数料を抽出します。`}
+            />
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button onClick={handleBdsParse} style={btn("primary")} disabled={!bdsText.trim()}>
+                解析する
+              </button>
+              <button onClick={() => { setBdsText(""); setParsedVehicles([]) }} style={btn("ghost")}>
+                クリア
+              </button>
+            </div>
+          </div>
+
+          {/* パース結果プレビュー */}
+          {parsedVehicles.length > 0 && (
+            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+              <div style={{ ...lbl, color: C.green, marginBottom: 12 }}>
+                {parsedVehicles.length}台を検出 — 内容を確認・修正してから登録してください
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={table}>
+                  <thead>
+                    <tr>
+                      {["車台番号", "型式", "メーカー", "車種", "排気量", "落札額", "手数料"].map(h => (
+                        <th key={h} style={th}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedVehicles.map((v, i) => (
+                      <tr key={i}>
+                        <td style={{ ...td, fontWeight: "bold", color: C.orange }}>{v.chassis_number}</td>
+                        <td style={td}>{v.model_type}</td>
+                        <td style={td}>
+                          <input style={{ ...inp, padding: "4px 8px", width: 80 }} value={v.maker}
+                            onChange={(e) => updateParsedVehicle(i, "maker", e.target.value)} />
+                        </td>
+                        <td style={td}>
+                          <input style={{ ...inp, padding: "4px 8px", width: 140 }} value={v.model_name}
+                            onChange={(e) => updateParsedVehicle(i, "model_name", e.target.value)} />
+                        </td>
+                        <td style={td}>
+                          <input style={{ ...inp, padding: "4px 8px", width: 70 }} value={v.cc_range}
+                            onChange={(e) => updateParsedVehicle(i, "cc_range", e.target.value)} />
+                        </td>
+                        <td style={{ ...td, fontWeight: "bold" }}>¥{v.purchase_price.toLocaleString()}</td>
+                        <td style={{ ...td, color: C.textMuted }}>¥{v.bds_fee.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                marginTop: 16, padding: "12px 16px",
+                background: `${C.green}08`, border: `1px solid ${C.green}30`, borderRadius: 8,
+              }}>
+                <div style={{ fontSize: 14, fontWeight: "bold", color: C.green }}>
+                  合計: ¥{parsedVehicles.reduce((s, v) => s + v.purchase_price, 0).toLocaleString()}
+                  <span style={{ color: C.textMuted, fontWeight: 400, fontSize: 12, marginLeft: 8 }}>
+                    (手数料: ¥{parsedVehicles.reduce((s, v) => s + v.bds_fee, 0).toLocaleString()})
+                  </span>
+                </div>
+                <button onClick={handleBdsBulkImport} disabled={bdsImporting}
+                  style={{ ...btn("primary"), background: C.green, opacity: bdsImporting ? 0.6 : 1 }}>
+                  {bdsImporting ? "登録中..." : `${parsedVehicles.length}台を一括登録`}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════════ TAB: 出品テンプレ生成 ══════════ */}
+      {tab === "template" && templateItem && (
+        <div style={{ ...card(), borderTop: `3px solid ${C.orange}` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div>
+              <div style={{ ...lbl, marginBottom: 4 }}>出品テンプレート</div>
+              <div style={{ fontSize: 14, fontWeight: "bold" }}>
+                {getDisplayName(templateItem)}
+                <span style={{ color: C.textMuted, fontWeight: 400, fontSize: 12, marginLeft: 8 }}>
+                  {templateItem.management_code}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={handleTemplateCopy}
+                style={{ ...btn("primary"), background: templateCopied ? C.green : C.orange }}>
+                {templateCopied ? "コピー完了" : "コピー"}
+              </button>
+              <Link href={`/yahoo-template`} style={{ ...btn("ghost"), textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+                詳細テンプレへ
+              </Link>
+              <button onClick={() => setTab("list")} style={btn("ghost")}>
+                戻る
+              </button>
+            </div>
+          </div>
+          <pre style={{
+            background: "#0a0a0b", border: `1px solid ${C.border}`, borderRadius: 8,
+            padding: 20, fontSize: 13, lineHeight: 2, whiteSpace: "pre-wrap",
+            wordBreak: "break-word", color: C.text, maxHeight: 600, overflowY: "auto",
+            margin: 0, fontFamily: "'Hiragino Sans','Yu Gothic','Meiryo',sans-serif",
+          }}>
+            {generateYahooTemplate(templateItem)}
+          </pre>
+          <div style={{ marginTop: 12, fontSize: 11, color: C.textMuted }}>
+            YouTube動画URL・詳細な状態記述・即決価格などは
+            <Link href="/yahoo-template" style={{ color: C.orange, marginLeft: 4 }}>詳細テンプレページ</Link>
+            で編集できます。
+          </div>
+        </div>
+      )}
     </div>
   )
 }

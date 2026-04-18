@@ -98,7 +98,7 @@ export function Sidebar() {
       {/* Mobile hamburger button */}
       {isMobile && (
         <button
-          onClick={() => setOpen(!open)}
+          onClick={() => setOpen((prev) => !prev)}
           style={{
             position: "fixed",
             top: 12,
@@ -115,6 +115,8 @@ export function Sidebar() {
             alignItems: "center",
             justifyContent: "center",
             cursor: "pointer",
+            touchAction: "manipulation",
+            WebkitTapHighlightColor: "transparent",
           }}
           aria-label="メニュー"
         >
@@ -148,7 +150,9 @@ export function Sidebar() {
           display: "flex",
           flexDirection: "column",
           zIndex: 40,
-          transition: "left 0.25s ease",
+          transition: "left 0.25s ease, visibility 0.25s ease",
+          pointerEvents: isMobile && !open ? "none" : "auto",
+          visibility: isMobile && !open ? "hidden" : "visible",
         }}
       >
         <div
