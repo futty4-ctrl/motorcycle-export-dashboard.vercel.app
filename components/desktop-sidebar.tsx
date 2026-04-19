@@ -6,15 +6,12 @@ import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
   Package,
-  ShoppingBag,
   Settings,
   ChevronLeft,
   ChevronRight,
   Calculator,
   TrendingUp,
   BookOpen,
-  FileCheck,
-  Zap,
   Flag,
   LineChart,
   FileText,
@@ -23,16 +20,13 @@ import {
 
 const navItems = [
   { label: "ダッシュボード", href: "/", icon: LayoutDashboard },
-  { label: "入札判断", href: "/bidding", icon: Zap },
   { label: "オークション当日", href: "/auction-day", icon: Flag },
   { label: "オークション履歴", href: "/auction-history", icon: History },
   { label: "振り返り分析", href: "/bidding-analytics", icon: LineChart },
-  { label: "BDS個票査定", href: "/assess", icon: FileCheck },
   { label: "相場比較", href: "/market", icon: TrendingUp },
-  { label: "見積・請求", href: "/documents", icon: Calculator },
+  { label: "見積・請求", href: "/quote", icon: Calculator },
   { label: "帳票発行", href: "/doc-generator", icon: FileText },
   { label: "在庫管理", href: "/inventory", icon: Package },
-  { label: "eBay出品", href: "/ebay", icon: ShoppingBag },
   { label: "取扱説明書", href: "/manual", icon: BookOpen },
   { label: "設定", href: "/settings", icon: Settings },
 ]
@@ -73,7 +67,7 @@ export function DesktopSidebar() {
             const isActive =
               item.href !== "#" &&
               (pathname === item.href ||
-                (item.href === "/documents" && (pathname === "/quote" || pathname === "/invoice")))
+                (item.href === "/quote" && pathname === "/invoice"))
             return (
               <li key={item.label}>
                 <Link

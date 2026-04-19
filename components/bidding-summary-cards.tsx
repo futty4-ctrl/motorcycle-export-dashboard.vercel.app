@@ -58,7 +58,7 @@ export function BiddingSummaryCards() {
           # 仕入れ判断サマリー
         </h2>
         <Link
-          href="/bidding"
+          href="/auction-day"
           style={{
             fontFamily: COLORS.font,
             fontSize: 11,
@@ -66,7 +66,7 @@ export function BiddingSummaryCards() {
             textDecoration: "none",
           }}
         >
-          入札判断へ →
+          オークション当日へ →
         </Link>
       </div>
       <div

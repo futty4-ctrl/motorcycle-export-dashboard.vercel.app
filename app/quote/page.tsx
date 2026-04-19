@@ -133,11 +133,11 @@ export default function QuotePage() {
     <div className="min-h-dvh bg-background pb-8">
       <div className="mx-auto min-w-0 max-w-4xl px-4 py-5 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
         <Link
-          href="/documents"
+          href="/"
           className="mb-5 flex min-h-[48px] items-center gap-2 text-sm text-muted-foreground hover:text-foreground touch-manipulation -ml-1 pl-1"
         >
           <ChevronLeft className="h-5 w-5 shrink-0" />
-          <span>見積・請求へ戻る</span>
+          <span>ダッシュボードへ戻る</span>
         </Link>
         <div className="mb-5">
           <h1 className="flex items-center gap-2 text-xl font-bold text-foreground sm:text-2xl">
