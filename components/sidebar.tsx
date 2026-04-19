@@ -27,23 +27,17 @@ const NAV = [
   {
     group: "仕入れ判断",
     items: [
-      { href: "/bidding", label: "入札判断", icon: "⚡" },
       { href: "/auction-day", label: "オークション当日", icon: "🏁" },
       { href: "/auction-history", label: "オークション履歴", icon: "📚" },
-      { href: "/bidding-analytics", label: "入札振り返り", icon: "📊" },
+      { href: "/analytics", label: "分析・振り返り", icon: "📊" },
     ],
   },
   {
     group: "分析",
     items: [
       { href: "/market", label: "市場価格", icon: "▲" },
-      { href: "/scoreboard", label: "利益スコアボード", icon: "🏆" },
-      { href: "/performance", label: "損益レポート", icon: "📉" },
       { href: "/recommendation", label: "仕入れ推薦", icon: "🎯" },
       { href: "/check", label: "仕入れチェック", icon: "✅" },
-      { href: "/profit-forecast", label: "在庫×期待利益", icon: "📊" },
-      { href: "/monthly-progress", label: "今月の目標進捗", icon: "📈" },
-      { href: "/cashflow", label: "資金繰りシミュ", icon: "💰" },
       { href: "/ebay-research", label: "eBayリサーチ", icon: "🌍" },
     ],
   },
@@ -51,7 +45,6 @@ const NAV = [
     group: "管理",
     items: [
       { href: "/yahoo-template", label: "出品テンプレ", icon: "📝" },
-      { href: "/doc-generator", label: "帳票発行", icon: "📄" },
       { href: "/kobutsu", label: "古物台帳", icon: "📋" },
       { href: "/documents", label: "ドキュメント", icon: "◻" },
       { href: "/settings", label: "設定", icon: "⚙" },

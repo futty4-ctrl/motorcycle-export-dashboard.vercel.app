@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import DocumentForm from "@/components/document-form"
 import { quoteReducer, initialQuoteState } from "@/lib/quote-tool/reducer"
 import { computeQuote } from "@/lib/quote-tool/calc"
 import {
@@ -55,6 +56,7 @@ function formatYen(n: number): string {
 
 export default function QuotePage() {
   const [state, dispatch] = useReducer(quoteReducer, initialQuoteState)
+  const [docTab, setDocTab] = useState<"calc" | "gen">("calc")
   const [showPreview, setShowPreview] = useState(false)
   const [importing, setImporting] = useState(false)
   const [templateCategoryIndex, setTemplateCategoryIndex] = useState<string>("0")
@@ -139,6 +141,34 @@ export default function QuotePage() {
           <ChevronLeft className="h-5 w-5 shrink-0" />
           <span>ダッシュボードへ戻る</span>
         </Link>
+        <div className="mb-4 flex gap-1 border-b border-border">
+          <button
+            type="button"
+            onClick={() => setDocTab("calc")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              docTab === "calc"
+                ? "border-b-2 border-primary text-primary -mb-px"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            見積逆算
+          </button>
+          <button
+            type="button"
+            onClick={() => setDocTab("gen")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              docTab === "gen"
+                ? "border-b-2 border-primary text-primary -mb-px"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            帳票発行
+          </button>
+        </div>
+        {docTab === "gen" ? (
+          <DocumentForm />
+        ) : (
+        <>
         <div className="mb-5">
           <h1 className="flex items-center gap-2 text-xl font-bold text-foreground sm:text-2xl">
             <Calculator className="h-6 w-6 shrink-0" />
@@ -677,6 +707,8 @@ export default function QuotePage() {
             tax={tax}
             totalInclTax={totalInclTax}
           />
+        )}
+        </>
         )}
       </div>
     </div>

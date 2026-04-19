@@ -292,7 +292,7 @@ export function KobutsuContent() {
           ))}
           <div style={{ marginLeft: "auto" }}>
             <Link
-              href="/kobutsu/settings"
+              href="/settings#kobutsu"
               style={{
                 padding: "8px 16px",
                 borderRadius: 6,

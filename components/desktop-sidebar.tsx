@@ -14,7 +14,6 @@ import {
   BookOpen,
   Flag,
   LineChart,
-  FileText,
   History,
 } from "lucide-react"
 
@@ -22,10 +21,9 @@ const navItems = [
   { label: "ダッシュボード", href: "/", icon: LayoutDashboard },
   { label: "オークション当日", href: "/auction-day", icon: Flag },
   { label: "オークション履歴", href: "/auction-history", icon: History },
-  { label: "振り返り分析", href: "/bidding-analytics", icon: LineChart },
+  { label: "分析・振り返り", href: "/analytics", icon: LineChart },
   { label: "相場比較", href: "/market", icon: TrendingUp },
-  { label: "見積・請求", href: "/quote", icon: Calculator },
-  { label: "帳票発行", href: "/doc-generator", icon: FileText },
+  { label: "見積・帳票", href: "/quote", icon: Calculator },
   { label: "在庫管理", href: "/inventory", icon: Package },
   { label: "取扱説明書", href: "/manual", icon: BookOpen },
   { label: "設定", href: "/settings", icon: Settings },

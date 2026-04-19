@@ -26,6 +26,7 @@ import {
   deleteInventoryItem,
   type InventoryItemRow,
 } from "@/lib/inventory-supabase"
+import InventoryActualsEditor from "@/components/inventory-actuals-editor"
 import { toast } from "sonner"
 
 const STATUSES = ["未処理", "出品準備中", "ヤフオク出品中", "売約済み"] as const
@@ -205,12 +206,12 @@ export function InventoryDetailContent({
             </option>
           ))}
         </select>
-        <Link
-          href={`/inventory/${item.management_code}/actuals`}
+        <a
+          href="#actuals-section"
           className="ml-auto inline-flex items-center gap-1 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/20"
         >
-          出品実績 →
-        </Link>
+          出品実績 ↓
+        </a>
       </div>
 
       {/* 画像カルーセル（モック） */}
@@ -428,6 +429,14 @@ export function InventoryDetailContent({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <section id="actuals-section" className="mt-8 scroll-mt-16">
+        <h2 className="mb-3 text-base font-semibold text-foreground">出品実績・売却結果</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          写真枚数・動画・ウォッチ数・入札数・売却結果を記録
+        </p>
+        <InventoryActualsEditor managementCode={item.management_code} />
+      </section>
     </div>
   )
 }
