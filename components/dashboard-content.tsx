@@ -42,14 +42,19 @@ export function DashboardContent() {
   }, [])
 
   const now = new Date()
-  const soldThisMonth = (vehicles ?? []).filter((v) => {
-    const d = new Date(v.createdAt ?? "")
+  const isThisMonth = (dateStr: string | null | undefined) => {
+    if (!dateStr) return false
+    const d = new Date(dateStr)
     return (
-      v.status === "売却済" &&
-      d.getMonth() === now.getMonth() &&
-      d.getFullYear() === now.getFullYear()
+      d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
     )
-  })
+  }
+  const soldThisMonth = (vehicles ?? []).filter(
+    (v) => v.status === "売却済" && isThisMonth(v.createdAt)
+  )
+  const purchasedThisMonth = (vehicles ?? []).filter((v) =>
+    isThisMonth(v.createdAt)
+  )
   const monthlyProfit = soldThisMonth.reduce(
     (a, v) => a + (v.expectedProfitJPY ?? 0),
     0
@@ -200,8 +205,8 @@ export function DashboardContent() {
       >
         {[
           {
-            label: "総車両数",
-            value: `${(vehicles ?? []).length}台`,
+            label: "今月仕入",
+            value: `${purchasedThisMonth.length}台`,
             color: C.orange,
             glow: C.orangeGlow,
           },

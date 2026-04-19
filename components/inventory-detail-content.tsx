@@ -27,6 +27,7 @@ import {
   type InventoryItemRow,
 } from "@/lib/inventory-supabase"
 import InventoryActualsEditor from "@/components/inventory-actuals-editor"
+import { InventoryPhotoUploader } from "@/components/inventory-photo-uploader"
 import { toast } from "sonner"
 
 const STATUSES = ["未処理", "出品準備中", "ヤフオク出品中", "売約済み"] as const
@@ -429,6 +430,14 @@ export function InventoryDetailContent({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-base font-semibold text-foreground">写真（出品用）</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          スマホから撮影・複数枚まとめてアップロード可能
+        </p>
+        <InventoryPhotoUploader managementCode={item.management_code} />
+      </section>
 
       <section id="actuals-section" className="mt-8 scroll-mt-16">
         <h2 className="mb-3 text-base font-semibold text-foreground">出品実績・売却結果</h2>

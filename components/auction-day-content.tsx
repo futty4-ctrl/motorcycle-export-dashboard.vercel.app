@@ -44,6 +44,7 @@ export default function AuctionDayContent() {
   const [filter, setFilter] = useState<FilterType>("ALL")
   const [loading, setLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [focusedIndex, setFocusedIndex] = useState(0)
 
   const today = new Date().toISOString().slice(0, 10)
   const [dateFilter, setDateFilter] = useState(today)
@@ -89,6 +90,46 @@ export default function AuctionDayContent() {
     }
     setUpdatingId(null)
   }
+
+  // キーボードショートカット: G=GO / N=NO GO / M=見送り / ↓→=次 / ↑←=前
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+      const current = filtered[focusedIndex]
+      const key = e.key.toLowerCase()
+      if (key === "g" && current) {
+        e.preventDefault()
+        handleDecision(current.id, "GO")
+        setFocusedIndex((i) => Math.min(i + 1, filtered.length - 1))
+      } else if (key === "n" && current) {
+        e.preventDefault()
+        handleDecision(current.id, "NO GO")
+        setFocusedIndex((i) => Math.min(i + 1, filtered.length - 1))
+      } else if (key === "m" && current) {
+        e.preventDefault()
+        handleDecision(current.id, "見送り")
+        setFocusedIndex((i) => Math.min(i + 1, filtered.length - 1))
+      } else if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+        e.preventDefault()
+        setFocusedIndex((i) => Math.min(i + 1, filtered.length - 1))
+      } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+        e.preventDefault()
+        setFocusedIndex((i) => Math.max(i - 1, 0))
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedIndex, items, filter, dateFilter])
 
   return (
     <div
@@ -233,11 +274,16 @@ export default function AuctionDayContent() {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {filtered.map((e) => (
+            <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>
+              キーボード: G=GO / N=NO GO / M=見送り / ↑↓ または ←→=前後
+            </div>
+            {filtered.map((e, idx) => (
               <Card
                 key={e.id}
                 evaluation={e}
                 updating={updatingId === e.id}
+                focused={idx === focusedIndex}
+                onClick={() => setFocusedIndex(idx)}
                 onDecision={(d) => handleDecision(e.id, d)}
               />
             ))}
@@ -251,16 +297,22 @@ export default function AuctionDayContent() {
 function Card({
   evaluation: e,
   updating,
+  focused,
+  onClick,
   onDecision,
 }: {
   evaluation: EvaluationWithVehicle
   updating: boolean
+  focused?: boolean
+  onClick?: () => void
   onDecision: (d: BidDecision) => void
 }) {
   const isGO = e.bid_decision === "GO"
   const isNoGo = e.bid_decision === "NO GO"
   const isSkip = e.bid_decision === "見送り"
-  const borderColor = isGO
+  const borderColor = focused
+    ? C.yellow
+    : isGO
     ? C.green
     : isNoGo
     ? C.red
@@ -270,6 +322,7 @@ function Card({
 
   return (
     <div
+      onClick={onClick}
       style={{
         background: C.surface,
         border: `2px solid ${borderColor}`,
@@ -277,6 +330,8 @@ function Card({
         padding: 14,
         opacity: updating ? 0.6 : 1,
         transition: "opacity 0.2s",
+        boxShadow: focused ? `0 0 0 3px ${C.yellow}40` : "none",
+        cursor: onClick ? "pointer" : "default",
       }}
     >
       {/* ヘッダー */}

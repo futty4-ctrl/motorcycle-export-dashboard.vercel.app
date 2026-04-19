@@ -275,6 +275,13 @@ export function YahooTemplateContent() {
     })
   }
 
+  const handleCopyAndOpenYahoo = async () => {
+    await navigator.clipboard.writeText(template)
+    setCopiedBody(true)
+    setTimeout(() => setCopiedBody(false), 2000)
+    window.open("https://auctions.yahoo.co.jp/sell/jp/show/submit?category=2084024278", "_blank", "noopener,noreferrer")
+  }
+
   const handleCopyTitle = () => {
     navigator.clipboard.writeText(title).then(() => {
       setCopiedTitle(true)
@@ -440,15 +447,25 @@ export function YahooTemplateContent() {
           <div style={sectionCard}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <span style={{ fontSize: 11, color: C.orange, fontWeight: 700 }}>出品文プレビュー</span>
-              <button onClick={handleCopyBody}
-                style={{
-                  padding: "8px 20px", borderRadius: 6, border: "none", cursor: "pointer",
-                  fontSize: 13, fontWeight: 700, fontFamily: font,
-                  background: copiedBody ? C.green : C.orange,
-                  color: "#fff", transition: "background 0.2s",
-                }}>
-                {copiedBody ? "コピー完了" : "出品文をコピー"}
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={handleCopyBody}
+                  style={{
+                    padding: "8px 20px", borderRadius: 6, border: "none", cursor: "pointer",
+                    fontSize: 13, fontWeight: 700, fontFamily: font,
+                    background: copiedBody ? C.green : C.orange,
+                    color: "#fff", transition: "background 0.2s",
+                  }}>
+                  {copiedBody ? "コピー完了" : "出品文をコピー"}
+                </button>
+                <button onClick={handleCopyAndOpenYahoo}
+                  style={{
+                    padding: "8px 20px", borderRadius: 6, border: `1px solid ${C.green}`, cursor: "pointer",
+                    fontSize: 13, fontWeight: 700, fontFamily: font,
+                    background: `${C.green}15`, color: C.green, transition: "background 0.2s",
+                  }}>
+                  コピー＆ヤフオク出品 →
+                </button>
+              </div>
             </div>
             <pre style={{
               background: "#0a0a0b", border: `1px solid ${C.border}`, borderRadius: 6,

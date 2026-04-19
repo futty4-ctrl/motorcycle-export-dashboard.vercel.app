@@ -310,6 +310,34 @@ export function InventoryContent() {
     toast.success(`${vehicles.length}台を検出しました`)
   }
 
+  // PDF/テキストファイルをドロップで取込
+  async function handleBdsFileDrop(file: File) {
+    try {
+      if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+        const pdfjs = await import("pdfjs-dist")
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
+        const buf = await file.arrayBuffer()
+        const pdf = await pdfjs.getDocument({ data: buf }).promise
+        let text = ""
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i)
+          const content = await page.getTextContent()
+          text += content.items
+            .map((it) => ("str" in it ? (it as { str: string }).str : ""))
+            .join("\n") + "\n"
+        }
+        setBdsText(text)
+        toast.success(`PDF読取完了: ${pdf.numPages}ページ`)
+      } else {
+        const text = await file.text()
+        setBdsText(text)
+        toast.success(`ファイル読取完了: ${file.name}`)
+      }
+    } catch (err) {
+      toast.error(`読取失敗: ${(err as Error).message}`)
+    }
+  }
+
   // BDS取込の各行を編集
   function updateParsedVehicle(idx: number, field: keyof ParsedVehicle, val: string | number) {
     setParsedVehicles(prev => prev.map((v, i) => i === idx ? { ...v, [field]: val } : v))
@@ -452,11 +480,17 @@ export function InventoryContent() {
         <div style={card()}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 8 }}>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {["すべて", ...STATUSES].map((st) => (
-                <button key={st} onClick={() => setStatusFilter(st)} style={selBtn(statusFilter === st, SC[st])}>
-                  {st}
-                </button>
-              ))}
+              {["すべて", ...STATUSES].map((st) => {
+                const count = st === "すべて" ? items.length : (counts as Record<string, number>)[st] ?? 0
+                return (
+                  <button key={st} onClick={() => setStatusFilter(st)} style={selBtn(statusFilter === st, SC[st])}>
+                    {st}
+                    <span style={{ marginLeft: 6, fontSize: 11, opacity: 0.8 }}>
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
           {filtered.length === 0 ? (
@@ -690,15 +724,41 @@ export function InventoryContent() {
                 <button key={v} onClick={() => setBdsVenueImport(v)} style={selBtn(bdsVenueImport === v)}>{v}</button>
               ))}
             </div>
-            <textarea
-              style={{
-                ...inp, minHeight: 200, resize: "vertical", lineHeight: 1.6,
-                fontFamily: "'Courier New', monospace", fontSize: 12,
+            <div
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+              onDrop={(e) => {
+                e.preventDefault()
+                const file = e.dataTransfer.files?.[0]
+                if (file) handleBdsFileDrop(file)
               }}
-              value={bdsText}
-              onChange={(e) => setBdsText(e.target.value)}
-              placeholder={`BDS請求書のテキストをここに貼り付けてください。\n\n（PDFを開いて全選択→コピー→ここに貼付）\n\n自動的に車台番号・落札価格・手数料を抽出します。`}
-            />
+              style={{
+                position: "relative",
+                borderRadius: 8,
+                border: `2px dashed ${C.border}`,
+                padding: 4,
+              }}
+            >
+              <textarea
+                style={{
+                  ...inp, minHeight: 200, resize: "vertical", lineHeight: 1.6,
+                  fontFamily: "'Courier New', monospace", fontSize: 12,
+                  border: "none",
+                }}
+                value={bdsText}
+                onChange={(e) => setBdsText(e.target.value)}
+                placeholder={`BDS請求書をここにドラッグ&ドロップ（PDF対応）\n\nまたはテキストを貼り付け（Ctrl+A → Ctrl+C → Ctrl+V）\n\n自動的に車台番号・落札価格・手数料を抽出します。`}
+              />
+              <input
+                type="file"
+                accept=".pdf,.txt"
+                style={{ display: "block", marginTop: 8, fontSize: 11, color: C.textSub }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) handleBdsFileDrop(f)
+                  e.target.value = ""
+                }}
+              />
+            </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <button onClick={handleBdsParse} style={btn("primary")} disabled={!bdsText.trim()}>
                 解析する
