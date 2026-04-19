@@ -9,6 +9,10 @@ import {
   updateInventoryItemStatus,
   type InventoryItemRow,
 } from "@/lib/inventory-supabase"
+import {
+  updateInventoryActuals,
+  bulkUpdateActualsByManagementCode,
+} from "@/app/actions/inventory-actuals"
 import { toast } from "sonner"
 import {
   C,
@@ -194,7 +198,10 @@ export function InventoryContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState("すべて")
-  const [tab, setTab] = useState<"list" | "quick" | "bds" | "template">("list")
+  const [tab, setTab] = useState<"list" | "quick" | "bds" | "template" | "csv">("list")
+  const [csvRows, setCsvRows] = useState<Array<{ management_code: string; sold_price: number | null; sold_date: string | null }>>([])
+  const [csvFileName, setCsvFileName] = useState("")
+  const [csvImporting, setCsvImporting] = useState(false)
 
   // クイック登録
   const [submitting, setSubmitting] = useState(false)
@@ -473,6 +480,7 @@ export function InventoryContent() {
         <button style={tabBtn("list", "在庫一覧", "▦")} onClick={() => setTab("list")}>▦ 在庫一覧</button>
         <button style={tabBtn("quick", "クイック登録", "+")} onClick={() => { setTab("quick"); resetQuickForm() }}>+ クイック登録</button>
         <button style={tabBtn("bds", "BDS請求書取込", "📄")} onClick={() => setTab("bds")}>📄 BDS取込</button>
+        <button style={tabBtn("csv", "実績CSV一括更新", "📊")} onClick={() => setTab("csv")}>📊 実績CSV</button>
       </div>
 
       {/* ══════════ TAB: 在庫一覧 ══════════ */}
@@ -502,55 +510,20 @@ export function InventoryContent() {
               <table style={table}>
                 <thead>
                   <tr>
-                    {["管理番号", "車名", "仕入価格", "会場", "状態", "操作"].map((h) => (
+                    {["管理番号", "車名", "仕入価格", "会場", "状態", "売却価格", "売却日", "操作"].map((h) => (
                       <th key={h} style={th}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((item) => (
-                    <tr key={item.id}
-                      style={{ transition: "background 0.15s" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = C.surfaceHover)}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                    >
-                      <td style={td}>
-                        <Link href={`/inventory/${item.management_code}`}
-                          style={{ color: C.orange, textDecoration: "none", fontWeight: "bold" }}>
-                          {item.management_code}
-                        </Link>
-                      </td>
-                      <td style={{ ...td, fontWeight: "bold" }}>{getDisplayName(item)}</td>
-                      <td style={{ ...td, color: C.textSub }}>{fmt(item.purchase_price)}</td>
-                      <td style={td}>
-                        {item.bds_venue ? (
-                          <span style={{ ...badge(C.blue), fontSize: 10 }}>{item.bds_venue}</span>
-                        ) : "—"}
-                      </td>
-                      <td style={td}>
-                        <select value={item.status} onChange={(e) => handleStatusChange(item.id, e.target.value)}
-                          style={{
-                            background: `${SC[item.status] ?? C.border}15`,
-                            border: `1px solid ${SC[item.status] ?? C.border}40`,
-                            borderRadius: 4, color: SC[item.status] ?? C.textSub,
-                            padding: "4px 8px", fontSize: 12, cursor: "pointer", fontFamily: font, outline: "none",
-                          }}>
-                          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </td>
-                      <td style={td}>
-                        <button
-                          onClick={() => { setTemplateItem(item); setTab("template") }}
-                          style={{
-                            padding: "4px 10px", borderRadius: 4, border: `1px solid ${C.border}`,
-                            background: "transparent", color: C.textSub, cursor: "pointer",
-                            fontSize: 11, fontFamily: font,
-                          }}
-                        >
-                          テンプレ生成
-                        </button>
-                      </td>
-                    </tr>
+                    <ActualsRow
+                      key={item.id}
+                      item={item}
+                      onStatusChange={handleStatusChange}
+                      onSaved={(updated) => setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)))}
+                      onTemplate={() => { setTemplateItem(item); setTab("template") }}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -829,6 +802,108 @@ export function InventoryContent() {
         </div>
       )}
 
+      {/* ══════════ TAB: 実績CSV一括更新 ══════════ */}
+      {tab === "csv" && (
+        <div style={{ ...card(C.greenGlow), borderTop: `3px solid ${C.green}` }}>
+          <div style={{ ...lbl, marginBottom: 16 }}>
+            実績CSV一括更新 — 管理コード・売却価格・売却日をまとめて更新
+          </div>
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 16, lineHeight: 1.8 }}>
+            CSV形式: <code style={{ background: C.surfaceHigh, padding: "2px 6px", borderRadius: 3 }}>管理コード,売却価格,売却日</code>
+            <br />
+            例: <code style={{ background: C.surfaceHigh, padding: "2px 6px", borderRadius: 3 }}>BDS-0001,380000,2026-04-15</code>
+            <br />
+            売却日は空欄OK。Excelから直接コピペもできます（カンマ/タブ両対応）
+          </div>
+          <textarea
+            style={{
+              ...inp, minHeight: 160, resize: "vertical", lineHeight: 1.6,
+              fontFamily: "'Courier New', monospace", fontSize: 12,
+            }}
+            value={csvFileName}
+            onChange={(e) => setCsvFileName(e.target.value)}
+            placeholder={`BDS-0001,380000,2026-04-15\nBDS-0002,420000,2026-04-16\nBDS-0003,250000,`}
+          />
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button
+              onClick={() => {
+                const lines = csvFileName.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+                const rows = lines.map((line) => {
+                  const parts = line.split(/[,\t]/).map((p) => p.trim())
+                  const code = parts[0] || ""
+                  const priceStr = (parts[1] || "").replace(/[^\d]/g, "")
+                  const dateStr = parts[2] || ""
+                  return {
+                    management_code: code,
+                    sold_price: priceStr ? parseInt(priceStr, 10) : null,
+                    sold_date: dateStr || null,
+                  }
+                }).filter((r) => r.management_code && r.sold_price != null)
+                setCsvRows(rows)
+                if (rows.length === 0) {
+                  toast.error("有効な行がありません。形式を確認してください")
+                } else {
+                  toast.success(`${rows.length}行を検出`)
+                }
+              }}
+              style={btn("primary")}
+              disabled={!csvFileName.trim()}
+            >
+              解析
+            </button>
+            <button onClick={() => { setCsvFileName(""); setCsvRows([]) }} style={btn("ghost")}>
+              クリア
+            </button>
+          </div>
+
+          {csvRows.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{ ...lbl, marginBottom: 8 }}>プレビュー（{csvRows.length}件）</div>
+              <div style={{ overflowX: "auto", maxHeight: 300, marginBottom: 12 }}>
+                <table style={table}>
+                  <thead>
+                    <tr>
+                      {["管理コード", "売却価格", "売却日"].map((h) => <th key={h} style={th}>{h}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {csvRows.map((r, i) => (
+                      <tr key={i}>
+                        <td style={td}>{r.management_code}</td>
+                        <td style={{ ...td, textAlign: "right", fontFamily: "monospace" }}>{fmt(r.sold_price)}</td>
+                        <td style={{ ...td, color: C.textSub }}>{r.sold_date || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button
+                onClick={async () => {
+                  setCsvImporting(true)
+                  const res = await bulkUpdateActualsByManagementCode(csvRows)
+                  setCsvImporting(false)
+                  if (res.errors.length > 0) {
+                    toast.error(`${res.updated}件成功 / ${res.errors.length}件失敗`)
+                    console.error("CSV update errors:", res.errors)
+                  } else {
+                    toast.success(`${res.updated}件を更新しました`)
+                  }
+                  setCsvFileName("")
+                  setCsvRows([])
+                  // 在庫リスト再取得
+                  const refreshed = await fetchInventoryItems()
+                  if (refreshed.data) setItems(refreshed.data)
+                }}
+                style={{ ...btn("primary"), background: C.green, borderColor: C.green }}
+                disabled={csvImporting}
+              >
+                {csvImporting ? "更新中..." : `${csvRows.length}件を一括更新`}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ══════════ TAB: 出品テンプレ生成 ══════════ */}
       {tab === "template" && templateItem && (
         <div style={{ ...card(), borderTop: `3px solid ${C.orange}` }}>
@@ -871,5 +946,148 @@ export function InventoryContent() {
         </div>
       )}
     </div>
+  )
+}
+
+/* ── 実績入力インライン行 ── */
+function ActualsRow({
+  item,
+  onStatusChange,
+  onSaved,
+  onTemplate,
+}: {
+  item: InventoryItemRow
+  onStatusChange: (id: string, newStatus: string) => void
+  onSaved: (updated: InventoryItemRow) => void
+  onTemplate: () => void
+}) {
+  const [price, setPrice] = useState(item.sold_price != null ? String(item.sold_price) : "")
+  const [date, setDate] = useState(item.sold_date ? String(item.sold_date).slice(0, 10) : "")
+  const [saving, setSaving] = useState(false)
+
+  const canEdit = item.status === "売約済み"
+  const isUnfilled = canEdit && item.sold_price == null
+
+  const save = async () => {
+    if (!price) {
+      toast.error("売却価格を入力してください")
+      return
+    }
+    setSaving(true)
+    const numPrice = parseInt(price.replace(/,/g, ""), 10)
+    const res = await updateInventoryActuals(item.id, {
+      sold_price: numPrice,
+      sold_date: date || null,
+    })
+    setSaving(false)
+    if (res.success) {
+      toast.success(`${item.management_code} 実績保存`)
+      onSaved({ ...item, sold_price: numPrice, sold_date: date || null })
+    } else {
+      toast.error(res.error || "保存失敗")
+    }
+  }
+
+  return (
+    <tr
+      style={{
+        transition: "background 0.15s",
+        background: isUnfilled ? `${C.yellow}08` : "transparent",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = C.surfaceHover)}
+      onMouseLeave={(e) => (e.currentTarget.style.background = isUnfilled ? `${C.yellow}08` : "transparent")}
+    >
+      <td style={td}>
+        <Link href={`/inventory/${item.management_code}`} style={{ color: C.orange, textDecoration: "none", fontWeight: "bold" }}>
+          {item.management_code}
+        </Link>
+      </td>
+      <td style={{ ...td, fontWeight: "bold" }}>{getDisplayName(item)}</td>
+      <td style={{ ...td, color: C.textSub }}>{fmt(item.purchase_price)}</td>
+      <td style={td}>
+        {item.bds_venue ? <span style={{ ...badge(C.blue), fontSize: 10 }}>{item.bds_venue}</span> : "—"}
+      </td>
+      <td style={td}>
+        <select
+          value={item.status}
+          onChange={(e) => onStatusChange(item.id, e.target.value)}
+          style={{
+            background: `${SC[item.status] ?? C.border}15`,
+            border: `1px solid ${SC[item.status] ?? C.border}40`,
+            borderRadius: 4, color: SC[item.status] ?? C.textSub,
+            padding: "4px 8px", fontSize: 12, cursor: "pointer", fontFamily: font, outline: "none",
+          }}
+        >
+          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </td>
+      <td style={td}>
+        {canEdit ? (
+          <input
+            type="text"
+            inputMode="numeric"
+            value={price}
+            onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))}
+            onKeyDown={(e) => { if (e.key === "Enter") save() }}
+            placeholder="価格"
+            style={{
+              ...inp,
+              width: 100,
+              padding: "4px 8px",
+              fontSize: 12,
+              fontFamily: "monospace",
+              borderColor: isUnfilled ? C.yellow : C.border,
+            }}
+          />
+        ) : "—"}
+      </td>
+      <td style={td}>
+        {canEdit ? (
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") save() }}
+            style={{
+              ...inp,
+              width: 130,
+              padding: "4px 8px",
+              fontSize: 12,
+            }}
+          />
+        ) : "—"}
+      </td>
+      <td style={td}>
+        {canEdit ? (
+          <button
+            onClick={save}
+            disabled={saving}
+            style={{
+              padding: "4px 10px",
+              borderRadius: 4,
+              border: `1px solid ${isUnfilled ? C.yellow : C.green}`,
+              background: `${isUnfilled ? C.yellow : C.green}15`,
+              color: isUnfilled ? C.yellow : C.green,
+              cursor: "pointer",
+              fontSize: 11,
+              fontFamily: font,
+            }}
+          >
+            {saving ? "..." : isUnfilled ? "保存" : "更新"}
+          </button>
+        ) : (
+          <button
+            onClick={onTemplate}
+            style={{
+              padding: "4px 10px", borderRadius: 4, border: `1px solid ${C.border}`,
+              background: "transparent", color: C.textSub, cursor: "pointer",
+              fontSize: 11, fontFamily: font,
+            }}
+          >
+            テンプレ生成
+          </button>
+        )}
+      </td>
+    </tr>
   )
 }

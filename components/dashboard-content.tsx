@@ -1,8 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getVehiclesFromSupabase, getConnectionStatus } from "@/app/actions/vehicles"
+import { countUnfilledSold } from "@/app/actions/inventory-actuals"
 import type { VehicleDisplay } from "@/lib/vehicle-display"
 import {
   C,
@@ -24,6 +26,7 @@ export function DashboardContent() {
   const router = useRouter()
   const [vehicles, setVehicles] = useState<VehicleDisplay[] | null>(null)
   const [loading, setLoading] = useState(true)
+  const [unfilledCount, setUnfilledCount] = useState<number>(0)
   const [connectionStatus, setConnectionStatus] = useState<{
     supabase: "ok" | "env_missing" | "error"
   }>({ supabase: "env_missing" })
@@ -33,8 +36,12 @@ export function DashboardContent() {
       const status = await getConnectionStatus()
       setConnectionStatus(status)
       if (status.supabase === "ok") {
-        const result = await getVehiclesFromSupabase()
-        if (result.vehicles) setVehicles(result.vehicles)
+        const [vehiclesResult, unfilledResult] = await Promise.all([
+          getVehiclesFromSupabase(),
+          countUnfilledSold(),
+        ])
+        if (vehiclesResult.vehicles) setVehicles(vehiclesResult.vehicles)
+        if (unfilledResult.success) setUnfilledCount(unfilledResult.count)
       }
       setLoading(false)
     }
@@ -105,6 +112,46 @@ export function DashboardContent() {
       </div>
 
       <BiddingSummaryCards />
+
+      {unfilledCount > 0 && (
+        <Link
+          href="/inventory"
+          style={{ textDecoration: "none" }}
+        >
+          <div
+            style={{
+              ...card(C.yellowGlow ?? `${C.yellow}18`),
+              borderLeft: `3px solid ${C.yellow}`,
+              marginBottom: 24,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+            }}
+          >
+            <div style={{ fontSize: 32 }}>⚠</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, color: C.yellow, fontWeight: 700, marginBottom: 4 }}>
+                実績未入力のバイク
+              </div>
+              <div style={{ fontSize: 12, color: C.textSub }}>
+                売約済みだけど売却価格が未入力の車両があります。仕入れ判断の精度UPのため、2項目だけ入れてください。
+              </div>
+            </div>
+            <div
+              style={{
+                fontSize: 28,
+                fontWeight: "bold",
+                color: C.yellow,
+                minWidth: 60,
+                textAlign: "right",
+              }}
+            >
+              {unfilledCount}台 →
+            </div>
+          </div>
+        </Link>
+      )}
 
       <div
         style={{
