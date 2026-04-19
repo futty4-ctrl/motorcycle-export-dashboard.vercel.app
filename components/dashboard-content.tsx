@@ -111,6 +111,33 @@ export function DashboardContent() {
         </div>
       </div>
 
+      <Link href="/bds-border" style={{ textDecoration: "none" }}>
+        <div
+          style={{
+            background: `linear-gradient(135deg, ${C.orange}15, ${C.orange}05)`,
+            border: `1px solid ${C.orange}`,
+            borderRadius: 12,
+            padding: "18px 24px",
+            marginBottom: 24,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+          }}
+        >
+          <div style={{ fontSize: 36 }}>🎯</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.orange, marginBottom: 2 }}>
+              仕入ボーダー計算
+            </div>
+            <div style={{ fontSize: 12, color: C.textSub }}>
+              ヤフオク相場 × 車種 × 会場 から逆算。過去実績も自動比較。
+            </div>
+          </div>
+          <div style={{ fontSize: 24, color: C.orange }}>→</div>
+        </div>
+      </Link>
+
       <BiddingSummaryCards />
 
       {unfilledCount > 0 && (
