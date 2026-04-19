@@ -15,10 +15,12 @@ import {
   Flag,
   LineChart,
   History,
+  Target,
 } from "lucide-react"
 
 const navItems = [
   { label: "ダッシュボード", href: "/", icon: LayoutDashboard },
+  { label: "仕入ボーダー", href: "/bds-border", icon: Target },
   { label: "オークション当日", href: "/auction-day", icon: Flag },
   { label: "オークション履歴", href: "/auction-history", icon: History },
   { label: "分析・振り返り", href: "/analytics", icon: LineChart },

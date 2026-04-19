@@ -27,6 +27,8 @@ const NAV = [
   {
     group: "仕入れ判断",
     items: [
+      { href: "/bds-border", label: "仕入ボーダー計算", icon: "🎯" },
+      { href: "/bds-simulator", label: "シミュレーター", icon: "🧮" },
       { href: "/auction-day", label: "オークション当日", icon: "🏁" },
       { href: "/auction-history", label: "オークション履歴", icon: "📚" },
       { href: "/analytics", label: "分析・振り返り", icon: "📊" },
