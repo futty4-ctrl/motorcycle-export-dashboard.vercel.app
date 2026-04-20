@@ -1,4 +1,4 @@
-BDS落札結果ページから auction_history に一括取込（v3 デバッグ強化）
+BDS落札結果ページから auction_history に一括取込（v4 日付prompt復活）
 ====================================================================
 
 【使い方】
@@ -6,22 +6,37 @@ BDS落札結果ページから auction_history に一括取込（v3 デバッグ
 2. ブラウザのブックマークバーに新規ブックマーク追加
 3. 名前: 例）BDS→履歴取込
 4. URL欄に貼り付けて保存
-5. BDSの落札結果ページでブックマークをクリック
+5. BDSの落札結果ページでブックマーククリック
 
-【v3の改善】
-- 日付自動抽出（promptなし）
-- bulk化で高速（100件1秒）
-- 重複扱いされた場合に「なぜ重複か」を表示
+【v4の動作】
+1. まずサーバーで日付を自動検出
+2. 検出された日付を prompt で確認表示
+3. ユーザーは Enter でそのまま / 編集して正しい日付に
+4. 空欄OK押すとキャンセル扱い
+5. 確定した日付で取込実行
 
-【ブックマークレット用コード（v3）】
+【なぜv4？】
+v3で「開催日が過去回の日付になってしまう」問題。
+BDSページ内の複数日付から「開催日」を優先抽出するが、
+それでも間違うケースがあるので、人が確認するステップを入れる。
 
-javascript:(function(){var t=document.body.innerText;if(t.length<100){alert('ページテキストが短すぎます');return;}fetch('https://motorcycle-export-dashboard.vercel.app/api/auction-history/quick-import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})}).then(r=>r.json()).then(d=>{if(d.success){var msg='✓ 取込完了\n開催日: '+d.auction_date+' ('+d.date_source+')\n解析: '+d.parsed+'件\n新規: '+d.inserted+'件\n更新: '+d.updated+'件\n重複: '+d.skipped+'件\n落札: '+d.sold+'件 / 流札: '+d.unsold+'件\n既存同日: '+d.existingCount+'件';if(d.skipSamples&&d.skipSamples.length>0){msg+='\n\n[重複例 先頭3件]';d.skipSamples.slice(0,3).forEach(function(s){msg+='\nkey:'+s.key+'\n 理由:'+s.reason;});}alert(msg);}else{alert('✗ 失敗: '+d.error);}}).catch(e=>alert('✗ エラー: '+e.message));})();
+【ブックマークレット用コード（v4）】
+
+javascript:(function(){var t=document.body.innerText;if(t.length<100){alert('ページテキストが短すぎます');return;}var detectedKaisai=t.match(/開催日?\s*[:：]?\s*(\d{4})[年/\-](\d{1,2})[月/\-](\d{1,2})/);var detectedYmd=!detectedKaisai?t.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/):null;var detectedSlash=!detectedKaisai&&!detectedYmd?t.match(/(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})/):null;var match=detectedKaisai||detectedYmd||detectedSlash;var defaultDate=match?match[1]+'-'+String(match[2]).padStart(2,'0')+'-'+String(match[3]).padStart(2,'0'):new Date().toISOString().slice(0,10);var userDate=prompt('開催日を確認（検出値を修正可）',defaultDate);if(userDate===null||!userDate.match(/^\d{4}-\d{2}-\d{2}$/)){alert('キャンセルまたは不正な日付形式');return;}fetch('https://motorcycle-export-dashboard.vercel.app/api/auction-history/quick-import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,auction_date:userDate})}).then(r=>r.json()).then(d=>{if(d.success){var msg='✓ 取込完了\n開催日: '+d.auction_date+' ('+d.date_source+')\n解析: '+d.parsed+'件\n新規: '+d.inserted+'件\n更新: '+d.updated+'件\n重複: '+d.skipped+'件\n落札: '+d.sold+'件 / 流札: '+d.unsold+'件\n既存同日: '+d.existingCount+'件';if(d.skipSamples&&d.skipSamples.length>0){msg+='\n\n[重複例 先頭3件]';d.skipSamples.slice(0,3).forEach(function(s){msg+='\nkey:'+s.key+'\n 理由:'+s.reason;});}alert(msg);}else{alert('✗ 失敗: '+d.error);}}).catch(e=>alert('✗ エラー: '+e.message));})();
+
+【使用例】
+1. BDSページ開く
+2. ブックマーククリック
+3. 「開催日を確認（検出値を修正可）」と出て[2026-04-17]等がデフォルト
+4. 正しければ Enter、違えば書き直して OK
+5. 取込完了アラート確認
 
 【アラート見方】
-- 新規 N件: DBに新しく入った件数（これが増えればOK）
+- 新規 N件: DBに新しく入った件数
 - 更新 M件: 既存レコードの結果更新件数
-- 重複 K件: スキップされた件数
-- 既存同日 X件: この日付でDBに既にある件数
-- 重複例: keyとreason（原因）が表示される
-  - already-has-sold-price: 既に結果入力済み
-  - no-new-data: 今回も結果なしなので更新不要
+- 重複 K件: スキップ
+- 既存同日 X件: その日付でDBに既にある件数
+
+【よくある重複原因】
+- 既存同日が多い → その日付のページは過去に取込済み
+- 日付入力ミス → 正しい開催日に直して再実行
