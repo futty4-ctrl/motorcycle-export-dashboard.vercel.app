@@ -122,7 +122,7 @@ export default function BdsBorderContent() {
   const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([])
   const [selectedMarket, setSelectedMarket] = useState<MarketPrice | null>(null)
   const [manualYahoo, setManualYahoo] = useState("")
-  const [priceSource, setPriceSource] = useState<"db" | "actuals" | "bds" | "eval" | "manual">(
+  const [priceSource, setPriceSource] = useState<"db" | "actuals" | "bds" | "yahoo" | "eval" | "manual">(
     evalId ? "eval" : "db"
   )
   const [evalSnapshot, setEvalSnapshot] = useState<Awaited<ReturnType<typeof getEvaluationSnapshot>>["data"] | null>(null)
@@ -135,6 +135,19 @@ export default function BdsBorderContent() {
   const [bdsBid, setBdsBid] = useState(initialBid)
   const [pastActuals, setPastActuals] = useState<PastActualsSummary | null>(null)
   const [bdsHistory, setBdsHistory] = useState<BdsHistorySummary | null>(null)
+  const [yahooResults, setYahooResults] = useState<
+    Array<{ title: string; price: number; bids: number; endDate: string; url: string }>
+  >([])
+  const [yahooStats, setYahooStats] = useState<{
+    count: number
+    avg: number
+    median: number
+    min: number
+    max: number
+    trimmedAvg: number
+  } | null>(null)
+  const [yahooLoading, setYahooLoading] = useState(false)
+  const [yahooExpanded, setYahooExpanded] = useState(false)
 
   useEffect(() => {
     getMarketPrices().then((res) => {
@@ -164,6 +177,8 @@ export default function BdsBorderContent() {
     if (!selectedMarket) {
       setPastActuals(null)
       setBdsHistory(null)
+      setYahooResults([])
+      setYahooStats(null)
       return
     }
     getPastActualsForModel(selectedMarket.maker, selectedMarket.model).then((res) => {
@@ -172,6 +187,19 @@ export default function BdsBorderContent() {
     getBdsHistoryForModel(selectedMarket.model).then((res) => {
       if (res.success) setBdsHistory(res.data)
     })
+    // ヤフオク生データ取得
+    setYahooLoading(true)
+    const query = `${selectedMarket.maker} ${selectedMarket.model}`.trim()
+    fetch(`/api/yahoo-auctions/closed?q=${encodeURIComponent(query)}&limit=50`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d.results)) {
+          setYahooResults(d.results)
+          setYahooStats(d.stats)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setYahooLoading(false))
   }, [selectedMarket])
 
   const yahooPrice = (() => {
@@ -182,6 +210,8 @@ export default function BdsBorderContent() {
         return Math.round(pastActuals?.medianSoldPrice ?? 0)
       case "bds":
         return Math.round(bdsHistory?.medianSoldPrice ?? 0)
+      case "yahoo":
+        return yahooStats?.median ?? 0
       case "eval":
         return evalSnapshot?.estimatedSalePrice ?? 0
       case "db":
@@ -297,8 +327,9 @@ export default function BdsBorderContent() {
                 ...(evalSnapshot
                   ? [{ label: "⚡ 評価データ（入札判断）", value: "eval" as const, note: "auction-dayの最新推定売価" }]
                   : []),
+                { label: "🟢 ヤフオク生中央値", value: "yahoo" as const, note: "終了済み落札スクレイピング" },
                 { label: "相場マスターDB", value: "db" as const, note: "手動入力値" },
-                { label: "自分の売却実績 中央値", value: "actuals" as const, note: "推奨（実データ）" },
+                { label: "自分の売却実績 中央値", value: "actuals" as const, note: "実データ" },
                 { label: "BDS落札中央値", value: "bds" as const, note: "BDS履歴1000件" },
                 { label: "手入力", value: "manual" as const, note: "その都度" },
               ].map((opt) => (
@@ -842,6 +873,188 @@ export default function BdsBorderContent() {
           )}
         </div>
       </div>
+
+      {/* ── ヤフオク生データ（終了済み落札結果） ── */}
+      {selectedMarket && (yahooLoading || yahooResults.length > 0) && (
+        <div
+          style={{
+            marginTop: 24,
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderLeft: `3px solid ${C.green}`,
+            borderRadius: 10,
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              marginBottom: 16,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: C.fontSans,
+                fontWeight: 700,
+                fontSize: 14,
+                color: C.text,
+              }}
+            >
+              🟢 ヤフオク 終了済み落札データ（生）
+            </div>
+            <div style={{ fontSize: 11, color: C.textSub }}>
+              {yahooLoading ? "取得中..." : `${yahooResults.length}件`}
+            </div>
+          </div>
+
+          {yahooStats && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: 12,
+                marginBottom: 16,
+              }}
+            >
+              {[
+                { label: "落札中央値", value: yahooStats.median, color: C.green },
+                { label: "トリム平均", value: yahooStats.trimmedAvg, color: C.orange },
+                { label: "最高", value: yahooStats.max, color: C.textSub },
+                { label: "最低", value: yahooStats.min, color: C.red },
+              ].map((k) => (
+                <div
+                  key={k.label}
+                  style={{
+                    background: C.surfaceHigh,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 8,
+                    padding: "12px 14px",
+                  }}
+                >
+                  <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 6, letterSpacing: "0.08em" }}>
+                    {k.label}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: C.fontSans,
+                      fontSize: 18,
+                      fontWeight: 700,
+                      color: k.color,
+                    }}
+                  >
+                    {fmtFull(k.value)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {yahooResults.length > 0 && (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 8,
+                }}
+              >
+                <div style={{ fontSize: 11, color: C.textMuted, letterSpacing: "0.08em" }}>
+                  落札一覧（{yahooExpanded ? "全件" : "上位15件"}）
+                </div>
+                <button
+                  onClick={() => setYahooExpanded(!yahooExpanded)}
+                  style={{
+                    fontSize: 11,
+                    padding: "4px 10px",
+                    background: "transparent",
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 4,
+                    color: C.textSub,
+                    cursor: "pointer",
+                    fontFamily: C.fontSans,
+                  }}
+                >
+                  {yahooExpanded ? "折りたたむ" : `全${yahooResults.length}件表示`}
+                </button>
+              </div>
+              <div style={{ overflowX: "auto", maxHeight: yahooExpanded ? 600 : 400 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${C.border}`, background: C.surfaceHigh }}>
+                      {["終了日", "タイトル", "落札額", "入札"].map((h) => (
+                        <th
+                          key={h}
+                          style={{
+                            textAlign: h === "タイトル" ? "left" : h === "終了日" ? "left" : "right",
+                            padding: "8px 10px",
+                            fontSize: 10,
+                            color: C.textMuted,
+                            fontFamily: C.font,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(yahooExpanded ? yahooResults : yahooResults.slice(0, 15)).map((r, i) => (
+                      <tr key={i} style={{ borderBottom: `1px solid ${C.border}40` }}>
+                        <td style={{ padding: "6px 10px", color: C.textSub, fontSize: 11, whiteSpace: "nowrap" }}>
+                          {r.endDate || "—"}
+                        </td>
+                        <td style={{ padding: "6px 10px", fontSize: 12 }}>
+                          <a
+                            href={r.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: C.text, textDecoration: "none" }}
+                          >
+                            {r.title}
+                          </a>
+                        </td>
+                        <td
+                          style={{
+                            padding: "6px 10px",
+                            textAlign: "right",
+                            fontFamily: "monospace",
+                            fontWeight: 600,
+                            color: C.green,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {fmtFull(r.price)}
+                        </td>
+                        <td
+                          style={{
+                            padding: "6px 10px",
+                            textAlign: "right",
+                            color: C.textSub,
+                            fontSize: 11,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {r.bids}回
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {!yahooLoading && yahooResults.length === 0 && (
+            <div style={{ padding: 20, textAlign: "center", color: C.textMuted, fontSize: 12 }}>
+              ヤフオクに終了済み落札データがありません
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── BDS落札相場（auction_historyの1000件+データ） ── */}
       {bdsHistory && bdsHistory.soldCount > 0 && (
