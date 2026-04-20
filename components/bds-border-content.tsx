@@ -260,22 +260,16 @@ export default function BdsBorderContent() {
     })
   }, [searchMaker, searchModel])
 
-  // プルダウン選択からクエリ構築して検索
+  // プルダウン選択からクエリ構築して検索（メーカー・車種のみAPI送信、排気量・型式はクライアントフィルタ）
   const runSearchFromDropdowns = (override?: {
     maker?: string
     model?: string
-    ccRange?: string
-    chassisPrefix?: string
   }) => {
     const parts: string[] = []
     const mk = override?.maker !== undefined ? override.maker : searchMaker
     const mdl = override?.model !== undefined ? override.model : searchModel
-    const cc = override?.ccRange !== undefined ? override.ccRange : searchCcRange
-    const ch = override?.chassisPrefix !== undefined ? override.chassisPrefix : searchChassisPrefix
     if (mk) parts.push(mk)
     if (mdl) parts.push(mdl)
-    if (ch) parts.push(ch)
-    if (cc) parts.push(cc)
     const q = parts.join(" ").trim()
     if (q) {
       setYahooQuery(q)
@@ -283,12 +277,24 @@ export default function BdsBorderContent() {
     }
   }
 
-  // 型式フィルタ適用（クライアント側・タイトル含有）
-  const yahooFilteredResults = yahooModelType.trim()
-    ? yahooResults.filter((r) =>
-        r.title.toLowerCase().includes(yahooModelType.toLowerCase())
-      )
-    : yahooResults
+  // クライアント側フィルタ（即時反映・再API不要）
+  const yahooFilteredResults = yahooResults.filter((r) => {
+    const title = r.title.toLowerCase()
+    // 型式プルダウン（例：NC42）
+    if (searchChassisPrefix && !title.includes(searchChassisPrefix.toLowerCase())) return false
+    // 型式追加テキスト（自由入力）
+    if (yahooModelType.trim() && !title.includes(yahooModelType.toLowerCase())) return false
+    // 排気量プルダウン（例：50cc / 125cc）- タイトルに "50cc" や数字 "50" を含む
+    if (searchCcRange) {
+      const ccNum = searchCcRange.replace(/[^\d]/g, "")
+      if (!ccNum) return true
+      // "50cc" "50ｃｃ" "50"を含むかチェック
+      const hasCc = title.includes(`${ccNum}cc`) || title.includes(`${ccNum}ｃｃ`) ||
+        new RegExp(`\\b${ccNum}\\b`).test(title)
+      if (!hasCc) return false
+    }
+    return true
+  })
 
   // 型式フィルタ後の再統計
   const yahooFilteredStats = (() => {
@@ -1047,14 +1053,10 @@ export default function BdsBorderContent() {
               </select>
             </div>
             <div>
-              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>排気量</div>
+              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>排気量（結果絞込）</div>
               <select
                 value={searchCcRange}
-                onChange={(e) => {
-                  const v = e.target.value
-                  setSearchCcRange(v)
-                  runSearchFromDropdowns({ ccRange: v })
-                }}
+                onChange={(e) => setSearchCcRange(e.target.value)}
                 style={dropdownStyle(C)}
               >
                 <option value="">--</option>
@@ -1090,15 +1092,11 @@ export default function BdsBorderContent() {
             </div>
             <div>
               <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>
-                型式 {chassisPrefixes.length > 0 && <span style={{ color: C.textMuted }}>({chassisPrefixes.length})</span>}
+                型式（結果絞込） {chassisPrefixes.length > 0 && <span style={{ color: C.textMuted }}>({chassisPrefixes.length})</span>}
               </div>
               <select
                 value={searchChassisPrefix}
-                onChange={(e) => {
-                  const v = e.target.value
-                  setSearchChassisPrefix(v)
-                  runSearchFromDropdowns({ chassisPrefix: v })
-                }}
+                onChange={(e) => setSearchChassisPrefix(e.target.value)}
                 style={dropdownStyle(C)}
               >
                 <option value="">--</option>
