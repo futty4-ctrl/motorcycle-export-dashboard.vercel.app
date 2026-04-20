@@ -9,6 +9,7 @@ import {
   listStaleInventory,
   getLastActualInputDate,
 } from "@/app/actions/inventory-actuals"
+import { getNextWeekPicks, type NextWeekPick } from "@/app/actions/next-week-picks"
 import type { VehicleDisplay } from "@/lib/vehicle-display"
 import {
   C,
@@ -33,6 +34,7 @@ export function DashboardContent() {
   const [unfilledCount, setUnfilledCount] = useState<number>(0)
   const [staleCount, setStaleCount] = useState<number>(0)
   const [daysSinceLastInput, setDaysSinceLastInput] = useState<number | null>(null)
+  const [nextWeekPicks, setNextWeekPicks] = useState<NextWeekPick[]>([])
   const [connectionStatus, setConnectionStatus] = useState<{
     supabase: "ok" | "env_missing" | "error"
   }>({ supabase: "env_missing" })
@@ -42,18 +44,25 @@ export function DashboardContent() {
       const status = await getConnectionStatus()
       setConnectionStatus(status)
       if (status.supabase === "ok") {
-        const [vehiclesResult, unfilledResult, staleResult, lastInputResult] =
-          await Promise.all([
-            getVehiclesFromSupabase(),
-            countUnfilledSold(),
-            listStaleInventory(7),
-            getLastActualInputDate(),
-          ])
+        const [
+          vehiclesResult,
+          unfilledResult,
+          staleResult,
+          lastInputResult,
+          picksResult,
+        ] = await Promise.all([
+          getVehiclesFromSupabase(),
+          countUnfilledSold(),
+          listStaleInventory(7),
+          getLastActualInputDate(),
+          getNextWeekPicks({ limit: 10 }),
+        ])
         if (vehiclesResult.vehicles) setVehicles(vehiclesResult.vehicles)
         if (unfilledResult.success) setUnfilledCount(unfilledResult.count)
         if (staleResult.success) setStaleCount(staleResult.count)
         if (lastInputResult.success)
           setDaysSinceLastInput(lastInputResult.daysSinceLastInput)
+        if (picksResult.success) setNextWeekPicks(picksResult.picks)
       }
       setLoading(false)
     }
@@ -122,6 +131,147 @@ export function DashboardContent() {
           </span>
         </div>
       </div>
+
+      {nextWeekPicks.length > 0 && (
+        <div
+          style={{
+            ...card(),
+            borderLeft: `3px solid ${C.orange}`,
+            marginBottom: 24,
+            padding: 0,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              padding: "14px 20px 10px",
+              borderBottom: `1px solid ${C.border}`,
+            }}
+          >
+            <div>
+              <div style={{ fontFamily: font, fontSize: 13, fontWeight: 700, color: C.orange }}>
+                🎯 次週のねらい目（データ駆動推薦）
+              </div>
+              <div style={{ fontFamily: font, fontSize: 11, color: C.textSub, marginTop: 2 }}>
+                過去90日のBDS落札＋自分の実績からスコア算出
+              </div>
+            </div>
+            <Link
+              href="/next-week"
+              style={{
+                fontFamily: font,
+                fontSize: 11,
+                color: C.textSub,
+                textDecoration: "none",
+                padding: "4px 10px",
+                border: `1px solid ${C.border}`,
+                borderRadius: 4,
+              }}
+            >
+              詳細 →
+            </Link>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontFamily: font,
+                fontSize: 12,
+              }}
+            >
+              <thead>
+                <tr style={{ background: C.surfaceHigh }}>
+                  {["#", "車種", "Score", "BDS件数", "BDS中央値", "自分", "粗利中央値", "推定上限", "アクション"].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        textAlign: h === "車種" || h === "アクション" ? "left" : h === "#" ? "center" : "right",
+                        padding: "8px 12px",
+                        fontSize: 10,
+                        color: C.textMuted,
+                        fontWeight: 600,
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {nextWeekPicks.map((p) => {
+                  const scoreClr = p.score >= 70 ? C.green : p.score >= 50 ? C.orange : p.score >= 30 ? C.yellow : C.textMuted
+                  return (
+                    <tr key={p.modelName} style={{ borderTop: `1px solid ${C.border}40` }}>
+                      <td style={{ padding: "8px 12px", textAlign: "center", fontWeight: 700, color: scoreClr }}>
+                        {p.rank}
+                      </td>
+                      <td style={{ padding: "8px 12px", fontWeight: 600 }}>
+                        {p.maker ? `${p.maker} ` : ""}{p.modelName}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 12px",
+                          textAlign: "right",
+                          fontWeight: 700,
+                          color: scoreClr,
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {p.score}
+                      </td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", color: C.textSub }}>
+                        {p.bdsLotCount90d}
+                      </td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", color: C.orange, fontFamily: "monospace" }}>
+                        {p.bdsSoldMedian != null ? `¥${Math.round(p.bdsSoldMedian).toLocaleString()}` : "—"}
+                      </td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", color: C.textSub }}>
+                        {p.myCount > 0 ? `${p.myCount}台` : "—"}
+                      </td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", color: C.green, fontFamily: "monospace" }}>
+                        {p.myProfitMedian != null ? `¥${Math.round(p.myProfitMedian).toLocaleString()}` : "—"}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 12px",
+                          textAlign: "right",
+                          fontWeight: 700,
+                          color: C.orange,
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {p.estimatedCeilingPrice != null
+                          ? `¥${Math.round(p.estimatedCeilingPrice).toLocaleString()}`
+                          : "—"}
+                      </td>
+                      <td style={{ padding: "8px 12px" }}>
+                        <Link
+                          href={`/bds-border?model=${encodeURIComponent(p.modelName)}${p.maker ? `&maker=${encodeURIComponent(p.maker)}` : ""}`}
+                          style={{
+                            color: C.orange,
+                            fontSize: 11,
+                            textDecoration: "none",
+                            padding: "3px 8px",
+                            border: `1px solid ${C.orange}60`,
+                            borderRadius: 3,
+                          }}
+                        >
+                          ボーダー→
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <Link href="/bds-border" style={{ textDecoration: "none" }}>
         <div
