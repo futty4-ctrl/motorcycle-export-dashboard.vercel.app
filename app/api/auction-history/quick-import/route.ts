@@ -55,27 +55,35 @@ export async function POST(req: NextRequest) {
     const records = parsed.map((r) => bdsRowToRecord(r, date, source || "BDS"))
     const supabase = createServerSupabaseClient()
 
-    // force=true: 既存チェックをバイパス、DB側のUNIQUE制約だけで重複排除
+    // force=true: 既存チェックをバイパス、シンプルINSERT＋UNIQUE違反で自動スキップ
     if (force) {
       let inserted = 0
       let skipped = 0
       const errorsDetail: string[] = []
+      // まず100件一括INSERTを試す
       for (let i = 0; i < records.length; i += 100) {
         const batch = records.slice(i, i + 100)
         const { data, error } = await supabase
           .from("auction_history")
-          .upsert(batch, {
-            onConflict: "bds_lot_number,auction_date,region,source",
-            ignoreDuplicates: true,
-          })
+          .insert(batch)
           .select("id")
-        if (error) {
-          errorsDetail.push(`batch ${i}: ${error.message}`)
-          skipped += batch.length
-        } else {
-          const actualInserted = data?.length ?? 0
-          inserted += actualInserted
-          skipped += batch.length - actualInserted
+        if (!error) {
+          inserted += data?.length ?? batch.length
+          continue
+        }
+        // バッチ失敗 → 1件ずつリトライ（UNIQUE違反だけスキップ）
+        for (const rec of batch) {
+          const { error: singleErr } = await supabase
+            .from("auction_history")
+            .insert(rec)
+          if (!singleErr) {
+            inserted++
+          } else if (singleErr.code === "23505" || /duplicate|unique/i.test(singleErr.message)) {
+            skipped++
+          } else {
+            errorsDetail.push(`${rec.bds_lot_number}: ${singleErr.message}`)
+            skipped++
+          }
         }
       }
       return NextResponse.json(
