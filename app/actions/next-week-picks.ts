@@ -1,6 +1,7 @@
 "use server"
 
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { computeBdsYahooRatio } from "./bds-yahoo-ratio"
 
 export type NextWeekPick = {
   rank: number
@@ -35,6 +36,9 @@ export async function getNextWeekPicks(opts?: {
   success: boolean
   picks: NextWeekPick[]
   totalModelsAnalyzed: number
+  ratioUsed: number
+  ratioConfidence: "high" | "medium" | "low"
+  ratioSampleSize: number
   error?: string
 }> {
   const targetProfit = opts?.targetProfit ?? 50000
@@ -45,6 +49,13 @@ export async function getNextWeekPicks(opts?: {
 
   try {
     const supabase = createServerSupabaseClient()
+
+    // BDS→ヤフオク係数を実績から学習
+    const ratioRes = await computeBdsYahooRatio()
+    const overallRatio = ratioRes.data?.overall ?? 1.4
+    const ratioConfidence = ratioRes.data?.confidence ?? "low"
+    const ratioSampleSize = ratioRes.data?.sampleSize ?? 0
+    const modelRatios = ratioRes.data?.byModel ?? {}
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - lookbackDays)
     const cutoffDate = cutoff.toISOString().slice(0, 10)
@@ -148,9 +159,11 @@ export async function getNextWeekPicks(opts?: {
       const myProfitMedian = median(s.myProfits)
       const myAvgDays = avg(s.myDays)
 
-      // 推定仕入上限: BDS中央値×0.85（ヤフオクで±相当額上乗せ想定）- 目標利益 - 手数料
-      // 簡易：ヤフオク売価 ≒ BDS中央値 × 1.4 と仮定（改善余地あり）
-      const estimatedYahooPrice = bdsSoldMedian ? bdsSoldMedian * 1.4 : null
+      // 推定仕入上限: BDS中央値 × 実績から学習した係数 を使用
+      // 車種別の係数があればそれを、なければ全体平均を使用
+      const modelRatio = modelRatios[modelName]?.ratio
+      const appliedRatio = modelRatio ?? overallRatio
+      const estimatedYahooPrice = bdsSoldMedian ? bdsSoldMedian * appliedRatio : null
       const estimatedCeiling = estimatedYahooPrice
         ? Math.max(
             0,
@@ -199,9 +212,24 @@ export async function getNextWeekPicks(opts?: {
     results.sort((a, b) => b.score - a.score)
     const top = results.slice(0, limit).map((r, i) => ({ ...r, rank: i + 1 }))
 
-    return { success: true, picks: top, totalModelsAnalyzed: results.length }
+    return {
+      success: true,
+      picks: top,
+      totalModelsAnalyzed: results.length,
+      ratioUsed: overallRatio,
+      ratioConfidence,
+      ratioSampleSize,
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "取得に失敗しました"
-    return { success: false, picks: [], totalModelsAnalyzed: 0, error: message }
+    return {
+      success: false,
+      picks: [],
+      totalModelsAnalyzed: 0,
+      ratioUsed: 1.4,
+      ratioConfidence: "low",
+      ratioSampleSize: 0,
+      error: message,
+    }
   }
 }

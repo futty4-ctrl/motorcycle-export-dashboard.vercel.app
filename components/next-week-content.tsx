@@ -38,6 +38,9 @@ export default function NextWeekContent() {
   const [loading, setLoading] = useState(true)
   const [targetProfit, setTargetProfit] = useState(50000)
   const [lookbackDays, setLookbackDays] = useState(90)
+  const [ratioUsed, setRatioUsed] = useState(1.4)
+  const [ratioConfidence, setRatioConfidence] = useState<"high" | "medium" | "low">("low")
+  const [ratioSampleSize, setRatioSampleSize] = useState(0)
 
   const load = async () => {
     setLoading(true)
@@ -45,6 +48,9 @@ export default function NextWeekContent() {
     if (res.success) {
       setPicks(res.picks)
       setTotalAnalyzed(res.totalModelsAnalyzed)
+      setRatioUsed(res.ratioUsed)
+      setRatioConfidence(res.ratioConfidence)
+      setRatioSampleSize(res.ratioSampleSize)
     } else {
       toast.error(res.error || "取得失敗")
     }
@@ -347,19 +353,47 @@ export default function NextWeekContent() {
         style={{
           marginTop: 30,
           padding: "14px 18px",
-          background: `${C.textMuted}08`,
-          border: `1px solid ${C.border}`,
+          background:
+            ratioConfidence === "high"
+              ? `${C.green}10`
+              : ratioConfidence === "medium"
+              ? `${C.yellow}10`
+              : `${C.textMuted}08`,
+          border: `1px solid ${
+            ratioConfidence === "high"
+              ? `${C.green}40`
+              : ratioConfidence === "medium"
+              ? `${C.yellow}40`
+              : C.border
+          }`,
           borderRadius: 10,
           fontSize: 11,
           color: C.textMuted,
-          lineHeight: 1.7,
+          lineHeight: 1.8,
         }}
       >
-        ※ 推定仕入上限の算式：(BDS中央値 × 1.4 × 0.912 - 30,700円 - 目標利益) / 1.10
+        <div style={{ fontWeight: 600, color: C.text, marginBottom: 6, fontFamily: C.fontSans, fontSize: 12 }}>
+          🧠 BDS→ヤフオク係数: <b style={{ color: scoreColor(ratioConfidence === "high" ? 80 : ratioConfidence === "medium" ? 60 : 30) }}>×{ratioUsed.toFixed(2)}</b>
+          <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 400 }}>
+            （自分の実績 {ratioSampleSize}件から学習、信頼度:
+            <b style={{
+              color: ratioConfidence === "high" ? C.green : ratioConfidence === "medium" ? C.yellow : C.textMuted,
+              marginLeft: 4,
+            }}>
+              {ratioConfidence === "high" ? "高" : ratioConfidence === "medium" ? "中" : "低"}
+            </b>）
+          </span>
+        </div>
+        ※ 推定仕入上限の算式：(BDS中央値 × 学習係数 × 0.912 - 30,700円 - 目標利益) / 1.10
         <br />
-        ※ 「BDS中央値 × 1.4」はヤフオク推定売価の仮値。auction-historyデータが増えると精度UP
+        ※ 車種別の実績がある場合はその個別係数、ない場合は全体中央値を適用
         <br />
         ※ データが少ない車種（供給2件未満かつ自分の仕入0）は除外
+        {ratioConfidence === "low" && (
+          <div style={{ color: C.yellow, marginTop: 4 }}>
+            ⚠ 実績データが10件未満。まだ仮値（×1.4）ベース。実績を積むと精度UP。
+          </div>
+        )}
       </div>
     </div>
   )
