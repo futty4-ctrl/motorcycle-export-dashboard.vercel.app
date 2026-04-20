@@ -4,7 +4,11 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getVehiclesFromSupabase, getConnectionStatus } from "@/app/actions/vehicles"
-import { countUnfilledSold } from "@/app/actions/inventory-actuals"
+import {
+  countUnfilledSold,
+  listStaleInventory,
+  getLastActualInputDate,
+} from "@/app/actions/inventory-actuals"
 import type { VehicleDisplay } from "@/lib/vehicle-display"
 import {
   C,
@@ -27,6 +31,8 @@ export function DashboardContent() {
   const [vehicles, setVehicles] = useState<VehicleDisplay[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [unfilledCount, setUnfilledCount] = useState<number>(0)
+  const [staleCount, setStaleCount] = useState<number>(0)
+  const [daysSinceLastInput, setDaysSinceLastInput] = useState<number | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<{
     supabase: "ok" | "env_missing" | "error"
   }>({ supabase: "env_missing" })
@@ -36,12 +42,18 @@ export function DashboardContent() {
       const status = await getConnectionStatus()
       setConnectionStatus(status)
       if (status.supabase === "ok") {
-        const [vehiclesResult, unfilledResult] = await Promise.all([
-          getVehiclesFromSupabase(),
-          countUnfilledSold(),
-        ])
+        const [vehiclesResult, unfilledResult, staleResult, lastInputResult] =
+          await Promise.all([
+            getVehiclesFromSupabase(),
+            countUnfilledSold(),
+            listStaleInventory(7),
+            getLastActualInputDate(),
+          ])
         if (vehiclesResult.vehicles) setVehicles(vehiclesResult.vehicles)
         if (unfilledResult.success) setUnfilledCount(unfilledResult.count)
+        if (staleResult.success) setStaleCount(staleResult.count)
+        if (lastInputResult.success)
+          setDaysSinceLastInput(lastInputResult.daysSinceLastInput)
       }
       setLoading(false)
     }
@@ -139,6 +151,65 @@ export function DashboardContent() {
       </Link>
 
       <BiddingSummaryCards />
+
+      {staleCount > 0 && (
+        <Link href="/inventory" style={{ textDecoration: "none" }}>
+          <div
+            style={{
+              ...card(C.redGlow ?? `${C.red}18`),
+              borderLeft: `3px solid ${C.red}`,
+              marginBottom: 12,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+            }}
+          >
+            <div style={{ fontSize: 32 }}>🚨</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, color: C.red, fontWeight: 700, marginBottom: 4 }}>
+                入荷から7日以上経過・未出品
+              </div>
+              <div style={{ fontSize: 12, color: C.textSub }}>
+                出品ステータスになってない車両があります。「ヤフオク出品中」に進めるか、整備状況を確認してください。
+              </div>
+            </div>
+            <div style={{ fontSize: 28, fontWeight: "bold", color: C.red, minWidth: 60, textAlign: "right" }}>
+              {staleCount}台 →
+            </div>
+          </div>
+        </Link>
+      )}
+
+      {daysSinceLastInput !== null && daysSinceLastInput >= 7 && (
+        <Link href="/inventory" style={{ textDecoration: "none" }}>
+          <div
+            style={{
+              ...card(),
+              borderLeft: `3px solid ${C.blue}`,
+              marginBottom: 12,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+            }}
+          >
+            <div style={{ fontSize: 32 }}>📝</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, color: C.blue, fontWeight: 700, marginBottom: 4 }}>
+                週次データ入力リマインダー
+              </div>
+              <div style={{ fontSize: 12, color: C.textSub }}>
+                最後の売却実績入力から <b style={{ color: C.text }}>{daysSinceLastInput}日</b> 経過しています。
+                先週分の実績、入れましたか？（売却価格・売却日の2項目だけ・30秒）
+              </div>
+            </div>
+            <div style={{ fontSize: 14, color: C.blue, minWidth: 60, textAlign: "right", fontWeight: 600 }}>
+              {daysSinceLastInput}日 →
+            </div>
+          </div>
+        </Link>
+      )}
 
       {unfilledCount > 0 && (
         <Link

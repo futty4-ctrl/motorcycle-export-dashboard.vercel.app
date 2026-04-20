@@ -28,6 +28,92 @@ export async function updateInventoryActuals(
 }
 
 /**
+ * 入荷から7日以上経過しているのに出品ステータスになっていない在庫を取得
+ * 遅延警告用：未処理・出品準備中のまま放置されてる車両を検出
+ */
+export async function listStaleInventory(dayThreshold = 7): Promise<{
+  success: boolean
+  count: number
+  items: Array<{
+    id: string
+    management_code: string
+    model_name: string | null
+    maker: string | null
+    status: string
+    purchase_date: string
+    daysElapsed: number
+  }>
+  error?: string
+}> {
+  try {
+    const supabase = createServerSupabaseClient()
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - dayThreshold)
+    const cutoffDate = cutoff.toISOString().slice(0, 10)
+
+    const { data, error } = await supabase
+      .from("inventory_items")
+      .select("id, management_code, model_name, maker, status, purchase_date")
+      .in("status", ["未処理", "出品準備中"])
+      .lte("purchase_date", cutoffDate)
+      .order("purchase_date", { ascending: true })
+    if (error) throw error
+
+    const today = new Date()
+    const items = (data ?? []).map((r) => {
+      const purchase = new Date(r.purchase_date)
+      const days = Math.floor((today.getTime() - purchase.getTime()) / (1000 * 60 * 60 * 24))
+      return {
+        id: r.id,
+        management_code: r.management_code,
+        model_name: r.model_name,
+        maker: r.maker,
+        status: r.status,
+        purchase_date: r.purchase_date,
+        daysElapsed: days,
+      }
+    })
+    return { success: true, count: items.length, items }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "取得に失敗しました"
+    return { success: false, count: 0, items: [], error: message }
+  }
+}
+
+/**
+ * 最後の売却実績入力からの経過日数
+ * 週次リマインダー用
+ */
+export async function getLastActualInputDate(): Promise<{
+  success: boolean
+  lastDate: string | null
+  daysSinceLastInput: number | null
+  error?: string
+}> {
+  try {
+    const supabase = createServerSupabaseClient()
+    const { data, error } = await supabase
+      .from("inventory_items")
+      .select("sold_date")
+      .not("sold_date", "is", null)
+      .order("sold_date", { ascending: false })
+      .limit(1)
+    if (error) throw error
+    if (!data || data.length === 0) {
+      return { success: true, lastDate: null, daysSinceLastInput: null }
+    }
+    const lastDate = data[0].sold_date as string
+    const today = new Date()
+    const last = new Date(lastDate)
+    const days = Math.floor((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24))
+    return { success: true, lastDate, daysSinceLastInput: days }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "取得に失敗しました"
+    return { success: false, lastDate: null, daysSinceLastInput: null, error: message }
+  }
+}
+
+/**
  * 売約済みで実績未入力の件数を取得
  */
 export async function countUnfilledSold(): Promise<{
