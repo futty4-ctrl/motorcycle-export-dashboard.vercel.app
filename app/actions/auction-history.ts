@@ -71,9 +71,22 @@ export async function getAuctionHistory(
       q = q.ilike("model_name", `%${filter.search}%`)
     }
 
+    // フィルタが使われていればlimit緩和、なければデフォルト100件（直近のみ）
+    const hasFilter =
+      (filter.search && filter.search.trim().length > 0) ||
+      (filter.recordType && filter.recordType !== "all") ||
+      (filter.resultStatus && filter.resultStatus !== "all") ||
+      (filter.auctionTypeKind && filter.auctionTypeKind !== "all") ||
+      (filter.region && filter.region !== "all") ||
+      (filter.source && filter.source !== "all") ||
+      (filter.ccRange && filter.ccRange !== "all") ||
+      filter.dateFrom ||
+      filter.dateTo
+    const rowLimit = hasFilter ? 50000 : 100
+
     const { data, error } = await q
       .order("auction_date", { ascending: false, nullsFirst: false })
-      .limit(50000)
+      .limit(rowLimit)
     if (error) throw error
     const rows = (data ?? []).map((r) => normalizeRow(r as Record<string, unknown>))
     return { success: true, rows }
