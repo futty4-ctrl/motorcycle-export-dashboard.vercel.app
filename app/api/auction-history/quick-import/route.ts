@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
     const toInsert: typeof records = []
     const toUpdate: Array<{ id: string; patch: Record<string, unknown> }> = []
     let skipped = 0
+    const skipSamples: Array<{ key: string; reason: string; newSoldPrice: unknown; oldSoldPrice: unknown }> = []
 
     for (const rec of records) {
       const k = keyOf(
@@ -113,6 +114,14 @@ export async function POST(req: NextRequest) {
         })
       } else {
         skipped++
+        if (skipSamples.length < 5) {
+          skipSamples.push({
+            key: k,
+            reason: ex.sold_price != null ? "already-has-sold-price" : "no-new-data",
+            newSoldPrice: rec.sold_price,
+            oldSoldPrice: ex.sold_price,
+          })
+        }
       }
     }
 
@@ -157,6 +166,8 @@ export async function POST(req: NextRequest) {
         unsold: parsed.filter((r) => r.result_status === "unsold").length,
         auction_date: date,
         date_source: dateSource,
+        existingCount: existingRows?.length ?? 0,
+        skipSamples,
         errorSample: errorsDetail.slice(0, 3),
       },
       { headers: corsHeaders() }
