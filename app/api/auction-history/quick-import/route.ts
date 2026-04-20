@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { parseBdsText, bdsRowToRecord } from "@/lib/bds-history-parser"
+import {
+  parseBdsText,
+  bdsRowToRecord,
+  extractAuctionDateFromText,
+} from "@/lib/bds-history-parser"
 
 /**
  * ブックマークレット/外部ツールから生テキストで一括取込
@@ -20,7 +24,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const date = auction_date || new Date().toISOString().slice(0, 10)
+    // 1. 明示指定 → それを使う
+    // 2. 指定なし → テキストから自動抽出
+    // 3. 抽出失敗 → 今日の日付
+    const autoDetected = auction_date ? null : extractAuctionDateFromText(text)
+    const date = auction_date || autoDetected || new Date().toISOString().slice(0, 10)
+    const dateSource = auction_date
+      ? "manual"
+      : autoDetected
+      ? "auto-detected"
+      : "today-fallback"
     const parsed = parseBdsText(text)
     if (parsed.length === 0) {
       return NextResponse.json(
@@ -105,6 +118,8 @@ export async function POST(req: NextRequest) {
         skipped,
         sold: parsed.filter((r) => r.result_status === "sold").length,
         unsold: parsed.filter((r) => r.result_status === "unsold").length,
+        auction_date: date,
+        date_source: dateSource,
         errorSample: errorsDetail.slice(0, 3),
       },
       { headers: corsHeaders() }

@@ -337,6 +337,17 @@ export function AuctionImport({ onImported }: Props) {
     const rows = parseBdsTextV2(rawText)
     setParsed(rows)
     setResult(null)
+    // テキストから日付を自動抽出して反映
+    const kaisai = rawText.match(/開催日?\s*[:：]?\s*(\d{4})[年/\-](\d{1,2})[月/\-](\d{1,2})/)
+    const ymd = !kaisai ? rawText.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/) : null
+    const slash = !kaisai && !ymd ? rawText.match(/(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})/) : null
+    const match = kaisai || ymd || slash
+    if (match) {
+      const y = match[1]
+      const m = match[2].padStart(2, "0")
+      const d = match[3].padStart(2, "0")
+      setAuctionDate(`${y}-${m}-${d}`)
+    }
   }
 
   const handleImport = async () => {

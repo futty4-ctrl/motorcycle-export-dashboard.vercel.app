@@ -1,4 +1,4 @@
-BDS落札結果ページから auction_history に一括取込するブックマークレット
+BDS落札結果ページから auction_history に一括取込するブックマークレット（v2: 日付自動検出）
 ====================================================================
 
 【使い方】
@@ -6,24 +6,28 @@ BDS落札結果ページから auction_history に一括取込するブックマ
 2. ブラウザのブックマークバーに新規ブックマーク追加
 3. 名前: 例）BDS→履歴取込
 4. URL欄に貼り付けて保存
-5. BDSの「下見検索結果」ページ（落札結果が表示されるページ）で
-   ブックマークをクリック → 一発で取込
+5. BDSの落札結果ページでブックマークをクリック → 一発で取込
 
-【送信先】
-- POST https://motorcycle-export-dashboard.vercel.app/api/auction-history/quick-import
-- 本文: { text: ページの全テキスト, auction_date: 'YYYY-MM-DD' }
+【v2の改善点】
+- 開催日のpromptを廃止
+- サーバー側がテキストから「開催日：YYYY年MM月DD日」等を自動抽出
+- 取込後のアラートで使用された日付＋ソース（auto-detected/manual/today-fallback）を表示
 
-【動作】
-- 現在のページの innerText をそのまま送信
-- サーバー側でパーサーが BDS形式の行だけ抽出
-- auction_history テーブルに upsert（bds_lot_number重複で自動スキップ）
-- 新規N件・重複スキップM件 をアラート表示
+【ブックマークレット用コード（v2）】
 
-【ブックマークレット用コード】
+javascript:(function(){var t=document.body.innerText;if(t.length<100){alert('ページテキストが短すぎます');return;}fetch('https://motorcycle-export-dashboard.vercel.app/api/auction-history/quick-import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})}).then(r=>r.json()).then(d=>{if(d.success){alert('✓ 取込完了\n開催日: '+d.auction_date+' ('+d.date_source+')\n解析: '+d.parsed+'件\n新規: '+d.inserted+'件\n更新: '+d.updated+'件\n重複: '+d.skipped+'件\n落札: '+d.sold+'件 / 流札: '+d.unsold+'件');}else{alert('✗ 失敗: '+d.error);}}).catch(e=>alert('✗ エラー: '+e.message));})();
 
-javascript:(function(){var u=prompt('開催日 (YYYY-MM-DD、空欄なら今日)',new Date().toISOString().slice(0,10));if(u===null)return;var t=document.body.innerText;if(t.length<100){alert('ページテキストが短すぎます');return;}fetch('https://motorcycle-export-dashboard.vercel.app/api/auction-history/quick-import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,auction_date:u||new Date().toISOString().slice(0,10)})}).then(r=>r.json()).then(d=>{if(d.success){alert('✓ 取込完了\n解析: '+d.parsed+'件\n新規: '+d.inserted+'件\n重複: '+d.skipped+'件\n落札: '+d.sold+'件 / 流札: '+d.unsold+'件');}else{alert('✗ 失敗: '+d.error);}}).catch(e=>alert('✗ エラー: '+e.message));})();
+【日付抽出のパターン】
+- 「開催日：2026年04月17日」 → 2026-04-17
+- 「2026年4月17日」 → 2026-04-17
+- 「2026/04/17」「2026-04-17」 → 2026-04-17
+- どれも見つからない場合は「今日の日付」
+
+【日付を手動指定したい場合】
+URLに日付パラメータを追加してfetchすればOK（通常は不要）：
+...body:JSON.stringify({text:t,auction_date:'2026-04-17'})...
 
 【注意】
-- 初回はCORSブロックされる可能性あり → route.ts側で OPTIONS対応済み
-- 1ページずつ実行（複数ページは1回ずつブックマーククリック）
-- 重複データは自動スキップなので何度でも押せる
+- 重複データは自動スキップ（lot#+開催日+会場+サイトで一意判定）
+- 何度押しても安全
+- 同一lot#でも日付・会場・サイトが違えば別エントリ

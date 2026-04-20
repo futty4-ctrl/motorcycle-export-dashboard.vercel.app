@@ -50,6 +50,36 @@ export type ParsedBdsRow = {
   sold_price: number | null
 }
 
+/**
+ * BDSページのテキストから開催日を自動抽出
+ * パターン例：
+ *   「開催日：2026年04月17日」
+ *   「2026/04/17」
+ *   「2026-04-17」
+ *   「開催日 2026/4/17」
+ */
+export function extractAuctionDateFromText(text: string): string | null {
+  // 優先: 「開催日」の近く
+  const kaisai = text.match(/開催日?\s*[:：]?\s*(\d{4})[年/\-](\d{1,2})[月/\-](\d{1,2})/)
+  if (kaisai) {
+    const y = kaisai[1]
+    const m = kaisai[2].padStart(2, "0")
+    const d = kaisai[3].padStart(2, "0")
+    return `${y}-${m}-${d}`
+  }
+  // 次: 年月日 フルマッチ
+  const ymd = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/)
+  if (ymd) {
+    return `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}`
+  }
+  // 最後: YYYY/MM/DD or YYYY-MM-DD
+  const slash = text.match(/(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})/)
+  if (slash) {
+    return `${slash[1]}-${slash[2].padStart(2, "0")}-${slash[3].padStart(2, "0")}`
+  }
+  return null
+}
+
 export function parseBdsText(text: string): ParsedBdsRow[] {
   const rows: ParsedBdsRow[] = []
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean)
