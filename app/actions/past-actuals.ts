@@ -6,6 +6,7 @@ export type PastActualsSummary = {
   count: number
   avgPurchasePrice: number | null
   avgSoldPrice: number | null
+  medianSoldPrice: number | null
   avgProfit: number | null
   medianProfit: number | null
   avgDaysInStock: number | null
@@ -85,6 +86,7 @@ export async function getPastActualsForModel(
         count: rows.length,
         avgPurchasePrice: avg(purchases),
         avgSoldPrice: avg(solds),
+        medianSoldPrice: median(solds),
         avgProfit: avg(profits),
         medianProfit: median(profits),
         avgDaysInStock: avg(days),
@@ -109,6 +111,7 @@ function emptySummary(): PastActualsSummary {
     count: 0,
     avgPurchasePrice: null,
     avgSoldPrice: null,
+    medianSoldPrice: null,
     avgProfit: null,
     medianProfit: null,
     avgDaysInStock: null,

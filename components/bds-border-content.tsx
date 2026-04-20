@@ -117,7 +117,7 @@ export default function BdsBorderContent() {
   const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([])
   const [selectedMarket, setSelectedMarket] = useState<MarketPrice | null>(null)
   const [manualYahoo, setManualYahoo] = useState("")
-  const [useManual, setUseManual] = useState(false)
+  const [priceSource, setPriceSource] = useState<"db" | "actuals" | "bds" | "manual">("db")
   const [venue, setVenue] = useState(
     initialVenue && VENUES.includes(initialVenue) ? initialVenue : "関東"
   )
@@ -160,9 +160,19 @@ export default function BdsBorderContent() {
     })
   }, [selectedMarket])
 
-  const yahooPrice = useManual
-    ? parseInt(manualYahoo) || 0
-    : selectedMarket?.avg_price || 0
+  const yahooPrice = (() => {
+    switch (priceSource) {
+      case "manual":
+        return parseInt(manualYahoo) || 0
+      case "actuals":
+        return Math.round(pastActuals?.medianSoldPrice ?? 0)
+      case "bds":
+        return Math.round(bdsHistory?.medianSoldPrice ?? 0)
+      case "db":
+      default:
+        return selectedMarket?.avg_price || 0
+    }
+  })()
 
   const shipping = SHIPPING[venue]?.[ccRange] ?? 0
   const { border, bdsFee } =
@@ -266,32 +276,35 @@ export default function BdsBorderContent() {
               ① ヤフオク売却相場
             </div>
 
-            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6, marginBottom: 14 }}>
               {[
-                { label: "相場マスターから選択", value: false },
-                { label: "手動入力", value: true },
+                { label: "相場マスターDB", value: "db" as const, note: "手動入力値" },
+                { label: "自分の売却実績 中央値", value: "actuals" as const, note: "推奨（実データ）" },
+                { label: "BDS落札中央値", value: "bds" as const, note: "BDS履歴1000件" },
+                { label: "手入力", value: "manual" as const, note: "その都度" },
               ].map((opt) => (
                 <button
-                  key={String(opt.value)}
-                  onClick={() => setUseManual(opt.value)}
+                  key={opt.value}
+                  onClick={() => setPriceSource(opt.value)}
                   style={{
-                    flex: 1,
-                    padding: "8px",
+                    padding: "10px 8px",
                     borderRadius: 6,
-                    background: useManual === opt.value ? C.orange : "none",
-                    border: `1px solid ${useManual === opt.value ? C.orange : C.border}`,
-                    color: useManual === opt.value ? "#fff" : C.textSub,
+                    background: priceSource === opt.value ? C.orange : "none",
+                    border: `1px solid ${priceSource === opt.value ? C.orange : C.border}`,
+                    color: priceSource === opt.value ? "#fff" : C.textSub,
                     fontFamily: C.fontSans,
                     fontSize: 12,
                     cursor: "pointer",
+                    textAlign: "left",
                   }}
                 >
-                  {opt.label}
+                  <div style={{ fontWeight: 600 }}>{opt.label}</div>
+                  <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>{opt.note}</div>
                 </button>
               ))}
             </div>
 
-            {!useManual ? (
+            {priceSource === "db" ? (
               <div>
                 <label style={labelStyle}>車種を選択</label>
                 <select
@@ -333,9 +346,9 @@ export default function BdsBorderContent() {
                   </div>
                 )}
               </div>
-            ) : (
+            ) : priceSource === "manual" ? (
               <div>
-                <label style={labelStyle}>ヤフオク落札相場（円）</label>
+                <label style={labelStyle}>ヤフオク落札相場（円・手入力）</label>
                 <input
                   type="number"
                   value={manualYahoo}
@@ -344,7 +357,102 @@ export default function BdsBorderContent() {
                   style={inputStyle}
                 />
               </div>
-            )}
+            ) : priceSource === "actuals" ? (
+              <div>
+                <label style={labelStyle}>車種を選択（自分の売却実績から中央値を取得）</label>
+                <select
+                  value={selectedMarket?.id ?? ""}
+                  onChange={(e) => {
+                    const found = marketPrices.find((m) => m.id === e.target.value)
+                    setSelectedMarket(found ?? null)
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="">-- 車種を選択 --</option>
+                  {marketPrices.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.maker} {m.model}
+                      {m.year ? ` (${m.year})` : ""}
+                    </option>
+                  ))}
+                </select>
+                {selectedMarket && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      padding: "12px 14px",
+                      background: pastActuals && pastActuals.count > 0 ? `${C.green}10` : `${C.yellow}10`,
+                      border: `1px solid ${pastActuals && pastActuals.count > 0 ? C.green : C.yellow}40`,
+                      borderRadius: 6,
+                      fontSize: 12,
+                      color: C.textSub,
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    {pastActuals && pastActuals.count > 0 ? (
+                      <>
+                        <div>✅ 売却実績 {pastActuals.count}台から算出</div>
+                        <div>中央値: <b style={{ color: C.green }}>{fmtFull(Math.round(pastActuals.medianSoldPrice ?? 0))}</b></div>
+                        <div>平均: {fmtFull(Math.round(pastActuals.avgSoldPrice ?? 0))}</div>
+                      </>
+                    ) : (
+                      <>
+                        <div>⚠ この車種の売却実績がまだありません</div>
+                        <div>他のソースに切替 or 実績を貯めてから利用してください</div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : priceSource === "bds" ? (
+              <div>
+                <label style={labelStyle}>車種を選択（BDS落札履歴から中央値を取得）</label>
+                <select
+                  value={selectedMarket?.id ?? ""}
+                  onChange={(e) => {
+                    const found = marketPrices.find((m) => m.id === e.target.value)
+                    setSelectedMarket(found ?? null)
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="">-- 車種を選択 --</option>
+                  {marketPrices.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.maker} {m.model}
+                      {m.year ? ` (${m.year})` : ""}
+                    </option>
+                  ))}
+                </select>
+                {selectedMarket && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      padding: "12px 14px",
+                      background: bdsHistory && bdsHistory.soldCount > 0 ? `${C.orange}10` : `${C.yellow}10`,
+                      border: `1px solid ${bdsHistory && bdsHistory.soldCount > 0 ? C.orange : C.yellow}40`,
+                      borderRadius: 6,
+                      fontSize: 12,
+                      color: C.textSub,
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    {bdsHistory && bdsHistory.soldCount > 0 ? (
+                      <>
+                        <div>🔥 BDS落札履歴 {bdsHistory.soldCount}件から算出</div>
+                        <div>落札中央値: <b style={{ color: C.orange }}>{fmtFull(Math.round(bdsHistory.medianSoldPrice ?? 0))}</b></div>
+                        <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
+                          ※ ヤフオク売却相場の推定として使用（BDS価格×1.2-1.5が現実的、要調整）
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>⚠ この車種のBDS落札履歴がありません</div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {/* BDS settings */}
