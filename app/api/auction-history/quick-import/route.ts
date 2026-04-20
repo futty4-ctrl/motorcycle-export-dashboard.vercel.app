@@ -17,7 +17,7 @@ import {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { text, auction_date, source } = await req.json()
+    const { text, auction_date, source, force } = await req.json()
     if (typeof text !== "string" || !text.trim()) {
       return NextResponse.json(
         { success: false, error: "text が空です" },
@@ -54,6 +54,47 @@ export async function POST(req: NextRequest) {
 
     const records = parsed.map((r) => bdsRowToRecord(r, date, source || "BDS"))
     const supabase = createServerSupabaseClient()
+
+    // force=true: 既存チェックをバイパス、DB側のUNIQUE制約だけで重複排除
+    if (force) {
+      let inserted = 0
+      let skipped = 0
+      const errorsDetail: string[] = []
+      for (let i = 0; i < records.length; i += 100) {
+        const batch = records.slice(i, i + 100)
+        const { data, error } = await supabase
+          .from("auction_history")
+          .upsert(batch, {
+            onConflict: "bds_lot_number,auction_date,region,source",
+            ignoreDuplicates: true,
+          })
+          .select("id")
+        if (error) {
+          errorsDetail.push(`batch ${i}: ${error.message}`)
+          skipped += batch.length
+        } else {
+          const actualInserted = data?.length ?? 0
+          inserted += actualInserted
+          skipped += batch.length - actualInserted
+        }
+      }
+      return NextResponse.json(
+        {
+          success: true,
+          mode: "force",
+          parsed: parsed.length,
+          inserted,
+          updated: 0,
+          skipped,
+          sold: parsed.filter((r) => r.result_status === "sold").length,
+          unsold: parsed.filter((r) => r.result_status === "unsold").length,
+          auction_date: date,
+          date_source: dateSource,
+          errorSample: errorsDetail.slice(0, 3),
+        },
+        { headers: corsHeaders() }
+      )
+    }
 
     const lotNumbers = Array.from(
       new Set(records.map((r) => r.bds_lot_number as string).filter(Boolean))
