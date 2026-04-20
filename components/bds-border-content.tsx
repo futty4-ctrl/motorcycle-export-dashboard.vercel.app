@@ -109,12 +109,17 @@ const fmtFull = (n: number) => `¥${n.toLocaleString()}`
 export default function BdsBorderContent() {
   const searchParams = useSearchParams()
   const initialBid = searchParams.get("bid") ?? ""
+  const initialModel = searchParams.get("model") ?? ""
+  const initialMaker = searchParams.get("maker") ?? ""
+  const initialVenue = searchParams.get("venue") ?? ""
 
   const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([])
   const [selectedMarket, setSelectedMarket] = useState<MarketPrice | null>(null)
   const [manualYahoo, setManualYahoo] = useState("")
   const [useManual, setUseManual] = useState(false)
-  const [venue, setVenue] = useState("関東")
+  const [venue, setVenue] = useState(
+    initialVenue && VENUES.includes(initialVenue) ? initialVenue : "関東"
+  )
   const [ccRange, setCcRange] = useState("～125cc")
   const [memberType, setMemberType] = useState<"A" | "C">("A")
   const [targetProfit, setTargetProfit] = useState(25000)
@@ -123,8 +128,20 @@ export default function BdsBorderContent() {
 
   useEffect(() => {
     getMarketPrices().then((res) => {
-      if (res.success && res.rows) setMarketPrices(res.rows)
+      if (res.success && res.rows) {
+        setMarketPrices(res.rows)
+        // URL params からモデル自動選択
+        if (initialModel || initialMaker) {
+          const match = res.rows.find(
+            (m) =>
+              (!initialMaker || m.maker === initialMaker) &&
+              (!initialModel || m.model === initialModel)
+          )
+          if (match) setSelectedMarket(match)
+        }
+      }
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
