@@ -7,6 +7,7 @@ export type NextWeekPick = {
   rank: number
   modelName: string
   maker: string | null
+  displacementCc: number | null
   score: number // 0-100
   bdsLotCount90d: number // 過去90日のBDS取扱件数
   bdsSoldCount90d: number
@@ -63,7 +64,7 @@ export async function getNextWeekPicks(opts?: {
     // auction_historyの過去90日データ
     const { data: histData, error: hErr } = await supabase
       .from("auction_history")
-      .select("model_name, sold_price, result_status, auction_date")
+      .select("model_name, sold_price, result_status, auction_date, displacement_cc")
       .gte("auction_date", cutoffDate)
       .not("model_name", "is", null)
       .limit(5000)
@@ -87,6 +88,7 @@ export async function getNextWeekPicks(opts?: {
       myDays: number[]
       myCount: number
       maker: string | null
+      ccSamples: number[]
     }
     const stats = new Map<string, Stats>()
     for (const r of histData ?? []) {
@@ -100,10 +102,12 @@ export async function getNextWeekPicks(opts?: {
           myDays: [],
           myCount: 0,
           maker: null,
+          ccSamples: [],
         })
       }
       const s = stats.get(r.model_name)!
       s.lotCount++
+      if (r.displacement_cc != null) s.ccSamples.push(r.displacement_cc)
       if (r.result_status === "sold" && r.sold_price != null) {
         s.soldCount++
         s.soldPrices.push(r.sold_price)
@@ -120,6 +124,7 @@ export async function getNextWeekPicks(opts?: {
           myDays: [],
           myCount: 0,
           maker: r.maker,
+          ccSamples: [],
         })
       }
       const s = stats.get(r.model_name)!
@@ -191,10 +196,13 @@ export async function getNextWeekPicks(opts?: {
       if (myAvgDays != null && myAvgDays <= 14) reason.push(`${Math.round(myAvgDays)}日で売却`)
       if (s.myCount === 0 && s.lotCount >= 3) reason.push("未仕入・候補")
 
+      const displacementCc = s.ccSamples.length > 0 ? median(s.ccSamples) : null
+
       results.push({
         rank: 0,
         modelName,
         maker: s.maker,
+        displacementCc,
         score,
         bdsLotCount90d: s.lotCount,
         bdsSoldCount90d: s.soldCount,

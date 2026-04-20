@@ -41,6 +41,27 @@ export default function NextWeekContent() {
   const [ratioUsed, setRatioUsed] = useState(1.4)
   const [ratioConfidence, setRatioConfidence] = useState<"high" | "medium" | "low">("low")
   const [ratioSampleSize, setRatioSampleSize] = useState(0)
+  const [sortBy, setSortBy] = useState<"score" | "cc">("score")
+  const [ccFilter, setCcFilter] = useState<"all" | "small" | "mid" | "large">("all")
+
+  const filtered = (() => {
+    let arr = [...picks]
+    if (ccFilter !== "all") {
+      arr = arr.filter((p) => {
+        const cc = p.displacementCc
+        if (cc == null) return false
+        if (ccFilter === "small") return cc <= 125
+        if (ccFilter === "mid") return cc > 125 && cc <= 400
+        if (ccFilter === "large") return cc > 400
+        return true
+      })
+    }
+    if (sortBy === "cc") {
+      arr.sort((a, b) => (a.displacementCc ?? 9999) - (b.displacementCc ?? 9999))
+      arr = arr.map((p, i) => ({ ...p, rank: i + 1 }))
+    }
+    return arr
+  })()
 
   const load = async () => {
     setLoading(true)
@@ -191,10 +212,76 @@ export default function NextWeekContent() {
         </div>
       </div>
 
+      {/* 排気量フィルタ＋ソート */}
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          marginBottom: 16,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <div style={{ display: "flex", gap: 4 }}>
+          <span style={{ fontSize: 11, color: C.textMuted, alignSelf: "center", marginRight: 6 }}>
+            排気量:
+          </span>
+          {[
+            { label: "全て", value: "all" as const },
+            { label: "〜125cc", value: "small" as const },
+            { label: "126〜400cc", value: "mid" as const },
+            { label: "401cc〜", value: "large" as const },
+          ].map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setCcFilter(f.value)}
+              style={{
+                padding: "6px 12px",
+                background: ccFilter === f.value ? `${C.orange}20` : "transparent",
+                border: `1px solid ${ccFilter === f.value ? C.orange : C.border}`,
+                borderRadius: 4,
+                color: ccFilter === f.value ? C.orange : C.textSub,
+                fontFamily: C.fontSans,
+                fontSize: 11,
+                cursor: "pointer",
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
+          <span style={{ fontSize: 11, color: C.textMuted, alignSelf: "center", marginRight: 6 }}>
+            並び順:
+          </span>
+          {[
+            { label: "Score順", value: "score" as const },
+            { label: "排気量小→大", value: "cc" as const },
+          ].map((s) => (
+            <button
+              key={s.value}
+              onClick={() => setSortBy(s.value)}
+              style={{
+                padding: "6px 12px",
+                background: sortBy === s.value ? `${C.blue}20` : "transparent",
+                border: `1px solid ${sortBy === s.value ? C.blue : C.border}`,
+                borderRadius: 4,
+                color: sortBy === s.value ? C.blue : C.textSub,
+                fontFamily: C.fontSans,
+                fontSize: 11,
+                cursor: "pointer",
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ランキング */}
       {loading ? (
         <div style={{ color: C.textMuted, textAlign: "center", padding: 40 }}>読み込み中...</div>
-      ) : picks.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div
           style={{
             background: C.surface,
@@ -209,7 +296,7 @@ export default function NextWeekContent() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {picks.map((p) => (
+          {filtered.map((p) => (
             <div
               key={p.modelName}
               style={{
@@ -255,6 +342,22 @@ export default function NextWeekContent() {
                   }}
                 >
                   {p.maker ? `${p.maker} ` : ""}{p.modelName}
+                  {p.displacementCc != null && (
+                    <span
+                      style={{
+                        marginLeft: 8,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: "2px 8px",
+                        borderRadius: 3,
+                        background: `${C.blue}15`,
+                        color: C.blue,
+                        fontFamily: C.font,
+                      }}
+                    >
+                      {Math.round(p.displacementCc)}cc
+                    </span>
+                  )}
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 11, color: C.textSub }}>
                   <span>
