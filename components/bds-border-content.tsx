@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { getMarketPrices } from "@/app/actions/market-prices"
 import { getPastActualsForModel, type PastActualsSummary } from "@/app/actions/past-actuals"
+import { getBdsHistoryForModel, type BdsHistorySummary } from "@/app/actions/bds-history"
 import type { MarketPrice } from "@/lib/types"
 
 const C = {
@@ -125,6 +126,7 @@ export default function BdsBorderContent() {
   const [targetProfit, setTargetProfit] = useState(25000)
   const [bdsBid, setBdsBid] = useState(initialBid)
   const [pastActuals, setPastActuals] = useState<PastActualsSummary | null>(null)
+  const [bdsHistory, setBdsHistory] = useState<BdsHistorySummary | null>(null)
 
   useEffect(() => {
     getMarketPrices().then((res) => {
@@ -147,10 +149,14 @@ export default function BdsBorderContent() {
   useEffect(() => {
     if (!selectedMarket) {
       setPastActuals(null)
+      setBdsHistory(null)
       return
     }
     getPastActualsForModel(selectedMarket.maker, selectedMarket.model).then((res) => {
       if (res.success) setPastActuals(res.data)
+    })
+    getBdsHistoryForModel(selectedMarket.model).then((res) => {
+      if (res.success) setBdsHistory(res.data)
     })
   }, [selectedMarket])
 
@@ -666,6 +672,196 @@ export default function BdsBorderContent() {
           )}
         </div>
       </div>
+
+      {/* ── BDS落札相場（auction_historyの1000件+データ） ── */}
+      {bdsHistory && bdsHistory.soldCount > 0 && (
+        <div
+          style={{
+            marginTop: 24,
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderLeft: `3px solid ${C.orange}`,
+            borderRadius: 10,
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              marginBottom: 16,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: C.fontSans,
+                fontWeight: 700,
+                fontSize: 14,
+                color: C.text,
+              }}
+            >
+              🔥 BDS落札相場（過去データ）
+            </div>
+            <div style={{ fontSize: 11, color: C.textSub }}>
+              落札 {bdsHistory.soldCount}件 / 全 {bdsHistory.count}件（落札率 {Math.round(bdsHistory.soldRate * 100)}%）
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            {[
+              { label: "落札中央値", value: bdsHistory.medianSoldPrice, color: C.orange },
+              { label: "落札平均", value: bdsHistory.avgSoldPrice, color: C.textSub },
+              { label: "最高落札", value: bdsHistory.maxSoldPrice, color: C.green },
+              { label: "最低落札", value: bdsHistory.minSoldPrice, color: C.red },
+            ].map((k) => (
+              <div
+                key={k.label}
+                style={{
+                  background: C.surfaceHigh,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 8,
+                  padding: "12px 14px",
+                }}
+              >
+                <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 6, letterSpacing: "0.08em" }}>
+                  {k.label}
+                </div>
+                <div
+                  style={{
+                    fontFamily: C.fontSans,
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: k.value != null ? k.color : C.textMuted,
+                  }}
+                >
+                  {k.value != null ? fmtFull(Math.round(k.value)) : "—"}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 計算ボーダーと BDS 落札中央値のギャップ警告 */}
+          {bdsHistory.medianSoldPrice != null && border > 0 && (
+            <div
+              style={{
+                padding: "12px 16px",
+                borderRadius: 8,
+                background:
+                  border > bdsHistory.medianSoldPrice
+                    ? `${C.green}10`
+                    : `${C.red}10`,
+                border: `1px solid ${
+                  border > bdsHistory.medianSoldPrice ? C.green : C.red
+                }40`,
+                marginBottom: 16,
+                fontSize: 12,
+                color: C.textSub,
+                lineHeight: 1.7,
+              }}
+            >
+              {border > bdsHistory.medianSoldPrice ? (
+                <span>
+                  ✅ 計算ボーダー <b style={{ color: C.orange }}>{fmtFull(border)}</b> は
+                  BDS落札中央値 <b style={{ color: C.text }}>{fmtFull(Math.round(bdsHistory.medianSoldPrice))}</b>
+                  を <b>+{fmtFull(Math.round(border - bdsHistory.medianSoldPrice))}</b> 上回っています。
+                  相場通りなら利益出る想定。
+                </span>
+              ) : (
+                <span>
+                  ⚠ 計算ボーダー <b style={{ color: C.orange }}>{fmtFull(border)}</b> が
+                  BDS落札中央値 <b style={{ color: C.text }}>{fmtFull(Math.round(bdsHistory.medianSoldPrice))}</b>
+                  を <b style={{ color: C.red }}>{fmtFull(Math.round(bdsHistory.medianSoldPrice - border))}</b> 下回っています。
+                  この車種はボーダーで買えない可能性が高い、または目標利益が強気すぎます。
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* 直近の落札履歴 */}
+          {bdsHistory.recentSales.length > 0 && (
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: C.textMuted,
+                  marginBottom: 8,
+                  letterSpacing: "0.08em",
+                }}
+              >
+                直近の履歴（最新{Math.min(bdsHistory.recentSales.length, 15)}件）
+              </div>
+              <div style={{ overflowX: "auto", maxHeight: 320 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                      {["日付", "会場", "型式/車名", "結果", "落札額", "走行"].map((h) => (
+                        <th
+                          key={h}
+                          style={{
+                            textAlign: ["落札額", "走行"].includes(h) ? "right" : "left",
+                            padding: "8px 10px",
+                            fontSize: 10,
+                            color: C.textMuted,
+                            fontFamily: C.font,
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bdsHistory.recentSales.map((s, i) => (
+                      <tr key={i} style={{ borderBottom: `1px solid ${C.border}40` }}>
+                        <td style={{ padding: "6px 10px", color: C.textSub, fontSize: 11 }}>
+                          {s.auction_date ? String(s.auction_date).slice(5, 10) : "—"}
+                        </td>
+                        <td style={{ padding: "6px 10px", color: C.textSub, fontSize: 11 }}>
+                          {s.region ?? "—"}
+                        </td>
+                        <td style={{ padding: "6px 10px", fontWeight: 500 }}>
+                          {s.model_name ?? "—"}
+                        </td>
+                        <td style={{ padding: "6px 10px" }}>
+                          {s.result_status === "sold" ? (
+                            <span style={{ color: C.green, fontSize: 11 }}>落札</span>
+                          ) : s.result_status === "unsold" ? (
+                            <span style={{ color: C.red, fontSize: 11 }}>流札</span>
+                          ) : (
+                            <span style={{ color: C.textMuted, fontSize: 11 }}>—</span>
+                          )}
+                        </td>
+                        <td
+                          style={{
+                            padding: "6px 10px",
+                            textAlign: "right",
+                            fontFamily: "monospace",
+                            fontWeight: 600,
+                            color: s.result_status === "sold" ? C.orange : C.textMuted,
+                          }}
+                        >
+                          {s.sold_price != null ? fmtFull(s.sold_price) : "—"}
+                        </td>
+                        <td style={{ padding: "6px 10px", textAlign: "right", color: C.textSub, fontSize: 11 }}>
+                          {s.mileage_km != null ? `${s.mileage_km.toLocaleString()}K` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── 過去実績（選択した車種の実データ） ── */}
       {pastActuals && pastActuals.count > 0 && (
