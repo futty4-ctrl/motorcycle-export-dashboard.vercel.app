@@ -156,10 +156,12 @@ export function parseBdsText(text: string): ParsedBdsRow[] {
 
 export function bdsRowToRecord(
   r: ParsedBdsRow,
-  auctionDate: string
+  auctionDate: string,
+  source: string = "BDS"
 ): Record<string, unknown> {
   return {
     record_type: "history",
+    source,
     bds_lot_number: r.lot_number.replace(/\s+/g, ""),
     model_name: `${r.maker_name} ${r.model_name}`,
     chassis_number: r.chassis_number || null,

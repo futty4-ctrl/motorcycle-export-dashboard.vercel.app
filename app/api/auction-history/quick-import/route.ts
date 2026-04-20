@@ -12,7 +12,7 @@ import { parseBdsText, bdsRowToRecord } from "@/lib/bds-history-parser"
  */
 export async function POST(req: NextRequest) {
   try {
-    const { text, auction_date } = await req.json()
+    const { text, auction_date, source } = await req.json()
     if (typeof text !== "string" || !text.trim()) {
       return NextResponse.json(
         { success: false, error: "text が空です" },
@@ -38,24 +38,25 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const records = parsed.map((r) => bdsRowToRecord(r, date))
+    const records = parsed.map((r) => bdsRowToRecord(r, date, source || "BDS"))
     const supabase = createServerSupabaseClient()
     let inserted = 0
     let updated = 0
     let skipped = 0
     const errorsDetail: string[] = []
 
-    // 1件ずつ: (bds_lot_number, auction_date, region) で既存を検索→分岐
-    // 会場別に蓄積するため region もキーに含める
+    // 1件ずつ: (bds_lot_number, auction_date, region, source) で既存を検索→分岐
     for (const rec of records) {
       const lotNum = rec.bds_lot_number as string
       const region = (rec.region as string | null) ?? ""
+      const recSource = (rec.source as string) || "BDS"
       try {
         let query = supabase
           .from("auction_history")
           .select("id, sold_price, result_status")
           .eq("bds_lot_number", lotNum)
           .eq("auction_date", date)
+          .eq("source", recSource)
         if (region) query = query.eq("region", region)
         else query = query.is("region", null)
         const { data: existing } = await query.limit(1).maybeSingle()

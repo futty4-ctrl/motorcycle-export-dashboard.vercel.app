@@ -26,7 +26,7 @@ export function AuctionFilters({ filter, onChange, regions }: Props) {
         padding: 16,
         marginBottom: 16,
         display: "grid",
-        gridTemplateColumns: "repeat(7, 1fr)",
+        gridTemplateColumns: "repeat(8, 1fr)",
         gap: 12,
       }}
     >
@@ -64,6 +64,21 @@ export function AuctionFilters({ filter, onChange, regions }: Props) {
           <option value="sold">落札</option>
           <option value="unsold">流札</option>
           <option value="unknown">不明</option>
+        </select>
+      </div>
+      <div>
+        <div style={lbl}>仕入サイト</div>
+        <select
+          style={{ ...inp, cursor: "pointer" }}
+          value={filter.source || "all"}
+          onChange={(e) => set("source", e.target.value as AuctionHistoryFilter["source"])}
+        >
+          <option value="all">全て</option>
+          <option value="BDS">BDS</option>
+          <option value="JBA">JBA</option>
+          <option value="OMC">OMC</option>
+          <option value="USS">USS</option>
+          <option value="その他">その他</option>
         </select>
       </div>
       <div>

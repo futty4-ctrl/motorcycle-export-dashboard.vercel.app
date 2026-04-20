@@ -5,10 +5,13 @@ export type ResultStatus = "sold" | "unsold" | "unknown"
 export type AuctionTypeKind = "蚤の市" | "定例"
 export type BidResult = "won" | "lost" | "skipped"
 
+export type AuctionSource = "BDS" | "JBA" | "OMC" | "USS" | "その他"
+
 export interface AuctionHistoryRecord {
   id: string
   created_at: string
   extracted_at: string | null
+  source: AuctionSource | null
 
   record_type: RecordType
 
@@ -53,6 +56,7 @@ export interface AuctionHistoryFilter {
   auctionTypeKind?: AuctionTypeKind | "all"
   region?: string | "all"
   ccRange?: CcRange
+  source?: AuctionSource | "all"
   dateFrom?: string
   dateTo?: string
 }
