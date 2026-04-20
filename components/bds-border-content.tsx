@@ -149,6 +149,8 @@ export default function BdsBorderContent() {
   const [yahooLoading, setYahooLoading] = useState(false)
   const [yahooExpanded, setYahooExpanded] = useState(false)
   const [yahooQuery, setYahooQuery] = useState("")
+  const [yahooExclude, setYahooExclude] = useState("ジャンク,パーツ,部品,外装,エンジン,書類なし,不動")
+  const [yahooModelType, setYahooModelType] = useState("")
 
   useEffect(() => {
     getMarketPrices().then((res) => {
@@ -201,7 +203,12 @@ export default function BdsBorderContent() {
       return
     }
     setYahooLoading(true)
-    fetch(`/api/yahoo-auctions/closed?q=${encodeURIComponent(query)}&limit=50&cat=26316`)
+    const excludeParam = yahooExclude.trim()
+      ? `&exclude=${encodeURIComponent(yahooExclude)}`
+      : ""
+    fetch(
+      `/api/yahoo-auctions/closed?q=${encodeURIComponent(query)}&limit=50&cat=26316${excludeParam}`
+    )
       .then((r) => r.json())
       .then((d) => {
         if (Array.isArray(d.results)) {
@@ -219,6 +226,31 @@ export default function BdsBorderContent() {
       .finally(() => setYahooLoading(false))
   }
 
+  // 型式フィルタ適用（クライアント側・タイトル含有）
+  const yahooFilteredResults = yahooModelType.trim()
+    ? yahooResults.filter((r) =>
+        r.title.toLowerCase().includes(yahooModelType.toLowerCase())
+      )
+    : yahooResults
+
+  // 型式フィルタ後の再統計
+  const yahooFilteredStats = (() => {
+    if (yahooFilteredResults.length === 0) return null
+    if (yahooFilteredResults.length === yahooResults.length) return yahooStats
+    const prices = yahooFilteredResults.map((r) => r.price).sort((a, b) => a - b)
+    const avg = Math.round(prices.reduce((s, p) => s + p, 0) / prices.length)
+    const min = prices[0]
+    const max = prices[prices.length - 1]
+    const median = prices[Math.floor(prices.length / 2)]
+    const trimCount = Math.floor(prices.length * 0.1)
+    const trimmed = prices.slice(trimCount, prices.length - trimCount)
+    const trimmedAvg =
+      trimmed.length > 0
+        ? Math.round(trimmed.reduce((s, p) => s + p, 0) / trimmed.length)
+        : avg
+    return { count: prices.length, avg, median, min, max, trimmedAvg }
+  })()
+
   const yahooPrice = (() => {
     switch (priceSource) {
       case "manual":
@@ -228,7 +260,7 @@ export default function BdsBorderContent() {
       case "bds":
         return Math.round(bdsHistory?.medianSoldPrice ?? 0)
       case "yahoo":
-        return yahooStats?.median ?? 0
+        return yahooFilteredStats?.median ?? yahooStats?.median ?? 0
       case "eval":
         return evalSnapshot?.estimatedSalePrice ?? 0
       case "db":
@@ -930,6 +962,7 @@ export default function BdsBorderContent() {
           <div
             style={{
               display: "flex",
+              flexDirection: "column",
               gap: 8,
               marginBottom: 16,
               padding: 12,
@@ -937,68 +970,125 @@ export default function BdsBorderContent() {
               borderRadius: 8,
             }}
           >
-            <input
-              value={yahooQuery}
-              onChange={(e) => setYahooQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") runYahooSearch(yahooQuery)
-              }}
-              placeholder="ヤフオク検索ワード（車種名・年式・色など）"
-              style={{
-                flex: 1,
-                background: C.surface,
-                border: `1px solid ${C.border}`,
-                borderRadius: 6,
-                padding: "8px 12px",
-                color: C.text,
-                fontFamily: C.fontSans,
-                fontSize: 13,
-                outline: "none",
-              }}
-            />
-            <button
-              onClick={() => runYahooSearch(yahooQuery)}
-              disabled={yahooLoading}
-              style={{
-                padding: "8px 16px",
-                background: C.green,
-                border: "none",
-                borderRadius: 6,
-                color: "#fff",
-                fontFamily: C.fontSans,
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: yahooLoading ? "not-allowed" : "pointer",
-                opacity: yahooLoading ? 0.6 : 1,
-              }}
-            >
-              {yahooLoading ? "検索中..." : "再検索"}
-            </button>
-            <button
-              onClick={() => {
-                if (selectedMarket) {
-                  const q = `${selectedMarket.maker} ${selectedMarket.model}`.trim()
-                  setYahooQuery(q)
-                  runYahooSearch(q)
-                }
-              }}
-              style={{
-                padding: "8px 12px",
-                background: "transparent",
-                border: `1px solid ${C.border}`,
-                borderRadius: 6,
-                color: C.textSub,
-                fontFamily: C.fontSans,
-                fontSize: 12,
-                cursor: "pointer",
-              }}
-              title="選択中の車種名に戻す"
-            >
-              ↺
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                value={yahooQuery}
+                onChange={(e) => setYahooQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") runYahooSearch(yahooQuery)
+                }}
+                placeholder="ヤフオク検索ワード（車種名・年式・色など）"
+                style={{
+                  flex: 1,
+                  background: C.surface,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  padding: "8px 12px",
+                  color: C.text,
+                  fontFamily: C.fontSans,
+                  fontSize: 13,
+                  outline: "none",
+                }}
+              />
+              <button
+                onClick={() => runYahooSearch(yahooQuery)}
+                disabled={yahooLoading}
+                style={{
+                  padding: "8px 16px",
+                  background: C.green,
+                  border: "none",
+                  borderRadius: 6,
+                  color: "#fff",
+                  fontFamily: C.fontSans,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: yahooLoading ? "not-allowed" : "pointer",
+                  opacity: yahooLoading ? 0.6 : 1,
+                }}
+              >
+                {yahooLoading ? "検索中..." : "再検索"}
+              </button>
+              <button
+                onClick={() => {
+                  if (selectedMarket) {
+                    const q = `${selectedMarket.maker} ${selectedMarket.model}`.trim()
+                    setYahooQuery(q)
+                    runYahooSearch(q)
+                  }
+                }}
+                style={{
+                  padding: "8px 12px",
+                  background: "transparent",
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  color: C.textSub,
+                  fontFamily: C.fontSans,
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+                title="選択中の車種名に戻す"
+              >
+                ↺
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ flex: 2, minWidth: 200 }}>
+                <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4 }}>
+                  除外ワード（API側で除外・再検索時反映）
+                </div>
+                <input
+                  value={yahooExclude}
+                  onChange={(e) => setYahooExclude(e.target.value)}
+                  placeholder="ジャンク,パーツ,部品..."
+                  style={{
+                    width: "100%",
+                    background: C.surface,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 6,
+                    padding: "7px 10px",
+                    color: C.text,
+                    fontFamily: C.font,
+                    fontSize: 11,
+                    outline: "none",
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4 }}>
+                  型式で絞る（タイトル部分一致・即時）
+                </div>
+                <input
+                  value={yahooModelType}
+                  onChange={(e) => setYahooModelType(e.target.value)}
+                  placeholder="例: NC42, JC58"
+                  style={{
+                    width: "100%",
+                    background: C.surface,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 6,
+                    padding: "7px 10px",
+                    color: C.text,
+                    fontFamily: C.font,
+                    fontSize: 11,
+                    outline: "none",
+                  }}
+                />
+              </div>
+            </div>
+            {yahooResults.length > 0 && (
+              <div style={{ fontSize: 10, color: C.textMuted, paddingTop: 4 }}>
+                取得 {yahooResults.length}件 / 型式フィルタ後 {yahooFilteredResults.length}件
+                {yahooFilteredStats && (
+                  <span style={{ marginLeft: 12 }}>
+                    中央値 <b style={{ color: C.green }}>{fmtFull(yahooFilteredStats.median)}</b>
+                    ・ 平均 <b style={{ color: C.orange }}>{fmtFull(yahooFilteredStats.trimmedAvg)}</b>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
-          {yahooStats && (
+          {(yahooFilteredStats || yahooStats) && (
             <div
               style={{
                 display: "grid",
@@ -1008,10 +1098,10 @@ export default function BdsBorderContent() {
               }}
             >
               {[
-                { label: "落札中央値", value: yahooStats.median, color: C.green },
-                { label: "トリム平均", value: yahooStats.trimmedAvg, color: C.orange },
-                { label: "最高", value: yahooStats.max, color: C.textSub },
-                { label: "最低", value: yahooStats.min, color: C.red },
+                { label: "落札中央値", value: (yahooFilteredStats ?? yahooStats)!.median, color: C.green },
+                { label: "トリム平均", value: (yahooFilteredStats ?? yahooStats)!.trimmedAvg, color: C.orange },
+                { label: "最高", value: (yahooFilteredStats ?? yahooStats)!.max, color: C.textSub },
+                { label: "最低", value: (yahooFilteredStats ?? yahooStats)!.min, color: C.red },
               ].map((k) => (
                 <div
                   key={k.label}
@@ -1040,7 +1130,7 @@ export default function BdsBorderContent() {
             </div>
           )}
 
-          {yahooResults.length > 0 && (
+          {yahooFilteredResults.length > 0 && (
             <>
               <div
                 style={{
@@ -1051,7 +1141,8 @@ export default function BdsBorderContent() {
                 }}
               >
                 <div style={{ fontSize: 11, color: C.textMuted, letterSpacing: "0.08em" }}>
-                  落札一覧（{yahooExpanded ? "全件" : "上位15件"}）
+                  落札一覧（{yahooExpanded ? "全件" : "上位15件"}
+                  {yahooModelType.trim() && ` ・型式「${yahooModelType}」でフィルタ中`}）
                 </div>
                 <button
                   onClick={() => setYahooExpanded(!yahooExpanded)}
@@ -1066,7 +1157,7 @@ export default function BdsBorderContent() {
                     fontFamily: C.fontSans,
                   }}
                 >
-                  {yahooExpanded ? "折りたたむ" : `全${yahooResults.length}件表示`}
+                  {yahooExpanded ? "折りたたむ" : `全${yahooFilteredResults.length}件表示`}
                 </button>
               </div>
               <div style={{ overflowX: "auto", maxHeight: yahooExpanded ? 600 : 400 }}>
@@ -1091,7 +1182,7 @@ export default function BdsBorderContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(yahooExpanded ? yahooResults : yahooResults.slice(0, 15)).map((r, i) => (
+                    {(yahooExpanded ? yahooFilteredResults : yahooFilteredResults.slice(0, 15)).map((r, i) => (
                       <tr key={i} style={{ borderBottom: `1px solid ${C.border}40` }}>
                         <td style={{ padding: "6px 10px", color: C.textSub, fontSize: 11, whiteSpace: "nowrap" }}>
                           {r.endDate || "—"}
@@ -1137,6 +1228,11 @@ export default function BdsBorderContent() {
             </>
           )}
 
+          {!yahooLoading && yahooResults.length > 0 && yahooFilteredResults.length === 0 && (
+            <div style={{ padding: 20, textAlign: "center", color: C.textMuted, fontSize: 12 }}>
+              型式「{yahooModelType}」に該当なし。型式欄をクリアするか検索を変えてください。
+            </div>
+          )}
           {!yahooLoading && yahooResults.length === 0 && (
             <div style={{ padding: 20, textAlign: "center", color: C.textMuted, fontSize: 12 }}>
               ヤフオクに終了済み落札データがありません
