@@ -52,6 +52,12 @@ export async function getAuctionHistory(
     if (filter.region && filter.region !== "all") {
       q = q.eq("region", filter.region)
     }
+    if (filter.ccRange && filter.ccRange !== "all") {
+      if (filter.ccRange === "small") q = q.lte("displacement_cc", 125)
+      else if (filter.ccRange === "mid")
+        q = q.gt("displacement_cc", 125).lte("displacement_cc", 400)
+      else if (filter.ccRange === "large") q = q.gt("displacement_cc", 400)
+    }
     if (filter.dateFrom) {
       q = q.gte("auction_date", filter.dateFrom)
     }

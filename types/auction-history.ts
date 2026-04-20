@@ -44,12 +44,15 @@ export interface AuctionHistoryRecord {
   bid_result: BidResult | null
 }
 
+export type CcRange = "all" | "small" | "mid" | "large"
+
 export interface AuctionHistoryFilter {
   search?: string
   recordType?: RecordType | "all"
   resultStatus?: ResultStatus | "all"
   auctionTypeKind?: AuctionTypeKind | "all"
   region?: string | "all"
+  ccRange?: CcRange
   dateFrom?: string
   dateTo?: string
 }

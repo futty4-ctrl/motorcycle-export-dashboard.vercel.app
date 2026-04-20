@@ -26,7 +26,7 @@ export function AuctionFilters({ filter, onChange, regions }: Props) {
         padding: 16,
         marginBottom: 16,
         display: "grid",
-        gridTemplateColumns: "repeat(6, 1fr)",
+        gridTemplateColumns: "repeat(7, 1fr)",
         gap: 12,
       }}
     >
@@ -64,6 +64,19 @@ export function AuctionFilters({ filter, onChange, regions }: Props) {
           <option value="sold">落札</option>
           <option value="unsold">流札</option>
           <option value="unknown">不明</option>
+        </select>
+      </div>
+      <div>
+        <div style={lbl}>排気量</div>
+        <select
+          style={{ ...inp, cursor: "pointer" }}
+          value={filter.ccRange || "all"}
+          onChange={(e) => set("ccRange", e.target.value as AuctionHistoryFilter["ccRange"])}
+        >
+          <option value="all">全て</option>
+          <option value="small">〜125cc</option>
+          <option value="mid">126〜400cc</option>
+          <option value="large">401cc〜</option>
         </select>
       </div>
       <div>

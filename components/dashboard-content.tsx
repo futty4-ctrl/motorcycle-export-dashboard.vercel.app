@@ -10,6 +10,7 @@ import {
   getLastActualInputDate,
 } from "@/app/actions/inventory-actuals"
 import { getNextWeekPicks, type NextWeekPick } from "@/app/actions/next-week-picks"
+import { getUpcomingAuctionSchedule } from "@/app/actions/auction-schedule"
 import type { VehicleDisplay } from "@/lib/vehicle-display"
 import {
   C,
@@ -35,6 +36,9 @@ export function DashboardContent() {
   const [staleCount, setStaleCount] = useState<number>(0)
   const [daysSinceLastInput, setDaysSinceLastInput] = useState<number | null>(null)
   const [nextWeekPicks, setNextWeekPicks] = useState<NextWeekPick[]>([])
+  const [upcomingAuctions, setUpcomingAuctions] = useState<
+    Array<{ date: string; dayOfWeek: string; region: string; note: string }>
+  >([])
   const [connectionStatus, setConnectionStatus] = useState<{
     supabase: "ok" | "env_missing" | "error"
   }>({ supabase: "env_missing" })
@@ -50,12 +54,14 @@ export function DashboardContent() {
           staleResult,
           lastInputResult,
           picksResult,
+          scheduleResult,
         ] = await Promise.all([
           getVehiclesFromSupabase(),
           countUnfilledSold(),
           listStaleInventory(7),
           getLastActualInputDate(),
           getNextWeekPicks({ limit: 10 }),
+          getUpcomingAuctionSchedule(),
         ])
         if (vehiclesResult.vehicles) setVehicles(vehiclesResult.vehicles)
         if (unfilledResult.success) setUnfilledCount(unfilledResult.count)
@@ -63,6 +69,7 @@ export function DashboardContent() {
         if (lastInputResult.success)
           setDaysSinceLastInput(lastInputResult.daysSinceLastInput)
         if (picksResult.success) setNextWeekPicks(picksResult.picks)
+        if (scheduleResult.success) setUpcomingAuctions(scheduleResult.upcoming)
       }
       setLoading(false)
     }
@@ -132,6 +139,41 @@ export function DashboardContent() {
         </div>
       </div>
 
+      {upcomingAuctions.length > 0 && (
+        <div
+          style={{
+            ...card(),
+            borderLeft: `3px solid ${C.blue}`,
+            marginBottom: 12,
+            padding: "12px 20px",
+          }}
+        >
+          <div style={{ fontSize: 11, color: C.blue, fontWeight: 700, marginBottom: 8, fontFamily: font }}>
+            📅 次のBDS開催予測（過去パターンから）
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {upcomingAuctions.slice(0, 6).map((a) => (
+              <div
+                key={`${a.date}-${a.region}`}
+                style={{
+                  padding: "6px 12px",
+                  background: C.surfaceHigh,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 4,
+                  fontSize: 11,
+                  color: C.textSub,
+                  fontFamily: font,
+                }}
+              >
+                <b style={{ color: C.text }}>{a.date}</b>
+                <span style={{ color: C.textMuted, marginLeft: 4 }}>({a.dayOfWeek})</span>
+                <span style={{ marginLeft: 8, color: C.orange }}>{a.region || "ー"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {nextWeekPicks.length > 0 && (
         <div
           style={{
@@ -185,7 +227,7 @@ export function DashboardContent() {
             >
               <thead>
                 <tr style={{ background: C.surfaceHigh }}>
-                  {["#", "車種", "Score", "BDS件数", "BDS中央値", "自分", "粗利中央値", "推定上限", "アクション"].map((h) => (
+                  {["#", "車種", "cc", "Score", "BDS件数", "BDS中央値", "自分", "粗利中央値", "推定上限", "アクション"].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -212,6 +254,9 @@ export function DashboardContent() {
                       </td>
                       <td style={{ padding: "8px 12px", fontWeight: 600 }}>
                         {p.maker ? `${p.maker} ` : ""}{p.modelName}
+                      </td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", color: C.blue, fontFamily: "monospace", fontSize: 11 }}>
+                        {p.displacementCc != null ? `${Math.round(p.displacementCc)}` : "—"}
                       </td>
                       <td
                         style={{
