@@ -276,9 +276,15 @@ export function YahooTemplateContent() {
   }
 
   const handleCopyAndOpenYahoo = async () => {
-    await navigator.clipboard.writeText(template)
+    // タイトル＋本文を合わせてクリップボードへ
+    const combined = `【タイトル】\n${title}\n\n【出品文】\n${template}`
+    await navigator.clipboard.writeText(combined)
     setCopiedBody(true)
-    setTimeout(() => setCopiedBody(false), 2000)
+    setCopiedTitle(true)
+    setTimeout(() => {
+      setCopiedBody(false)
+      setCopiedTitle(false)
+    }, 2000)
     window.open("https://auctions.yahoo.co.jp/sell/jp/show/submit?category=2084024278", "_blank", "noopener,noreferrer")
   }
 

@@ -447,11 +447,30 @@ function Card({
           fontSize: 11,
           color: C.textSub,
           marginBottom: 10,
+          alignItems: "center",
         }}
       >
         <span>売価 {fmt万(e.estimated_sale_price)}</span>
         <span>整備 {fmt万(e.repair_cost_estimate)}</span>
         <span>陸送 {fmt万(e.transport_cost)}</span>
+        <a
+          href={`/bds-border${e.bid_limit_best ? `?bid=${e.bid_limit_best}` : ""}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            marginLeft: "auto",
+            padding: "4px 10px",
+            borderRadius: 4,
+            border: `1px solid ${C.orange}`,
+            background: `${C.orange}15`,
+            color: C.orange,
+            fontSize: 11,
+            fontWeight: 600,
+            textDecoration: "none",
+          }}
+        >
+          🎯 ボーダー詳細 →
+        </a>
       </div>
 
       {/* 判定ボタン */}
