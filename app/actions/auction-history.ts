@@ -103,13 +103,26 @@ export async function getAuctionHistorySummary(): Promise<{
 }> {
   try {
     const supabase = createServerSupabaseClient()
+
+    // 総件数は count: exact + head: true で正確に取得（データは取らない）
+    const { count: total, error: countErr } = await supabase
+      .from("auction_history")
+      .select("*", { count: "exact", head: true })
+    if (countErr) throw countErr
+
+    // 統計用データは直近6ヶ月に限定して最大50000件
+    const sixMonthsAgo = new Date()
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+    const cutoff = sixMonthsAgo.toISOString().slice(0, 10)
+
     const { data, error } = await supabase
       .from("auction_history")
       .select("result_status,sold_price,auction_date")
+      .gte("auction_date", cutoff)
+      .limit(50000)
     if (error) throw error
 
     const rows = data ?? []
-    const total = rows.length
     const now = new Date()
     const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
     const thisMonth = rows.filter((r) => {
@@ -118,7 +131,7 @@ export async function getAuctionHistorySummary(): Promise<{
     }).length
 
     const soldRows = rows.filter((r) => r.result_status === "sold")
-    const soldRate = total > 0 ? soldRows.length / total : 0
+    const soldRate = rows.length > 0 ? soldRows.length / rows.length : 0
     const soldWithPrice = soldRows.filter(
       (r) => typeof r.sold_price === "number" && r.sold_price! > 0
     ) as { sold_price: number }[]
@@ -132,7 +145,7 @@ export async function getAuctionHistorySummary(): Promise<{
 
     return {
       success: true,
-      summary: { total, thisMonth, soldRate, avgSoldPrice },
+      summary: { total: total ?? 0, thisMonth, soldRate, avgSoldPrice },
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "サマリー取得に失敗しました"
@@ -171,6 +184,7 @@ export async function getDistinctRegions(): Promise<{
       .from("auction_history")
       .select("region")
       .not("region", "is", null)
+      .limit(50000)
     if (error) throw error
     const set = new Set<string>()
     for (const row of data ?? []) {
