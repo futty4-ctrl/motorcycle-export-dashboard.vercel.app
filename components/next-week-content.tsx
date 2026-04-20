@@ -43,9 +43,25 @@ export default function NextWeekContent() {
   const [ratioSampleSize, setRatioSampleSize] = useState(0)
   const [sortBy, setSortBy] = useState<"score" | "cc">("cc")
   const [ccFilter, setCcFilter] = useState<"all" | "small" | "mid" | "large">("all")
+  const [makerFilter, setMakerFilter] = useState<string>("")
+  const [modelFilter, setModelFilter] = useState<string>("")
+
+  // picks からメーカー・車種のユニークリスト
+  const allMakers = Array.from(new Set(picks.map((p) => p.maker).filter(Boolean))).sort() as string[]
+  const modelsForMaker = (makerFilter
+    ? picks.filter((p) => p.maker === makerFilter).map((p) => p.modelName)
+    : picks.map((p) => p.modelName)
+  ).filter(Boolean)
+  const uniqModels = Array.from(new Set(modelsForMaker)).sort()
 
   const filtered = (() => {
     let arr = [...picks]
+    if (makerFilter) {
+      arr = arr.filter((p) => p.maker === makerFilter)
+    }
+    if (modelFilter) {
+      arr = arr.filter((p) => p.modelName === modelFilter)
+    }
     if (ccFilter !== "all") {
       arr = arr.filter((p) => {
         const cc = p.displacementCc
@@ -210,6 +226,97 @@ export default function NextWeekContent() {
           ・
           <b style={{ color: C.text }}>25点</b> 回転速度（在庫日数）：短いほど良い
         </div>
+      </div>
+
+      {/* メーカー・車種プルダウン */}
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          marginBottom: 12,
+          flexWrap: "wrap",
+          alignItems: "flex-end",
+          padding: 12,
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          borderRadius: 8,
+        }}
+      >
+        <div style={{ minWidth: 160 }}>
+          <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>
+            メーカー{allMakers.length > 0 && ` (${allMakers.length})`}
+          </div>
+          <select
+            value={makerFilter}
+            onChange={(e) => {
+              setMakerFilter(e.target.value)
+              setModelFilter("")
+            }}
+            style={{
+              width: "100%",
+              background: C.surfaceHigh,
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              padding: "7px 10px",
+              color: C.text,
+              fontFamily: C.fontSans,
+              fontSize: 12,
+              outline: "none",
+              cursor: "pointer",
+            }}
+          >
+            <option value="">全て</option>
+            {allMakers.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ minWidth: 200 }}>
+          <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>
+            車種{uniqModels.length > 0 && ` (${uniqModels.length})`}
+          </div>
+          <select
+            value={modelFilter}
+            onChange={(e) => setModelFilter(e.target.value)}
+            style={{
+              width: "100%",
+              background: C.surfaceHigh,
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              padding: "7px 10px",
+              color: C.text,
+              fontFamily: C.fontSans,
+              fontSize: 12,
+              outline: "none",
+              cursor: "pointer",
+            }}
+          >
+            <option value="">全て</option>
+            {uniqModels.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+        {(makerFilter || modelFilter) && (
+          <button
+            onClick={() => {
+              setMakerFilter("")
+              setModelFilter("")
+            }}
+            style={{
+              padding: "7px 14px",
+              background: "transparent",
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              color: C.textSub,
+              fontFamily: C.fontSans,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            クリア
+          </button>
+        )}
       </div>
 
       {/* 排気量フィルタ＋ソート */}
