@@ -284,14 +284,10 @@ export default function BdsBorderContent() {
     if (searchChassisPrefix && !title.includes(searchChassisPrefix.toLowerCase())) return false
     // 型式追加テキスト（自由入力）
     if (yahooModelType.trim() && !title.includes(yahooModelType.toLowerCase())) return false
-    // 排気量プルダウン（例：50cc / 125cc）- タイトルに "50cc" や数字 "50" を含む
+    // 排気量プルダウン（例：400cc）- タイトルに「400」含めば OK（CB400SF 等もマッチ）
     if (searchCcRange) {
       const ccNum = searchCcRange.replace(/[^\d]/g, "")
-      if (!ccNum) return true
-      // "50cc" "50ｃｃ" "50"を含むかチェック
-      const hasCc = title.includes(`${ccNum}cc`) || title.includes(`${ccNum}ｃｃ`) ||
-        new RegExp(`\\b${ccNum}\\b`).test(title)
-      if (!hasCc) return false
+      if (ccNum && !title.includes(ccNum)) return false
     }
     return true
   })
