@@ -454,7 +454,7 @@ function Card({
         <span>整備 {fmt万(e.repair_cost_estimate)}</span>
         <span>陸送 {fmt万(e.transport_cost)}</span>
         <a
-          href={`/bds-border${e.bid_limit_best ? `?bid=${e.bid_limit_best}` : ""}`}
+          href={`/bds-border?eval=${e.id}${e.bid_limit_best ? `&bid=${e.bid_limit_best}` : ""}`}
           target="_blank"
           rel="noopener noreferrer"
           style={{

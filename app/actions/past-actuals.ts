@@ -106,6 +106,67 @@ export async function getPastActualsForModel(
   }
 }
 
+/**
+ * 特定の evaluation から推定売価・車種情報を取得
+ * auction-day の入札判断データを /bds-border で流用するため
+ */
+export async function getEvaluationSnapshot(evaluationId: string): Promise<{
+  success: boolean
+  data: {
+    evaluationId: string
+    estimatedSalePrice: number | null
+    transportCost: number | null
+    repairCostEstimate: number | null
+    targetProfit: number | null
+    bidLimitBest: number | null
+    bidLimitMin: number | null
+    vehicleCategory: string | null
+    maker: string | null
+    modelName: string | null
+    chassisNumber: string | null
+  } | null
+  error?: string
+}> {
+  try {
+    const supabase = createServerSupabaseClient()
+    const { data, error } = await supabase
+      .from("evaluations")
+      .select(
+        "id, estimated_sale_price, transport_cost, repair_cost_estimate, target_profit, bid_limit_best, bid_limit_min, vehicle_category, vehicle:vehicles(chassis_number, name)"
+      )
+      .eq("id", evaluationId)
+      .single()
+    if (error) throw error
+    if (!data) return { success: true, data: null }
+
+    const vehicle = (data.vehicle as { chassis_number: string | null; name: string | null } | null) ?? null
+    const vehicleName = vehicle?.name ?? ""
+    const parts = vehicleName.split(/\s+/).filter(Boolean)
+    const maker = parts[0] ?? null
+    const modelName = parts.slice(1).join(" ") || null
+
+    return {
+      success: true,
+      data: {
+        evaluationId: data.id,
+        estimatedSalePrice: data.estimated_sale_price,
+        transportCost: data.transport_cost,
+        repairCostEstimate: data.repair_cost_estimate,
+        targetProfit: data.target_profit,
+        bidLimitBest: data.bid_limit_best,
+        bidLimitMin: data.bid_limit_min,
+        vehicleCategory: data.vehicle_category,
+        maker,
+        modelName,
+        chassisNumber: vehicle?.chassis_number ?? null,
+      },
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "取得に失敗しました"
+    return { success: false, data: null, error: message }
+  }
+}
+
 function emptySummary(): PastActualsSummary {
   return {
     count: 0,

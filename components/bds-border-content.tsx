@@ -3,7 +3,11 @@
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { getMarketPrices } from "@/app/actions/market-prices"
-import { getPastActualsForModel, type PastActualsSummary } from "@/app/actions/past-actuals"
+import {
+  getPastActualsForModel,
+  getEvaluationSnapshot,
+  type PastActualsSummary,
+} from "@/app/actions/past-actuals"
 import { getBdsHistoryForModel, type BdsHistorySummary } from "@/app/actions/bds-history"
 import type { MarketPrice } from "@/lib/types"
 
@@ -113,11 +117,15 @@ export default function BdsBorderContent() {
   const initialModel = searchParams.get("model") ?? ""
   const initialMaker = searchParams.get("maker") ?? ""
   const initialVenue = searchParams.get("venue") ?? ""
+  const evalId = searchParams.get("eval") ?? ""
 
   const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([])
   const [selectedMarket, setSelectedMarket] = useState<MarketPrice | null>(null)
   const [manualYahoo, setManualYahoo] = useState("")
-  const [priceSource, setPriceSource] = useState<"db" | "actuals" | "bds" | "manual">("db")
+  const [priceSource, setPriceSource] = useState<"db" | "actuals" | "bds" | "eval" | "manual">(
+    evalId ? "eval" : "db"
+  )
+  const [evalSnapshot, setEvalSnapshot] = useState<Awaited<ReturnType<typeof getEvaluationSnapshot>>["data"] | null>(null)
   const [venue, setVenue] = useState(
     initialVenue && VENUES.includes(initialVenue) ? initialVenue : "関東"
   )
@@ -143,6 +151,12 @@ export default function BdsBorderContent() {
         }
       }
     })
+    // evaluation があれば取得
+    if (evalId) {
+      getEvaluationSnapshot(evalId).then((res) => {
+        if (res.success && res.data) setEvalSnapshot(res.data)
+      })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -168,6 +182,8 @@ export default function BdsBorderContent() {
         return Math.round(pastActuals?.medianSoldPrice ?? 0)
       case "bds":
         return Math.round(bdsHistory?.medianSoldPrice ?? 0)
+      case "eval":
+        return evalSnapshot?.estimatedSalePrice ?? 0
       case "db":
       default:
         return selectedMarket?.avg_price || 0
@@ -278,6 +294,9 @@ export default function BdsBorderContent() {
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6, marginBottom: 14 }}>
               {[
+                ...(evalSnapshot
+                  ? [{ label: "⚡ 評価データ（入札判断）", value: "eval" as const, note: "auction-dayの最新推定売価" }]
+                  : []),
                 { label: "相場マスターDB", value: "db" as const, note: "手動入力値" },
                 { label: "自分の売却実績 中央値", value: "actuals" as const, note: "推奨（実データ）" },
                 { label: "BDS落札中央値", value: "bds" as const, note: "BDS履歴1000件" },
@@ -403,6 +422,49 @@ export default function BdsBorderContent() {
                     )}
                   </div>
                 )}
+              </div>
+            ) : priceSource === "eval" && evalSnapshot ? (
+              <div
+                style={{
+                  padding: "12px 14px",
+                  background: `${C.orange}10`,
+                  border: `1px solid ${C.orange}40`,
+                  borderRadius: 6,
+                  fontSize: 12,
+                  color: C.textSub,
+                  lineHeight: 1.8,
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.orange, marginBottom: 8 }}>
+                  ⚡ auction-dayの入札判断データから取得
+                </div>
+                {evalSnapshot.chassisNumber && (
+                  <div>車台: <code style={{ fontFamily: "monospace" }}>{evalSnapshot.chassisNumber}</code></div>
+                )}
+                {(evalSnapshot.maker || evalSnapshot.modelName) && (
+                  <div>
+                    車種: {evalSnapshot.maker} {evalSnapshot.modelName}
+                  </div>
+                )}
+                {evalSnapshot.vehicleCategory && (
+                  <div>カテゴリ: {evalSnapshot.vehicleCategory}</div>
+                )}
+                <div>
+                  推定売価: <b style={{ color: C.green }}>{fmtFull(evalSnapshot.estimatedSalePrice ?? 0)}</b>
+                </div>
+                {evalSnapshot.bidLimitBest != null && (
+                  <div>
+                    DB計算ボーダー（利益5万）: <b>{fmtFull(evalSnapshot.bidLimitBest)}</b>
+                  </div>
+                )}
+                {evalSnapshot.bidLimitMin != null && (
+                  <div>
+                    DB計算ボーダー（利益2万）: <b>{fmtFull(evalSnapshot.bidLimitMin)}</b>
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: C.textMuted, marginTop: 6 }}>
+                  ※ auction-dayで評価したデータをそのまま相場として使用。
+                </div>
               </div>
             ) : priceSource === "bds" ? (
               <div>
