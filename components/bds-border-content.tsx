@@ -151,6 +151,9 @@ export default function BdsBorderContent() {
   const [yahooQuery, setYahooQuery] = useState("")
   const [yahooExclude, setYahooExclude] = useState("ジャンク,パーツ,部品,外装,エンジン,書類なし,不動")
   const [yahooModelType, setYahooModelType] = useState("")
+  const [searchMaker, setSearchMaker] = useState("")
+  const [searchModel, setSearchModel] = useState("")
+  const [searchCcRange, setSearchCcRange] = useState("")
 
   useEffect(() => {
     getMarketPrices().then((res) => {
@@ -224,6 +227,25 @@ export default function BdsBorderContent() {
         setYahooStats(null)
       })
       .finally(() => setYahooLoading(false))
+  }
+
+  // メーカー・車種のユニークリスト（market_pricesから）
+  const allMakers = Array.from(new Set(marketPrices.map((m) => m.maker).filter(Boolean))).sort()
+  const modelsForMaker = searchMaker
+    ? Array.from(new Set(marketPrices.filter((m) => m.maker === searchMaker).map((m) => m.model).filter(Boolean))).sort()
+    : Array.from(new Set(marketPrices.map((m) => m.model).filter(Boolean))).sort()
+
+  // プルダウン選択からクエリ構築して検索
+  const runSearchFromDropdowns = () => {
+    const parts: string[] = []
+    if (searchMaker) parts.push(searchMaker)
+    if (searchModel) parts.push(searchModel)
+    if (searchCcRange) parts.push(searchCcRange)
+    const q = parts.join(" ").trim()
+    if (q) {
+      setYahooQuery(q)
+      runYahooSearch(q)
+    }
   }
 
   // 型式フィルタ適用（クライアント側・タイトル含有）
@@ -958,7 +980,141 @@ export default function BdsBorderContent() {
             </div>
           </div>
 
-          {/* 手動検索ボックス */}
+          {/* プルダウン選択 */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr 1fr auto",
+              gap: 8,
+              marginBottom: 12,
+              padding: 12,
+              background: C.surfaceHigh,
+              borderRadius: 8,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>メーカー</div>
+              <select
+                value={searchMaker}
+                onChange={(e) => {
+                  setSearchMaker(e.target.value)
+                  setSearchModel("")
+                }}
+                style={{
+                  width: "100%",
+                  background: C.surface,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  padding: "7px 10px",
+                  color: C.text,
+                  fontFamily: C.fontSans,
+                  fontSize: 12,
+                  outline: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="">--</option>
+                {allMakers.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>車種</div>
+              <select
+                value={searchModel}
+                onChange={(e) => setSearchModel(e.target.value)}
+                style={{
+                  width: "100%",
+                  background: C.surface,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  padding: "7px 10px",
+                  color: C.text,
+                  fontFamily: C.fontSans,
+                  fontSize: 12,
+                  outline: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="">--</option>
+                {modelsForMaker.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>排気量</div>
+              <select
+                value={searchCcRange}
+                onChange={(e) => setSearchCcRange(e.target.value)}
+                style={{
+                  width: "100%",
+                  background: C.surface,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  padding: "7px 10px",
+                  color: C.text,
+                  fontFamily: C.fontSans,
+                  fontSize: 12,
+                  outline: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="">--</option>
+                <option value="50cc">50cc</option>
+                <option value="125cc">125cc</option>
+                <option value="250cc">250cc</option>
+                <option value="400cc">400cc</option>
+                <option value="600cc">600cc</option>
+                <option value="750cc">750cc</option>
+                <option value="1000cc">1000cc</option>
+                <option value="1200cc">1200cc</option>
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>型式（部分一致）</div>
+              <input
+                value={yahooModelType}
+                onChange={(e) => setYahooModelType(e.target.value)}
+                placeholder="NC42, JC58"
+                style={{
+                  width: "100%",
+                  background: C.surface,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  padding: "7px 10px",
+                  color: C.text,
+                  fontFamily: C.font,
+                  fontSize: 11,
+                  outline: "none",
+                }}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end" }}>
+              <button
+                onClick={runSearchFromDropdowns}
+                disabled={yahooLoading || (!searchMaker && !searchModel && !searchCcRange)}
+                style={{
+                  padding: "8px 14px",
+                  background: C.orange,
+                  border: "none",
+                  borderRadius: 6,
+                  color: "#fff",
+                  fontFamily: C.fontSans,
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: yahooLoading ? "not-allowed" : "pointer",
+                  opacity: yahooLoading || (!searchMaker && !searchModel && !searchCcRange) ? 0.6 : 1,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                選択で検索
+              </button>
+            </div>
+          </div>
+
+          {/* フリーワード検索ボックス */}
           <div
             style={{
               display: "flex",
@@ -1031,49 +1187,26 @@ export default function BdsBorderContent() {
                 ↺
               </button>
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <div style={{ flex: 2, minWidth: 200 }}>
-                <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4 }}>
-                  除外ワード（API側で除外・再検索時反映）
-                </div>
-                <input
-                  value={yahooExclude}
-                  onChange={(e) => setYahooExclude(e.target.value)}
-                  placeholder="ジャンク,パーツ,部品..."
-                  style={{
-                    width: "100%",
-                    background: C.surface,
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 6,
-                    padding: "7px 10px",
-                    color: C.text,
-                    fontFamily: C.font,
-                    fontSize: 11,
-                    outline: "none",
-                  }}
-                />
+            <div>
+              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4 }}>
+                除外ワード（API側で除外・再検索時反映）
               </div>
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4 }}>
-                  型式で絞る（タイトル部分一致・即時）
-                </div>
-                <input
-                  value={yahooModelType}
-                  onChange={(e) => setYahooModelType(e.target.value)}
-                  placeholder="例: NC42, JC58"
-                  style={{
-                    width: "100%",
-                    background: C.surface,
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 6,
-                    padding: "7px 10px",
-                    color: C.text,
-                    fontFamily: C.font,
-                    fontSize: 11,
-                    outline: "none",
-                  }}
-                />
-              </div>
+              <input
+                value={yahooExclude}
+                onChange={(e) => setYahooExclude(e.target.value)}
+                placeholder="ジャンク,パーツ,部品..."
+                style={{
+                  width: "100%",
+                  background: C.surface,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  padding: "7px 10px",
+                  color: C.text,
+                  fontFamily: C.font,
+                  fontSize: 11,
+                  outline: "none",
+                }}
+              />
             </div>
             {yahooResults.length > 0 && (
               <div style={{ fontSize: 10, color: C.textMuted, paddingTop: 4 }}>
