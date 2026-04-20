@@ -187,10 +187,10 @@ export default function BdsBorderContent() {
     getBdsHistoryForModel(selectedMarket.model).then((res) => {
       if (res.success) setBdsHistory(res.data)
     })
-    // ヤフオク生データ取得
+    // ヤフオク生データ取得（cat=26316: オートバイ車体カテゴリーで固定）
     setYahooLoading(true)
     const query = `${selectedMarket.maker} ${selectedMarket.model}`.trim()
-    fetch(`/api/yahoo-auctions/closed?q=${encodeURIComponent(query)}&limit=50`)
+    fetch(`/api/yahoo-auctions/closed?q=${encodeURIComponent(query)}&limit=50&cat=26316`)
       .then((r) => r.json())
       .then((d) => {
         if (Array.isArray(d.results)) {
@@ -902,7 +902,7 @@ export default function BdsBorderContent() {
                 color: C.text,
               }}
             >
-              🟢 ヤフオク 終了済み落札データ（生）
+              🟢 ヤフオク 終了済み落札データ（生・オートバイ車体カテゴリ）
             </div>
             <div style={{ fontSize: 11, color: C.textSub }}>
               {yahooLoading ? "取得中..." : `${yahooResults.length}件`}
