@@ -148,6 +148,7 @@ export default function BdsBorderContent() {
   } | null>(null)
   const [yahooLoading, setYahooLoading] = useState(false)
   const [yahooExpanded, setYahooExpanded] = useState(false)
+  const [yahooQuery, setYahooQuery] = useState("")
 
   useEffect(() => {
     getMarketPrices().then((res) => {
@@ -187,20 +188,36 @@ export default function BdsBorderContent() {
     getBdsHistoryForModel(selectedMarket.model).then((res) => {
       if (res.success) setBdsHistory(res.data)
     })
-    // ヤフオク生データ取得（cat=26316: オートバイ車体カテゴリーで固定）
+    // 車種選択時にクエリ初期化＆自動検索
+    const initialQuery = `${selectedMarket.maker} ${selectedMarket.model}`.trim()
+    setYahooQuery(initialQuery)
+    runYahooSearch(initialQuery)
+  }, [selectedMarket])
+
+  const runYahooSearch = (query: string) => {
+    if (!query.trim()) {
+      setYahooResults([])
+      setYahooStats(null)
+      return
+    }
     setYahooLoading(true)
-    const query = `${selectedMarket.maker} ${selectedMarket.model}`.trim()
     fetch(`/api/yahoo-auctions/closed?q=${encodeURIComponent(query)}&limit=50&cat=26316`)
       .then((r) => r.json())
       .then((d) => {
         if (Array.isArray(d.results)) {
           setYahooResults(d.results)
           setYahooStats(d.stats)
+        } else {
+          setYahooResults([])
+          setYahooStats(null)
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        setYahooResults([])
+        setYahooStats(null)
+      })
       .finally(() => setYahooLoading(false))
-  }, [selectedMarket])
+  }
 
   const yahooPrice = (() => {
     switch (priceSource) {
@@ -907,6 +924,78 @@ export default function BdsBorderContent() {
             <div style={{ fontSize: 11, color: C.textSub }}>
               {yahooLoading ? "取得中..." : `${yahooResults.length}件`}
             </div>
+          </div>
+
+          {/* 手動検索ボックス */}
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: 16,
+              padding: 12,
+              background: C.surfaceHigh,
+              borderRadius: 8,
+            }}
+          >
+            <input
+              value={yahooQuery}
+              onChange={(e) => setYahooQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") runYahooSearch(yahooQuery)
+              }}
+              placeholder="ヤフオク検索ワード（車種名・年式・色など）"
+              style={{
+                flex: 1,
+                background: C.surface,
+                border: `1px solid ${C.border}`,
+                borderRadius: 6,
+                padding: "8px 12px",
+                color: C.text,
+                fontFamily: C.fontSans,
+                fontSize: 13,
+                outline: "none",
+              }}
+            />
+            <button
+              onClick={() => runYahooSearch(yahooQuery)}
+              disabled={yahooLoading}
+              style={{
+                padding: "8px 16px",
+                background: C.green,
+                border: "none",
+                borderRadius: 6,
+                color: "#fff",
+                fontFamily: C.fontSans,
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: yahooLoading ? "not-allowed" : "pointer",
+                opacity: yahooLoading ? 0.6 : 1,
+              }}
+            >
+              {yahooLoading ? "検索中..." : "再検索"}
+            </button>
+            <button
+              onClick={() => {
+                if (selectedMarket) {
+                  const q = `${selectedMarket.maker} ${selectedMarket.model}`.trim()
+                  setYahooQuery(q)
+                  runYahooSearch(q)
+                }
+              }}
+              style={{
+                padding: "8px 12px",
+                background: "transparent",
+                border: `1px solid ${C.border}`,
+                borderRadius: 6,
+                color: C.textSub,
+                fontFamily: C.fontSans,
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+              title="選択中の車種名に戻す"
+            >
+              ↺
+            </button>
           </div>
 
           {yahooStats && (
