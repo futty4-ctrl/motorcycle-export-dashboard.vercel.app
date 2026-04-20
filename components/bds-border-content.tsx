@@ -9,6 +9,7 @@ import {
   type PastActualsSummary,
 } from "@/app/actions/past-actuals"
 import { getBdsHistoryForModel, type BdsHistorySummary } from "@/app/actions/bds-history"
+import { getChassisPrefixes } from "@/app/actions/chassis-prefixes"
 import type { MarketPrice } from "@/lib/types"
 
 const C = {
@@ -111,6 +112,21 @@ const fmt = (n: number) =>
   n >= 10000 ? `¥${(n / 10000).toFixed(1)}万` : `¥${n.toLocaleString()}`
 const fmtFull = (n: number) => `¥${n.toLocaleString()}`
 
+function dropdownStyle(C: typeof import("@/components/ui-system").C | { surface: string; border: string; text: string }) {
+  return {
+    width: "100%",
+    background: C.surface,
+    border: `1px solid ${C.border}`,
+    borderRadius: 6,
+    padding: "7px 10px",
+    color: C.text,
+    fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+    fontSize: 12,
+    outline: "none",
+    cursor: "pointer",
+  } as const
+}
+
 export default function BdsBorderContent() {
   const searchParams = useSearchParams()
   const initialBid = searchParams.get("bid") ?? ""
@@ -154,6 +170,8 @@ export default function BdsBorderContent() {
   const [searchMaker, setSearchMaker] = useState("")
   const [searchModel, setSearchModel] = useState("")
   const [searchCcRange, setSearchCcRange] = useState("")
+  const [searchChassisPrefix, setSearchChassisPrefix] = useState("")
+  const [chassisPrefixes, setChassisPrefixes] = useState<string[]>([])
 
   useEffect(() => {
     getMarketPrices().then((res) => {
@@ -235,12 +253,29 @@ export default function BdsBorderContent() {
     ? Array.from(new Set(marketPrices.filter((m) => m.maker === searchMaker).map((m) => m.model).filter(Boolean))).sort()
     : Array.from(new Set(marketPrices.map((m) => m.model).filter(Boolean))).sort()
 
+  // メーカー・車種が変わったら型式候補を取得
+  useEffect(() => {
+    getChassisPrefixes(searchMaker || null, searchModel || null).then((res) => {
+      if (res.success) setChassisPrefixes(res.prefixes)
+    })
+  }, [searchMaker, searchModel])
+
   // プルダウン選択からクエリ構築して検索
-  const runSearchFromDropdowns = () => {
+  const runSearchFromDropdowns = (override?: {
+    maker?: string
+    model?: string
+    ccRange?: string
+    chassisPrefix?: string
+  }) => {
     const parts: string[] = []
-    if (searchMaker) parts.push(searchMaker)
-    if (searchModel) parts.push(searchModel)
-    if (searchCcRange) parts.push(searchCcRange)
+    const mk = override?.maker !== undefined ? override.maker : searchMaker
+    const mdl = override?.model !== undefined ? override.model : searchModel
+    const cc = override?.ccRange !== undefined ? override.ccRange : searchCcRange
+    const ch = override?.chassisPrefix !== undefined ? override.chassisPrefix : searchChassisPrefix
+    if (mk) parts.push(mk)
+    if (mdl) parts.push(mdl)
+    if (ch) parts.push(ch)
+    if (cc) parts.push(cc)
     const q = parts.join(" ").trim()
     if (q) {
       setYahooQuery(q)
@@ -980,11 +1015,11 @@ export default function BdsBorderContent() {
             </div>
           </div>
 
-          {/* プルダウン選択 */}
+          {/* プルダウン選択（変更即検索） */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr 1fr auto",
+              gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr auto",
               gap: 8,
               marginBottom: 12,
               padding: 12,
@@ -997,21 +1032,13 @@ export default function BdsBorderContent() {
               <select
                 value={searchMaker}
                 onChange={(e) => {
-                  setSearchMaker(e.target.value)
+                  const v = e.target.value
+                  setSearchMaker(v)
                   setSearchModel("")
+                  setSearchChassisPrefix("")
+                  runSearchFromDropdowns({ maker: v, model: "", chassisPrefix: "" })
                 }}
-                style={{
-                  width: "100%",
-                  background: C.surface,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 6,
-                  padding: "7px 10px",
-                  color: C.text,
-                  fontFamily: C.fontSans,
-                  fontSize: 12,
-                  outline: "none",
-                  cursor: "pointer",
-                }}
+                style={dropdownStyle(C)}
               >
                 <option value="">--</option>
                 {allMakers.map((m) => (
@@ -1020,22 +1047,18 @@ export default function BdsBorderContent() {
               </select>
             </div>
             <div>
-              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>車種</div>
+              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>
+                車種 {modelsForMaker.length > 0 && <span style={{ color: C.textMuted }}>({modelsForMaker.length})</span>}
+              </div>
               <select
                 value={searchModel}
-                onChange={(e) => setSearchModel(e.target.value)}
-                style={{
-                  width: "100%",
-                  background: C.surface,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 6,
-                  padding: "7px 10px",
-                  color: C.text,
-                  fontFamily: C.fontSans,
-                  fontSize: 12,
-                  outline: "none",
-                  cursor: "pointer",
+                onChange={(e) => {
+                  const v = e.target.value
+                  setSearchModel(v)
+                  setSearchChassisPrefix("")
+                  runSearchFromDropdowns({ model: v, chassisPrefix: "" })
                 }}
+                style={dropdownStyle(C)}
               >
                 <option value="">--</option>
                 {modelsForMaker.map((m) => (
@@ -1044,22 +1067,34 @@ export default function BdsBorderContent() {
               </select>
             </div>
             <div>
+              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>
+                型式 {chassisPrefixes.length > 0 && <span style={{ color: C.textMuted }}>({chassisPrefixes.length})</span>}
+              </div>
+              <select
+                value={searchChassisPrefix}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setSearchChassisPrefix(v)
+                  runSearchFromDropdowns({ chassisPrefix: v })
+                }}
+                style={dropdownStyle(C)}
+              >
+                <option value="">--</option>
+                {chassisPrefixes.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+            <div>
               <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>排気量</div>
               <select
                 value={searchCcRange}
-                onChange={(e) => setSearchCcRange(e.target.value)}
-                style={{
-                  width: "100%",
-                  background: C.surface,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 6,
-                  padding: "7px 10px",
-                  color: C.text,
-                  fontFamily: C.fontSans,
-                  fontSize: 12,
-                  outline: "none",
-                  cursor: "pointer",
+                onChange={(e) => {
+                  const v = e.target.value
+                  setSearchCcRange(v)
+                  runSearchFromDropdowns({ ccRange: v })
                 }}
+                style={dropdownStyle(C)}
               >
                 <option value="">--</option>
                 <option value="50cc">50cc</option>
@@ -1073,11 +1108,11 @@ export default function BdsBorderContent() {
               </select>
             </div>
             <div>
-              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>型式（部分一致）</div>
+              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>型式追加</div>
               <input
                 value={yahooModelType}
                 onChange={(e) => setYahooModelType(e.target.value)}
-                placeholder="NC42, JC58"
+                placeholder="タイトル部分一致"
                 style={{
                   width: "100%",
                   background: C.surface,
@@ -1093,23 +1128,27 @@ export default function BdsBorderContent() {
             </div>
             <div style={{ display: "flex", alignItems: "flex-end" }}>
               <button
-                onClick={runSearchFromDropdowns}
-                disabled={yahooLoading || (!searchMaker && !searchModel && !searchCcRange)}
+                onClick={() => {
+                  setSearchMaker("")
+                  setSearchModel("")
+                  setSearchCcRange("")
+                  setSearchChassisPrefix("")
+                  setYahooModelType("")
+                }}
                 style={{
-                  padding: "8px 14px",
-                  background: C.orange,
-                  border: "none",
+                  padding: "8px 12px",
+                  background: "transparent",
+                  border: `1px solid ${C.border}`,
                   borderRadius: 6,
-                  color: "#fff",
+                  color: C.textSub,
                   fontFamily: C.fontSans,
-                  fontWeight: 700,
                   fontSize: 12,
-                  cursor: yahooLoading ? "not-allowed" : "pointer",
-                  opacity: yahooLoading || (!searchMaker && !searchModel && !searchCcRange) ? 0.6 : 1,
+                  cursor: "pointer",
                   whiteSpace: "nowrap",
                 }}
+                title="プルダウンをすべてクリア"
               >
-                選択で検索
+                クリア
               </button>
             </div>
           </div>
