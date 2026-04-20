@@ -41,7 +41,7 @@ export default function NextWeekContent() {
   const [ratioUsed, setRatioUsed] = useState(1.4)
   const [ratioConfidence, setRatioConfidence] = useState<"high" | "medium" | "low">("low")
   const [ratioSampleSize, setRatioSampleSize] = useState(0)
-  const [sortBy, setSortBy] = useState<"score" | "cc">("score")
+  const [sortBy, setSortBy] = useState<"score" | "cc">("cc")
   const [ccFilter, setCcFilter] = useState<"all" | "small" | "mid" | "large">("all")
 
   const filtered = (() => {
