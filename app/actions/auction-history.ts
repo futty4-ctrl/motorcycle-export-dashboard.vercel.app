@@ -71,10 +71,9 @@ export async function getAuctionHistory(
       q = q.ilike("model_name", `%${filter.search}%`)
     }
 
-    const { data, error } = await q.order("auction_date", {
-      ascending: false,
-      nullsFirst: false,
-    })
+    const { data, error } = await q
+      .order("auction_date", { ascending: false, nullsFirst: false })
+      .limit(50000)
     if (error) throw error
     const rows = (data ?? []).map((r) => normalizeRow(r as Record<string, unknown>))
     return { success: true, rows }
