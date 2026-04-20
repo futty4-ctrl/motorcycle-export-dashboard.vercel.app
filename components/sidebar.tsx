@@ -21,6 +21,7 @@ const NAV = [
     group: "メイン",
     items: [
       { href: "/", label: "ダッシュボード", icon: "◈" },
+      { href: "/guide", label: "使い方ガイド", icon: "📖" },
       { href: "/inventory", label: "在庫管理", icon: "▦" },
     ],
   },

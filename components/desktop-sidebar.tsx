@@ -20,6 +20,7 @@ import {
 
 const navItems = [
   { label: "ダッシュボード", href: "/", icon: LayoutDashboard },
+  { label: "使い方ガイド", href: "/guide", icon: BookOpen },
   { label: "仕入ボーダー", href: "/bds-border", icon: Target },
   { label: "オークション当日", href: "/auction-day", icon: Flag },
   { label: "オークション履歴", href: "/auction-history", icon: History },
