@@ -1047,6 +1047,28 @@ export default function BdsBorderContent() {
               </select>
             </div>
             <div>
+              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>排気量</div>
+              <select
+                value={searchCcRange}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setSearchCcRange(v)
+                  runSearchFromDropdowns({ ccRange: v })
+                }}
+                style={dropdownStyle(C)}
+              >
+                <option value="">--</option>
+                <option value="50cc">50cc</option>
+                <option value="125cc">125cc</option>
+                <option value="250cc">250cc</option>
+                <option value="400cc">400cc</option>
+                <option value="600cc">600cc</option>
+                <option value="750cc">750cc</option>
+                <option value="1000cc">1000cc</option>
+                <option value="1200cc">1200cc</option>
+              </select>
+            </div>
+            <div>
               <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>
                 車種 {modelsForMaker.length > 0 && <span style={{ color: C.textMuted }}>({modelsForMaker.length})</span>}
               </div>
@@ -1083,28 +1105,6 @@ export default function BdsBorderContent() {
                 {chassisPrefixes.map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>排気量</div>
-              <select
-                value={searchCcRange}
-                onChange={(e) => {
-                  const v = e.target.value
-                  setSearchCcRange(v)
-                  runSearchFromDropdowns({ ccRange: v })
-                }}
-                style={dropdownStyle(C)}
-              >
-                <option value="">--</option>
-                <option value="50cc">50cc</option>
-                <option value="125cc">125cc</option>
-                <option value="250cc">250cc</option>
-                <option value="400cc">400cc</option>
-                <option value="600cc">600cc</option>
-                <option value="750cc">750cc</option>
-                <option value="1000cc">1000cc</option>
-                <option value="1200cc">1200cc</option>
               </select>
             </div>
             <div>
