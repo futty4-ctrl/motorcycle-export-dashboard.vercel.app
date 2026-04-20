@@ -923,8 +923,8 @@ export default function BdsBorderContent() {
         </div>
       </div>
 
-      {/* ── ヤフオク生データ（終了済み落札結果） ── */}
-      {selectedMarket && (yahooLoading || yahooResults.length > 0) && (
+      {/* ── ヤフオク生データ（終了済み落札結果・常時表示） ── */}
+      {true && (
         <div
           style={{
             marginTop: 24,
