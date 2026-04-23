@@ -9,6 +9,7 @@ export type MakerModelEntry = {
   fullName: string
   count: number
   avgSoldPrice: number | null
+  displacementCc: number | null
 }
 
 /**
@@ -24,22 +25,25 @@ export async function getMakerModelList(): Promise<{
     const supabase = createServerSupabaseClient()
     const { data, error } = await supabase
       .from("auction_history")
-      .select("model_name, sold_price, result_status")
+      .select("model_name, sold_price, result_status, displacement_cc")
       .not("model_name", "is", null)
       .limit(10000)
     if (error) throw error
 
-    const map = new Map<string, { count: number; soldPrices: number[] }>()
+    const map = new Map<string, { count: number; soldPrices: number[]; ccSamples: number[] }>()
     for (const r of data ?? []) {
       const name = ((r.model_name as string) || "").trim()
       if (!name) continue
       if (!map.has(name)) {
-        map.set(name, { count: 0, soldPrices: [] })
+        map.set(name, { count: 0, soldPrices: [], ccSamples: [] })
       }
       const m = map.get(name)!
       m.count++
       if (r.result_status === "sold" && typeof r.sold_price === "number" && r.sold_price > 0) {
         m.soldPrices.push(r.sold_price)
+      }
+      if (typeof r.displacement_cc === "number" && r.displacement_cc > 0) {
+        m.ccSamples.push(r.displacement_cc)
       }
     }
 
@@ -51,6 +55,11 @@ export async function getMakerModelList(): Promise<{
         const avg = v.soldPrices.length > 0
           ? v.soldPrices.reduce((a, b) => a + b, 0) / v.soldPrices.length
           : null
+        // 排気量は中央値で代表
+        const ccSorted = [...v.ccSamples].sort((a, b) => a - b)
+        const ccMedian = ccSorted.length > 0
+          ? ccSorted[Math.floor(ccSorted.length / 2)]
+          : null
         return {
           id: name,
           maker,
@@ -58,6 +67,7 @@ export async function getMakerModelList(): Promise<{
           fullName: name,
           count: v.count,
           avgSoldPrice: avg,
+          displacementCc: ccMedian,
         }
       })
       .filter((e) => e.count >= 1)

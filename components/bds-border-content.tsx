@@ -173,6 +173,7 @@ export default function BdsBorderContent() {
   const [searchCcRange, setSearchCcRange] = useState("")
   const [searchChassisPrefix, setSearchChassisPrefix] = useState("")
   const [chassisPrefixes, setChassisPrefixes] = useState<string[]>([])
+  const [modelCcMap, setModelCcMap] = useState<Record<string, number | null>>({})
 
   useEffect(() => {
     // auction_history から実データベースで車種リスト生成（market_prices の手動データを置き換え）
@@ -196,6 +197,12 @@ export default function BdsBorderContent() {
           avg_days_to_sell: null,
         }))
         setMarketPrices(mps)
+        // 車種ごとの排気量中央値マップを保存
+        const ccMap: Record<string, number | null> = {}
+        for (const e of res.entries) {
+          ccMap[e.id] = e.displacementCc
+        }
+        setModelCcMap(ccMap)
         if (initialModel || initialMaker) {
           const match = mps.find(
             (m) =>
@@ -270,11 +277,58 @@ export default function BdsBorderContent() {
       .finally(() => setYahooLoading(false))
   }
 
-  // メーカー・車種のユニークリスト（market_pricesから）
+  // メーカー・車種のユニークリスト（階層連動：メーカー→排気量→車種）
   const allMakers = Array.from(new Set(marketPrices.map((m) => m.maker).filter(Boolean))).sort()
-  const modelsForMaker = searchMaker
-    ? Array.from(new Set(marketPrices.filter((m) => m.maker === searchMaker).map((m) => m.model).filter(Boolean))).sort()
-    : Array.from(new Set(marketPrices.map((m) => m.model).filter(Boolean))).sort()
+
+  // メーカー選択後、そのメーカーにある車種の排気量リスト
+  const ccInRange = (cc: number | null, range: string): boolean => {
+    if (!range || cc == null) return !range
+    if (range === "small") return cc <= 125
+    if (range === "mid") return cc > 125 && cc <= 400
+    if (range === "large") return cc > 400
+    return true
+  }
+  const ccRangeOfModel = (modelId: string): string => {
+    const cc = modelCcMap[modelId]
+    if (cc == null) return ""
+    if (cc <= 125) return "small"
+    if (cc <= 400) return "mid"
+    return "large"
+  }
+  const availableCcRanges = (() => {
+    const set = new Set<string>()
+    for (const m of marketPrices) {
+      if (searchMaker && m.maker !== searchMaker) continue
+      const cc = modelCcMap[m.id]
+      if (cc == null) continue
+      if (cc <= 125) set.add("small")
+      else if (cc <= 400) set.add("mid")
+      else set.add("large")
+    }
+    return set
+  })()
+
+  const modelsForMaker = marketPrices
+    .filter((m) => {
+      if (searchMaker && m.maker !== searchMaker) return false
+      if (searchCcRange) {
+        const range = searchCcRange === "small" || searchCcRange === "mid" || searchCcRange === "large"
+          ? searchCcRange
+          : ccInRange(modelCcMap[m.id] ?? null, "") ? "" : ""
+        if (searchCcRange === "small" || searchCcRange === "mid" || searchCcRange === "large") {
+          if (!ccInRange(modelCcMap[m.id] ?? null, range)) return false
+        } else {
+          // "50cc" "125cc" 等の具体的数値指定
+          const ccNum = parseInt(searchCcRange.replace(/[^\d]/g, ""), 10)
+          const mcc = modelCcMap[m.id]
+          if (ccNum && mcc != null && Math.abs(mcc - ccNum) > 50) return false
+        }
+      }
+      return true
+    })
+    .map((m) => m.model)
+    .filter(Boolean)
+  const uniqModelsForMaker = Array.from(new Set(modelsForMaker)).sort()
 
   // メーカー・車種が変わったら型式候補を取得
   useEffect(() => {
@@ -1091,7 +1145,7 @@ export default function BdsBorderContent() {
             </div>
             <div>
               <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>
-                車種 {modelsForMaker.length > 0 && <span style={{ color: C.textMuted }}>({modelsForMaker.length})</span>}
+                車種 {uniqModelsForMaker.length > 0 && <span style={{ color: C.textMuted }}>({uniqModelsForMaker.length})</span>}
               </div>
               <select
                 value={searchModel}
@@ -1099,12 +1153,12 @@ export default function BdsBorderContent() {
                   const v = e.target.value
                   setSearchModel(v)
                   setSearchChassisPrefix("")
-                  runSearchFromDropdowns({ model: v, chassisPrefix: "" })
+                  runSearchFromDropdowns({ model: v })
                 }}
                 style={dropdownStyle(C)}
               >
                 <option value="">--</option>
-                {modelsForMaker.map((m) => (
+                {uniqModelsForMaker.map((m) => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
