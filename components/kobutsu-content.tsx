@@ -902,6 +902,18 @@ export function KobutsuContent() {
           }
         }
         @media print {
+          @page {
+            size: A4 portrait;
+            margin: 0;
+          }
+          html, body {
+            width: 210mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           body * {
             visibility: hidden;
           }
@@ -911,22 +923,43 @@ export function KobutsuContent() {
           .kobutsu-cert-page2 * {
             visibility: visible !important;
           }
-          .kobutsu-cert {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 210mm;
+          .kobutsu-cert,
+          .kobutsu-cert-page2 {
+            position: absolute !important;
+            left: 0 !important;
+            width: 210mm !important;
             padding: 20mm 25mm !important;
             background: #fff !important;
+            box-sizing: border-box !important;
+            display: block !important;
+          }
+          .kobutsu-cert {
+            top: 0 !important;
           }
           .kobutsu-cert-page2 {
-            position: absolute;
-            left: 0;
-            top: 297mm;
-            width: 210mm;
-            padding: 20mm 25mm !important;
-            background: #fff !important;
-            page-break-before: always;
+            top: 297mm !important;
+            page-break-before: always !important;
+          }
+          /* モバイル用CSSを印刷時は完全無効化 */
+          .kobutsu-cards-mobile {
+            display: none !important;
+          }
+          .kobutsu-table-desktop {
+            display: table !important;
+          }
+          /* table を固定レイアウトで崩れ防止 */
+          .kobutsu-cert table,
+          .kobutsu-cert-page2 table {
+            table-layout: fixed !important;
+            width: 100% !important;
+            border-collapse: collapse !important;
+          }
+          .kobutsu-cert table td,
+          .kobutsu-cert table th,
+          .kobutsu-cert-page2 table td,
+          .kobutsu-cert-page2 table th {
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
           }
           .kobutsu-screen > *:not(.kobutsu-cert):not(.kobutsu-cert-page2) {
             display: none !important;
