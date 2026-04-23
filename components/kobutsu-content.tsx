@@ -725,9 +725,6 @@ export function KobutsuContent() {
                 fontSize: 14,
                 lineHeight: 1.8,
                 maxWidth: 720,
-                width: "100%",
-                boxSizing: "border-box",
-                overflowX: "auto",
                 display: certEntry || tab === "cert" ? "block" : "none",
               }}
             >
@@ -902,35 +899,6 @@ export function KobutsuContent() {
           }
           .kobutsu-cards-mobile {
             display: block;
-          }
-          /* モバイル画面での証明書プレビュー縮小表示 */
-          .kobutsu-cert,
-          .kobutsu-cert-page2 {
-            padding: 16px 14px !important;
-            font-size: 11px !important;
-            line-height: 1.6 !important;
-            max-width: 100% !important;
-          }
-          .kobutsu-cert h2,
-          .kobutsu-cert-page2 h2 {
-            font-size: 15px !important;
-            letter-spacing: 0.1em !important;
-            margin-bottom: 16px !important;
-            padding-bottom: 4px !important;
-          }
-          .kobutsu-cert table,
-          .kobutsu-cert-page2 table {
-            font-size: 10px !important;
-            width: 100% !important;
-            table-layout: fixed !important;
-          }
-          .kobutsu-cert table td,
-          .kobutsu-cert table th,
-          .kobutsu-cert-page2 table td,
-          .kobutsu-cert-page2 table th {
-            padding: 4px 6px !important;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
           }
         }
         @media print {
