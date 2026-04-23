@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { getMarketPrices } from "@/app/actions/market-prices"
+import { getMakerModelList } from "@/app/actions/maker-model-list"
 import {
   getPastActualsForModel,
   getEvaluationSnapshot,
@@ -174,18 +175,40 @@ export default function BdsBorderContent() {
   const [chassisPrefixes, setChassisPrefixes] = useState<string[]>([])
 
   useEffect(() => {
-    getMarketPrices().then((res) => {
-      if (res.success && res.rows) {
-        setMarketPrices(res.rows)
-        // URL params からモデル自動選択
+    // auction_history から実データベースで車種リスト生成（market_prices の手動データを置き換え）
+    getMakerModelList().then((res) => {
+      if (res.success) {
+        const mps: MarketPrice[] = res.entries.map((e) => ({
+          id: e.id,
+          maker: e.maker,
+          model: e.model,
+          year: null,
+          condition: "中古" as MarketPrice["condition"],
+          source: "手動" as MarketPrice["source"],
+          avg_price: e.avgSoldPrice ? Math.round(e.avgSoldPrice) : 0,
+          min_price: 0,
+          max_price: 0,
+          sample_count: e.count,
+          trend: "横ばい" as MarketPrice["trend"],
+          trend_pct: 0,
+          memo: null,
+          shipping_cost: 0,
+          avg_days_to_sell: null,
+        }))
+        setMarketPrices(mps)
         if (initialModel || initialMaker) {
-          const match = res.rows.find(
+          const match = mps.find(
             (m) =>
               (!initialMaker || m.maker === initialMaker) &&
               (!initialModel || m.model === initialModel)
           )
           if (match) setSelectedMarket(match)
         }
+      } else {
+        // フォールバック: 従来のmarket_pricesを使う
+        getMarketPrices().then((res2) => {
+          if (res2.success && res2.rows) setMarketPrices(res2.rows)
+        })
       }
     })
     // evaluation があれば取得
