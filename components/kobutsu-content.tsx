@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import type { KobutsuEntry, KobutsuSettings } from "@/types/kobutsu"
 import Link from "next/link"
 import {
@@ -87,6 +88,36 @@ export function KobutsuContent() {
     load()
     getSettings().then(({ data }) => { if (data) setSettings(data) })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    const prefill = searchParams.get("prefill")
+    if (!prefill) return
+    const priceStr = searchParams.get("price") || "0"
+    const priceNum = parseInt(priceStr, 10) || 0
+    setForm({
+      transaction_date: searchParams.get("date") || new Date().toISOString().split("T")[0],
+      transaction_type: prefill === "out" ? "譲渡" : "受入",
+      price: priceNum,
+      maker: searchParams.get("maker") || "",
+      model: searchParams.get("model") || "",
+      katashiki: searchParams.get("katashiki") || "",
+      frame_no: searchParams.get("frame_no") || "",
+      engine_no: "",
+      displacement: searchParams.get("displacement") || "",
+      model_year: "",
+      body_color: "",
+      counterparty_name: "",
+      counterparty_address: "",
+      counterparty_tel: "",
+      counterparty_occupation: "",
+      id_type: "運転免許証",
+      id_number: "",
+      notes: `管理No: ${searchParams.get("management_code") || ""} から連携`,
+    })
+    setEditId(null)
+    setTab("form")
+  }, [searchParams])
 
   useEffect(() => {
     const t = setTimeout(() => load(), 300)

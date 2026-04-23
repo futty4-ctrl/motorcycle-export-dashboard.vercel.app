@@ -446,6 +446,27 @@ export function InventoryDetailContent({
         </p>
         <InventoryActualsEditor managementCode={item.management_code} />
       </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-base font-semibold text-foreground">📋 古物台帳連携</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          買取（受入）・販売（譲渡）の古物台帳記録を1クリックでプリフィル登録
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href={`/kobutsu?prefill=in&management_code=${encodeURIComponent(item.management_code)}&maker=${encodeURIComponent(item.maker ?? "")}&model=${encodeURIComponent(item.model_name ?? "")}&katashiki=${encodeURIComponent(item.model_type ?? "")}&frame_no=${encodeURIComponent(item.chassis_number ?? "")}&displacement=${encodeURIComponent(item.cc_range ?? "")}&price=${item.purchase_price ?? 0}&date=${encodeURIComponent(item.purchase_date ?? "")}`}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-500 hover:bg-blue-500/20 touch-manipulation"
+          >
+            ⬇ 受入（買取）を古物台帳に登録
+          </Link>
+          <Link
+            href={`/kobutsu?prefill=out&management_code=${encodeURIComponent(item.management_code)}&maker=${encodeURIComponent(item.maker ?? "")}&model=${encodeURIComponent(item.model_name ?? "")}&katashiki=${encodeURIComponent(item.model_type ?? "")}&frame_no=${encodeURIComponent(item.chassis_number ?? "")}&displacement=${encodeURIComponent(item.cc_range ?? "")}&price=${item.sold_price ?? 0}&date=${encodeURIComponent(String(item.sold_date ?? "").slice(0, 10))}`}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-green-500/40 bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-500 hover:bg-green-500/20 touch-manipulation"
+          >
+            ⬆ 譲渡（販売）を古物台帳に登録
+          </Link>
+        </div>
+      </section>
     </div>
   )
 }
