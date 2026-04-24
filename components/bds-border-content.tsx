@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/past-actuals"
 import { getBdsHistoryForModel, type BdsHistorySummary } from "@/app/actions/bds-history"
 import { getChassisPrefixes } from "@/app/actions/chassis-prefixes"
+import { BIKE_TYPE_CODES_50_125, resolveModelName } from "@/lib/bike-type-codes-50-125"
 import type { MarketPrice } from "@/lib/types"
 
 const C = {
@@ -1165,17 +1166,60 @@ export default function BdsBorderContent() {
             </div>
             <div>
               <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, letterSpacing: "0.08em" }}>
-                型式（結果絞込） {chassisPrefixes.length > 0 && <span style={{ color: C.textMuted }}>({chassisPrefixes.length})</span>}
+                型式（50-125マスター＋実データ）
               </div>
               <select
                 value={searchChassisPrefix}
-                onChange={(e) => setSearchChassisPrefix(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setSearchChassisPrefix(v)
+                  // 型式選択時、車種名を解決してAPI検索（精度UP）
+                  const resolved = resolveModelName(v)
+                  if (resolved) {
+                    const parts = resolved.split(/\s+/)
+                    const resolvedMaker = parts[0] ?? ""
+                    const resolvedModel = parts.slice(1).join(" ") || v
+                    setSearchMaker(resolvedMaker)
+                    setSearchModel(resolvedModel)
+                    runSearchFromDropdowns({ maker: resolvedMaker, model: resolvedModel })
+                  }
+                }}
                 style={dropdownStyle(C)}
               >
                 <option value="">--</option>
-                {chassisPrefixes.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
+                <optgroup label="★ 50-125cc マスター型式">
+                  {Object.entries(BIKE_TYPE_CODES_50_125)
+                    .filter(([, info]) => {
+                      if (searchMaker && info.maker !== searchMaker) return false
+                      if (searchCcRange) {
+                        if (searchCcRange === "small" && info.cc > 125) return false
+                        if (searchCcRange === "mid" && (info.cc <= 125 || info.cc > 400)) return false
+                        if (searchCcRange === "large" && info.cc <= 400) return false
+                        const ccNum = parseInt(searchCcRange.replace(/[^\d]/g, ""), 10)
+                        if (ccNum && Math.abs(info.cc - ccNum) > 30) return false
+                      }
+                      return true
+                    })
+                    .sort((a, b) => {
+                      if (a[1].maker !== b[1].maker) return a[1].maker.localeCompare(b[1].maker)
+                      if (a[1].model !== b[1].model) return a[1].model.localeCompare(b[1].model)
+                      return a[0].localeCompare(b[0])
+                    })
+                    .map(([code, info]) => (
+                      <option key={code} value={code}>
+                        {code} - {info.maker} {info.model} ({info.cc}cc)
+                      </option>
+                    ))}
+                </optgroup>
+                {chassisPrefixes.length > 0 && (
+                  <optgroup label="実データ（auction_history）">
+                    {chassisPrefixes
+                      .filter((p) => !BIKE_TYPE_CODES_50_125[p.toUpperCase()])
+                      .map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                  </optgroup>
+                )}
               </select>
             </div>
             <div>
