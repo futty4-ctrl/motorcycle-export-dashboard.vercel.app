@@ -20,6 +20,7 @@ export const BIKE_TYPE_CODES_50_125: Record<string, BikeTypeCode> = {
 
   // ── ヤマハ アクシス系 ──
   SED7J: { maker: "ヤマハ", model: "アクシスZ", cc: 125 },
+  SEJ6J: { maker: "ヤマハ", model: "AXIS125Z", cc: 125 },
   SB01J: { maker: "ヤマハ", model: "アクシス", cc: 125 },
   SA09J: { maker: "ヤマハ", model: "アクシス90", cc: 90 },
   SE03J: { maker: "ヤマハ", model: "アクシストリート", cc: 125 },
