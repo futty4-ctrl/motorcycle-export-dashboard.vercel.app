@@ -25,7 +25,60 @@ export type InventoryItemRow = {
   sold_date: string | null
   created_at: string
   updated_at: string
+  // パーツ単位管理拡張（2026-04-26 migration）
+  yahoo_auction_id: string | null
+  yahoo_auction_url: string | null
+  yahoo_started_at: string | null
+  yahoo_winning_bid: number | null
+  listing_photo_urls: string[] | null
+  part_name: string | null
+  part_category: string | null
+  location: string | null
+  source_vehicle_id: string | null
+  notes: string | null
 }
+
+export type YahooListingHistoryRow = {
+  id: string
+  inventory_item_id: string
+  yahoo_auction_id: string | null
+  yahoo_auction_url: string | null
+  start_price: number | null
+  final_price: number | null
+  result: "sold" | "unsold" | "withdrawn" | "pending" | null
+  bid_count: number | null
+  watch_count: number | null
+  listing_round: number
+  started_at: string | null
+  ended_at: string | null
+  created_at: string
+  notes: string | null
+}
+
+export type PartsTemplateRow = {
+  id: string
+  vehicle_maker: string | null
+  vehicle_model: string
+  part_name: string
+  part_category: string | null
+  estimated_price: number | null
+  pickup_rate: number | null
+  sample_size: number
+  updated_at: string
+}
+
+export type InventoryStatus =
+  | "未処理"
+  | "出品準備中"
+  | "ヤフオク出品中"
+  | "売約済み"
+  | "planned"
+  | "in_stock"
+  | "listed"
+  | "relisting"
+  | "sold"
+  | "shipped"
+  | "completed"
 
 function generateManagementCode(): string {
   const today = new Date()
