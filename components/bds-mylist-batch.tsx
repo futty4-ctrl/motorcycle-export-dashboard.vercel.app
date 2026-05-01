@@ -27,45 +27,64 @@ export function BdsMylistBatch() {
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<ViewTab>("single")
   const [keyword, setKeyword] = useState("")
+  const [rawText, setRawText] = useState("")
+  const [showRaw, setShowRaw] = useState(false)
+  const [pasteMode, setPasteMode] = useState(false)
+  const [pasteText, setPasteText] = useState("")
 
   const summary = useMemo(() => summarizeMylist(rows), [rows])
 
-  const handleFile = useCallback(async (file: File) => {
-    setLoading(true)
-    try {
-      let text = ""
-      if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
-        const pdfjs = await import("pdfjs-dist")
-        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
-        const buf = await file.arrayBuffer()
-        const pdf = await pdfjs.getDocument({ data: buf }).promise
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i)
-          const content = await page.getTextContent()
-          text +=
-            content.items
-              .map((it) =>
-                "str" in it ? (it as { str: string }).str : ""
-              )
-              .join(" ") + "\n"
-        }
-      } else {
-        text = await file.text()
-      }
-      const parsed = parseBdsMylistText(text)
-      if (parsed.length === 0) {
-        toast.error("行が認識できませんでした")
-      } else {
-        toast.success(`${parsed.length}件パース成功`)
-      }
-      setRows(parsed)
-      setRowState({})
-    } catch (err) {
-      toast.error(`読込失敗: ${(err as Error).message}`)
-    } finally {
-      setLoading(false)
+  const handleParseText = useCallback((text: string) => {
+    setRawText(text)
+    const parsed = parseBdsMylistText(text)
+    if (parsed.length === 0) {
+      toast.error(
+        "行が認識できませんでした。下の「抽出テキスト確認」で内容を確認してください"
+      )
+      setShowRaw(true)
+    } else {
+      toast.success(`${parsed.length}件パース成功`)
     }
+    setRows(parsed)
+    setRowState({})
   }, [])
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      setLoading(true)
+      try {
+        let text = ""
+        if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+          const pdfjs = await import("pdfjs-dist")
+          pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
+          const buf = await file.arrayBuffer()
+          const pdf = await pdfjs.getDocument({ data: buf }).promise
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i)
+            const content = await page.getTextContent()
+            text +=
+              content.items
+                .map((it) =>
+                  "str" in it ? (it as { str: string }).str : ""
+                )
+                .join(" ") + "\n"
+          }
+          toast.info(
+            `PDF読込: ${pdf.numPages}ページ・${text.length}文字`
+          )
+        } else {
+          text = await file.text()
+        }
+        handleParseText(text)
+      } catch (err) {
+        toast.error(`読込失敗: ${(err as Error).message}`)
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [handleParseText]
+  )
 
   const filteredRows = useMemo(() => {
     const kw = keyword.trim().toLowerCase()
@@ -175,19 +194,110 @@ export function BdsMylistBatch() {
         <div style={{ ...lbl, marginBottom: 12, color: C.blue }}>
           📄 BDSマイリストPDF 一括スコアリング
         </div>
-        <input
-          type="file"
-          accept=".pdf,.txt"
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) void handleFile(f)
-            e.target.value = ""
-          }}
-          style={{ fontSize: 12, color: C.textSub, marginBottom: 8 }}
-        />
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <button
+            onClick={() => setPasteMode(false)}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 6,
+              border: `1px solid ${!pasteMode ? C.blue : C.border}`,
+              background: !pasteMode ? `${C.blue}18` : "transparent",
+              color: !pasteMode ? C.blue : C.textSub,
+              cursor: "pointer",
+              fontFamily: font,
+              fontSize: 11,
+              fontWeight: 700,
+            }}
+          >
+            📁 PDFアップロード
+          </button>
+          <button
+            onClick={() => setPasteMode(true)}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 6,
+              border: `1px solid ${pasteMode ? C.blue : C.border}`,
+              background: pasteMode ? `${C.blue}18` : "transparent",
+              color: pasteMode ? C.blue : C.textSub,
+              cursor: "pointer",
+              fontFamily: font,
+              fontSize: 11,
+              fontWeight: 700,
+            }}
+          >
+            📋 テキスト貼り付け
+          </button>
+        </div>
+        {!pasteMode ? (
+          <input
+            type="file"
+            accept=".pdf,.txt"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void handleFile(f)
+              e.target.value = ""
+            }}
+            style={{ fontSize: 12, color: C.textSub, marginBottom: 8 }}
+          />
+        ) : (
+          <div>
+            <textarea
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder="BDSマイリストPDFのテキストを貼り付け（PDFをCtrl+Aでコピーするか、PDFビューアの選択範囲をコピー）"
+              style={{
+                ...inp,
+                minHeight: 100,
+                fontFamily: "monospace",
+                fontSize: 11,
+                marginBottom: 8,
+              }}
+            />
+            <button
+              onClick={() => handleParseText(pasteText)}
+              disabled={!pasteText.trim()}
+              style={btn("primary")}
+            >
+              パース実行
+            </button>
+          </div>
+        )}
         {loading && (
-          <div style={{ fontSize: 12, color: C.textMuted }}>
+          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8 }}>
             読込・パース中…
+          </div>
+        )}
+        {rawText && (
+          <div style={{ marginTop: 12 }}>
+            <button
+              onClick={() => setShowRaw((v) => !v)}
+              style={{
+                fontSize: 11,
+                color: C.textSub,
+                background: "transparent",
+                border: `1px solid ${C.border}`,
+                borderRadius: 4,
+                padding: "4px 10px",
+                cursor: "pointer",
+                fontFamily: font,
+              }}
+            >
+              {showRaw ? "▼" : "▶"} 抽出テキスト確認（
+              {rawText.length}文字 / 行: {rawText.split("\n").length}）
+            </button>
+            {showRaw && (
+              <textarea
+                readOnly
+                value={rawText.slice(0, 5000)}
+                style={{
+                  ...inp,
+                  marginTop: 8,
+                  minHeight: 200,
+                  fontFamily: "monospace",
+                  fontSize: 10,
+                }}
+              />
+            )}
           </div>
         )}
         {rows.length > 0 && (
