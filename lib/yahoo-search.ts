@@ -39,6 +39,36 @@ export function buildYahooSearchUrl(
   }
 }
 
+/**
+ * BDS商品名をそのまま貼り付けて検索（型式・メーカー不要）
+ * 末尾の状態記号（／中 / 良 / 並 等）と先頭の番号を除去
+ * 例: "フォルツァ4社外マフラー／中" → "フォルツァ4社外マフラー"
+ */
+export function buildYahooSearchUrlByName(rawName: string): {
+  url: string
+  keyword: string
+} {
+  const cleaned = rawName
+    .replace(/[／\/](中|良|並|難|大|特|新品|未使用|難あり)$/, "")
+    .replace(/^\d+[\.\)\s]+/, "")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  const params = new URLSearchParams({
+    p: cleaned,
+    b: "1",
+    n: "50",
+    s1: "end",
+    o1: "d",
+    fixed: "0",
+  })
+
+  return {
+    url: `https://auctions.yahoo.co.jp/closedsearch/closedsearch?${params.toString()}`,
+    keyword: cleaned,
+  }
+}
+
 export function extractBdsLotNo(url: string): string | null {
   if (!url) return null
   const match = url.match(/NJP\d+\/(NJP\d+)/)

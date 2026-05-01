@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import {
   buildYahooSearchUrl,
   buildYahooSearchUrlByTypeCode,
+  buildYahooSearchUrlByName,
   extractBdsLotNo,
   normalizeTypeCode,
 } from "@/lib/yahoo-search"
@@ -36,6 +37,17 @@ const FIXED_MAKERS = [
   "その他",
 ] as const
 
+const QUICK_PARTS = [
+  "外装",
+  "エンジン",
+  "マフラー",
+  "ホイール",
+  "シート",
+  "メーター",
+  "タンク",
+  "カウル",
+] as const
+
 type LogRow = {
   id: string
   bds_url: string | null
@@ -62,6 +74,7 @@ export function PartsResearchContent() {
   const [submitting, setSubmitting] = useState(false)
   const [recent, setRecent] = useState<LogRow[]>([])
   const [lookupLoading, setLookupLoading] = useState(false)
+  const [pasteName, setPasteName] = useState("")
 
   const maker = makerSelect === "その他" ? makerCustom : makerSelect
   const lotNo = useMemo(() => extractBdsLotNo(bdsUrl), [bdsUrl])
@@ -186,6 +199,91 @@ export function PartsResearchContent() {
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
+  // 履歴から型式上位5件抽出
+  const frequentTypeCodes = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const r of recent) {
+      const code = r.search_keyword.match(/^[A-Z0-9]{3,8}/)?.[0]
+      if (code) map.set(code, (map.get(code) ?? 0) + 1)
+    }
+    return [...map.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([code]) => code)
+  }, [recent])
+
+  // 履歴チップ（重複排除した直近の組み合わせ最大8件）
+  const recentChips = useMemo(() => {
+    const seen = new Set<string>()
+    const out: LogRow[] = []
+    for (const r of recent) {
+      const key = `${r.search_keyword}`.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(r)
+      if (out.length >= 8) break
+    }
+    return out
+  }, [recent])
+
+  const handleMatrixClick = async (typeCodeLocal: string, partCat: string) => {
+    const built = buildYahooSearchUrlByTypeCode(typeCodeLocal, partCat)
+    window.open(built.url, "_blank", "noopener,noreferrer")
+    try {
+      await fetch("/api/parts-research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          maker: "未指定",
+          product_name: partCat,
+          search_keyword: built.keyword,
+          notes: `クイック検索: ${typeCodeLocal} × ${partCat}`,
+        }),
+      })
+      void loadRecent()
+    } catch {
+      // 履歴保存失敗は無視
+    }
+  }
+
+  const handlePasteSearch = async () => {
+    const raw = pasteName.trim()
+    if (!raw) {
+      toast.error("商品名を貼り付けてください")
+      return
+    }
+    const built = buildYahooSearchUrlByName(raw)
+    if (!built.keyword) {
+      toast.error("商品名から有効な検索キーワードが作れませんでした")
+      return
+    }
+    window.open(built.url, "_blank", "noopener,noreferrer")
+    try {
+      await fetch("/api/parts-research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          maker: "未指定",
+          product_name: built.keyword,
+          search_keyword: built.keyword,
+          notes: `BDS商品名そのまま検索: ${raw}`,
+        }),
+      })
+      void loadRecent()
+      setPasteName("")
+    } catch {
+      // 履歴保存失敗は無視
+    }
+  }
+
+  const handleChipClick = (row: LogRow) => {
+    const codeMatch = row.search_keyword.match(/^[A-Z0-9]{3,8}/)
+    const built = codeMatch
+      ? buildYahooSearchUrlByTypeCode(codeMatch[0], row.product_name)
+      : buildYahooSearchUrl(row.maker, row.product_name)
+    window.open(built.url, "_blank", "noopener,noreferrer")
+  }
+
   const handleQuickReSearch = (row: LogRow) => {
     const codeMatch = row.search_keyword.match(/^[A-Z0-9]{3,8}/)
     const built = codeMatch
@@ -206,6 +304,173 @@ export function PartsResearchContent() {
       <div style={{ ...pageSub, marginBottom: 16 }}>
         型式コード主軸でヤフオク終了済み相場を検索 → 入札上限を即時表示
       </div>
+
+      {/* ── 商品名そのまま貼り付け検索 ── */}
+      <div style={{ ...card(), borderTop: `3px solid ${C.green}` }}>
+        <div style={{ ...lbl, marginBottom: 10, color: C.green }}>
+          ⚡ BDS商品名をそのまま貼り付けて検索（最速）
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            style={{ ...inp, fontSize: 14, flex: 1 }}
+            value={pasteName}
+            onChange={(e) => setPasteName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handlePasteSearch()
+            }}
+            placeholder="例: フォルツァ4社外マフラー／中"
+          />
+          <button
+            onClick={() => void handlePasteSearch()}
+            style={{
+              background: C.green,
+              border: "none",
+              color: "#fff",
+              borderRadius: 8,
+              padding: "0 20px",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: font,
+              minWidth: 100,
+            }}
+          >
+            🔍 検索
+          </button>
+        </div>
+        <div style={{ marginTop: 6, fontSize: 11, color: C.textMuted }}>
+          末尾の「／中・／良」や先頭の番号は自動で除去します
+        </div>
+      </div>
+
+      {/* ── クイック検索: 履歴チップ ── */}
+      {recentChips.length > 0 && (
+        <div style={card()}>
+          <div style={{ ...lbl, marginBottom: 10 }}>
+            ⚡ 直近の検索（タップで再検索）
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {recentChips.map((row) => (
+              <button
+                key={row.id}
+                onClick={() => handleChipClick(row)}
+                style={{
+                  background: `${C.orange}12`,
+                  border: `1px solid ${C.orange}50`,
+                  color: C.orange,
+                  borderRadius: 999,
+                  padding: "10px 16px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: font,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                🔍 {row.search_keyword}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── クイック検索: 型式×パーツ マトリクス ── */}
+      {frequentTypeCodes.length > 0 && (
+        <div style={card()}>
+          <div style={{ ...lbl, marginBottom: 10 }}>
+            ⚡ よく使う型式 × パーツ区分（タップで検索）
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                borderCollapse: "collapse",
+                fontSize: 12,
+                minWidth: "100%",
+              }}
+            >
+              <thead>
+                <tr>
+                  <th
+                    style={{
+                      padding: "8px 10px",
+                      borderBottom: `1px solid ${C.border}`,
+                      color: C.textMuted,
+                      textAlign: "left",
+                      fontSize: 10,
+                      letterSpacing: 1.5,
+                    }}
+                  >
+                    型式
+                  </th>
+                  {QUICK_PARTS.map((p) => (
+                    <th
+                      key={p}
+                      style={{
+                        padding: "8px 6px",
+                        borderBottom: `1px solid ${C.border}`,
+                        color: C.textMuted,
+                        textAlign: "center",
+                        fontSize: 10,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {p}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {frequentTypeCodes.map((code) => (
+                  <tr key={code}>
+                    <td
+                      style={{
+                        padding: "6px 10px",
+                        borderBottom: `1px solid ${C.border}40`,
+                        fontFamily: font,
+                        fontWeight: 700,
+                        color: C.text,
+                      }}
+                    >
+                      {code}
+                    </td>
+                    {QUICK_PARTS.map((p) => (
+                      <td
+                        key={p}
+                        style={{
+                          padding: "4px 4px",
+                          borderBottom: `1px solid ${C.border}40`,
+                          textAlign: "center",
+                        }}
+                      >
+                        <button
+                          onClick={() => handleMatrixClick(code, p)}
+                          title={`${code} ${p}`}
+                          style={{
+                            background: "transparent",
+                            border: `1px solid ${C.border}`,
+                            color: C.textSub,
+                            borderRadius: 6,
+                            width: 36,
+                            height: 32,
+                            cursor: "pointer",
+                            fontFamily: font,
+                            fontSize: 14,
+                          }}
+                        >
+                          🔍
+                        </button>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 10, color: C.textMuted }}>
+            ※検索履歴の上位5型式から自動表示
+          </div>
+        </div>
+      )}
 
       <div style={card()}>
         <div style={{ marginBottom: 14 }}>
