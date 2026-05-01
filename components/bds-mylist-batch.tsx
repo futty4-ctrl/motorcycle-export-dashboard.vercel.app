@@ -56,7 +56,7 @@ export function BdsMylistBatch() {
         let text = ""
         if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
           const pdfjs = await import("pdfjs-dist")
-          pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
+          pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
           const buf = await file.arrayBuffer()
           const pdf = await pdfjs.getDocument({ data: buf }).promise
           for (let i = 1; i <= pdf.numPages; i++) {
