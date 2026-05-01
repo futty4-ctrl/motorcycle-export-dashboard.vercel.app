@@ -23,6 +23,7 @@ const NAV = [
       { href: "/", label: "ダッシュボード", icon: "◈" },
       { href: "/guide", label: "使い方ガイド", icon: "📖" },
       { href: "/inventory", label: "在庫管理", icon: "▦" },
+      { href: "/parts-research", label: "パーツ相場リサーチ", icon: "🔍" },
     ],
   },
   {

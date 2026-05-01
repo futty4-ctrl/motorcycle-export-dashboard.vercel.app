@@ -16,6 +16,7 @@ import {
   LineChart,
   History,
   Target,
+  Search,
 } from "lucide-react"
 
 const navItems = [
@@ -29,6 +30,7 @@ const navItems = [
   { label: "相場比較", href: "/market", icon: TrendingUp },
   { label: "見積・帳票", href: "/quote", icon: Calculator },
   { label: "在庫管理", href: "/inventory", icon: Package },
+  { label: "パーツ相場リサーチ", href: "/parts-research", icon: Search },
   { label: "取扱説明書", href: "/manual", icon: BookOpen },
   { label: "設定", href: "/settings", icon: Settings },
 ]
