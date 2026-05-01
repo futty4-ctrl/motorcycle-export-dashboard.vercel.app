@@ -130,6 +130,12 @@ export type InventoryInsertInput = {
   id_verification_method?: string | null
   bds_venue?: string | null
   cc_range?: string | null
+  // パーツ仕入れ用
+  part_name?: string | null
+  part_category?: string | null
+  location?: string | null
+  notes?: string | null
+  source_vehicle_id?: string | null
 }
 
 export async function getUniqueManagementCode(): Promise<string> {
@@ -182,6 +188,11 @@ export async function insertInventoryItem(
         id_verification_method: input.id_verification_method ?? null,
         bds_venue: input.bds_venue ?? null,
         cc_range: input.cc_range ?? null,
+        part_name: input.part_name ?? null,
+        part_category: input.part_category ?? null,
+        location: input.location ?? null,
+        notes: input.notes ?? null,
+        source_vehicle_id: input.source_vehicle_id ?? null,
       })
       .select()
       .single()

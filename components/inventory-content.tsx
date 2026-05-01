@@ -198,7 +198,7 @@ export function InventoryContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState("すべて")
-  const [tab, setTab] = useState<"list" | "quick" | "bds" | "template" | "csv">("list")
+  const [tab, setTab] = useState<"list" | "quick" | "parts" | "bds" | "template" | "csv">("list")
   const [csvRows, setCsvRows] = useState<Array<{ management_code: string; sold_price: number | null; sold_date: string | null }>>([])
   const [csvFileName, setCsvFileName] = useState("")
   const [csvImporting, setCsvImporting] = useState(false)
@@ -224,6 +224,20 @@ export function InventoryContent() {
   const [sellerAddress, setSellerAddress] = useState("")
   const [sellerOccupation, setSellerOccupation] = useState("")
   const [idVerificationMethod, setIdVerificationMethod] = useState("")
+
+  // BDSパーツ仕入れ
+  const [partSubmitting, setPartSubmitting] = useState(false)
+  const [partName, setPartName] = useState("")
+  const [partCategory, setPartCategory] = useState("外装")
+  const [partLocation, setPartLocation] = useState("")
+  const [partVehicleModel, setPartVehicleModel] = useState("")
+  const [partVehicleMaker, setPartVehicleMaker] = useState("")
+  const [partPrice, setPartPrice] = useState("")
+  const [partVenue, setPartVenue] = useState("大阪")
+  const [partDate, setPartDate] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  )
+  const [partNotes, setPartNotes] = useState("")
 
   // BDS取込
   const [bdsText, setBdsText] = useState("")
@@ -479,6 +493,7 @@ export function InventoryContent() {
       <div style={{ display: "flex", gap: 4, marginBottom: -1, position: "relative", zIndex: 1 }}>
         <button style={tabBtn("list", "在庫一覧", "▦")} onClick={() => setTab("list")}>▦ 在庫一覧</button>
         <button style={tabBtn("quick", "クイック登録", "+")} onClick={() => { setTab("quick"); resetQuickForm() }}>+ クイック登録</button>
+        <button style={tabBtn("parts", "BDSパーツ仕入れ", "🔩")} onClick={() => setTab("parts")}>🔩 BDSパーツ</button>
         <button style={tabBtn("bds", "BDS請求書取込", "📄")} onClick={() => setTab("bds")}>📄 BDS取込</button>
         <button style={tabBtn("csv", "実績CSV一括更新", "📊")} onClick={() => setTab("csv")}>📊 実績CSV</button>
       </div>
@@ -680,6 +695,189 @@ export function InventoryContent() {
               一覧に戻る
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ══════════ TAB: BDSパーツ仕入れ ══════════ */}
+      {tab === "parts" && (
+        <div style={{ ...card(C.greenGlow), borderTop: `3px solid ${C.green}` }}>
+          <div style={{ ...lbl, marginBottom: 16 }}>
+            BDSパーツ仕入れ — パーツ単位で直接登録（車両分解ではなく単体購入）
+          </div>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!partName.trim()) {
+                toast.error("パーツ名は必須")
+                return
+              }
+              setPartSubmitting(true)
+              const { data, error: err } = await insertInventoryItem({
+                purchase_date: partDate,
+                category: "パーツ",
+                maker: partVehicleMaker.trim() || null,
+                model_name: partVehicleModel.trim() || null,
+                purchase_price: partPrice ? Number(partPrice) : null,
+                bds_venue: partVenue,
+                part_name: partName.trim(),
+                part_category: partCategory,
+                location: partLocation.trim() || null,
+                notes: partNotes.trim() || null,
+              })
+              setPartSubmitting(false)
+              if (err) {
+                toast.error(err.message)
+                return
+              }
+              if (data) {
+                setItems((prev) => [data, ...prev])
+                toast.success(`${data.management_code} を登録しました`)
+                setPartName("")
+                setPartLocation("")
+                setPartPrice("")
+                setPartNotes("")
+              }
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+                marginBottom: 16,
+              }}
+            >
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>パーツ名 *</label>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    style={{ ...inp, flex: 1 }}
+                    value={partName}
+                    onChange={(e) => setPartName(e.target.value)}
+                    placeholder="例: フロントフォーク"
+                  />
+                  <a
+                    href={
+                      partName.trim()
+                        ? `https://auctions.yahoo.co.jp/closedsearch/closedsearch?p=${encodeURIComponent(
+                            `${partVehicleModel} ${partName}`.trim()
+                          )}&category=26316&n=50&b=1&exflg=1`
+                        : undefined
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      ...btn("ghost"),
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      pointerEvents: partName.trim() ? "auto" : "none",
+                      opacity: partName.trim() ? 1 : 0.4,
+                    }}
+                  >
+                    🔍 ヤフオク相場
+                  </a>
+                </div>
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>パーツ区分</label>
+                <select
+                  style={inp}
+                  value={partCategory}
+                  onChange={(e) => setPartCategory(e.target.value)}
+                >
+                  {["外装", "エンジン", "足回り", "電装", "その他"].map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>適合メーカー</label>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {MAKERS.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setPartVehicleMaker(m)}
+                      style={selBtn(partVehicleMaker === m)}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>適合車種</label>
+                <input
+                  style={inp}
+                  value={partVehicleModel}
+                  onChange={(e) => setPartVehicleModel(e.target.value)}
+                  placeholder="例: シグナスX"
+                />
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>BDS会場</label>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {VENUES.map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setPartVenue(v)}
+                      style={selBtn(partVenue === v)}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>仕入価格（円）</label>
+                <input
+                  style={{ ...inp, fontSize: 16, fontWeight: "bold" }}
+                  type="number"
+                  value={partPrice}
+                  onChange={(e) => setPartPrice(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>仕入日</label>
+                <input
+                  style={inp}
+                  type="date"
+                  value={partDate}
+                  onChange={(e) => setPartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={{ ...lbl, marginBottom: 4 }}>保管場所</label>
+                <input
+                  style={inp}
+                  value={partLocation}
+                  onChange={(e) => setPartLocation(e.target.value)}
+                  placeholder="例: 倉庫A-3"
+                />
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ ...lbl, marginBottom: 4 }}>メモ</label>
+              <input
+                style={inp}
+                value={partNotes}
+                onChange={(e) => setPartNotes(e.target.value)}
+                placeholder="状態・特記事項（任意）"
+              />
+            </div>
+            <button
+              type="submit"
+              style={btn("primary")}
+              disabled={partSubmitting}
+            >
+              {partSubmitting ? "登録中…" : "パーツを登録"}
+            </button>
+          </form>
         </div>
       )}
 
@@ -1002,7 +1200,44 @@ function ActualsRow({
           {item.management_code}
         </Link>
       </td>
-      <td style={{ ...td, fontWeight: "bold" }}>{getDisplayName(item)}</td>
+      <td style={{ ...td, fontWeight: "bold" }}>
+        <span>{getDisplayName(item)}</span>
+        {(() => {
+          const q = [
+            item.maker,
+            item.model_name,
+            item.part_name,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .trim()
+          if (!q) return null
+          const isParts = item.category === "パーツ"
+          const url = `https://auctions.yahoo.co.jp/closedsearch/closedsearch?p=${encodeURIComponent(q)}${
+            isParts ? "" : "&category=26316"
+          }&n=50&b=1&exflg=1`
+          return (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              title="ヤフオク落札相場を見る"
+              style={{
+                marginLeft: 6,
+                fontSize: 10,
+                color: C.textMuted,
+                textDecoration: "none",
+                padding: "1px 6px",
+                border: `1px solid ${C.border}`,
+                borderRadius: 4,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              🔍ヤフオク
+            </a>
+          )
+        })()}
+      </td>
       <td style={{ ...td, color: C.textSub }}>{fmt(item.purchase_price)}</td>
       <td style={td}>
         {item.bds_venue ? <span style={{ ...badge(C.blue), fontSize: 10 }}>{item.bds_venue}</span> : "—"}
