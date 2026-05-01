@@ -203,7 +203,15 @@ export function parseBdsMylistText(rawText: string): BdsMylistRow[] {
     const cls = classifyRow(category, productName, maker)
     const vehicleModel =
       cls === "single" ? extractVehicleModel(productName) : null
-    const cleanName = productName.replace(CONDITION_RE, "").trim()
+    const stripped = productName.replace(CONDITION_RE, "").trim()
+    // 検索性向上: パーツ語・状態語の前後にスペース挿入
+    const partWord =
+      "タンク|シート|マフラー|ホイール|フォーク|サイレンサー|エキパイ|ハンドル|ステップ|ミラー|ウィンカー|ウインカー|アッパー|カウル|テール|エンジン|キャブ|キャリア|フェンダー|バンパー|ガード|スイッチ|レバー|ボックス|ショック|キャリパー|ブレーキ|チェーン|ディスク|クラッチ|メーター|フェアリング|バッテリー|プラグ|ヘッドライト|スプロケ|セット|キット"
+    const cleanName = stripped
+      .replace(/(純正|社外|中古|新品)/g, " $1 ")
+      .replace(new RegExp(`(${partWord})`, "g"), " $1 ")
+      .replace(/\s+/g, " ")
+      .trim()
 
     rows.push({
       date,

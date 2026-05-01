@@ -40,19 +40,35 @@ export function buildYahooSearchUrl(
 }
 
 /**
+ * 検索キーワードに自然なスペースを挿入
+ * 例: "KTM390アドベンチャー純正タンク" → "KTM390アドベンチャー 純正 タンク"
+ */
+export function insertSearchSpaces(s: string): string {
+  if (!s) return s
+  const partWord =
+    "タンク|シート|マフラー|ホイール|フォーク|サイレンサー|エキパイ|ハンドル|ステップ|ミラー|ウィンカー|ウインカー|アッパー|カウル|テール|エンジン|キャブ|キャリア|フェンダー|バンパー|ガード|スイッチ|レバー|ボックス|ショック|キャリパー|ブレーキ|チェーン|ディスク|クラッチ|メーター|フェアリング|バッテリー|プラグ|ヘッドライト|ヘッドライトバイザー|スプロケ|テールランプ|ブレーキランプ|セット|燃料ポンプ|ＥＴＣ|ETC|キット"
+  return s
+    .replace(/(純正|社外|中古|新品)/g, " $1 ")
+    .replace(new RegExp(`(${partWord})`, "g"), " $1 ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+/**
  * BDS商品名をそのまま貼り付けて検索（型式・メーカー不要）
  * 末尾の状態記号（／中 / 良 / 並 等）と先頭の番号を除去
- * 例: "フォルツァ4社外マフラー／中" → "フォルツァ4社外マフラー"
+ * 例: "フォルツァ4社外マフラー／中" → "フォルツァ4 社外 マフラー"
  */
 export function buildYahooSearchUrlByName(rawName: string): {
   url: string
   keyword: string
 } {
-  const cleaned = rawName
+  const stripped = rawName
     .replace(/[／\/](中|良|並|難|大|特|新品|未使用|難あり)$/, "")
     .replace(/^\d+[\.\)\s]+/, "")
     .replace(/\s+/g, " ")
     .trim()
+  const cleaned = insertSearchSpaces(stripped)
 
   const params = new URLSearchParams({
     p: cleaned,
@@ -98,7 +114,8 @@ export function buildYahooSearchUrlByTypeCode(
   partName: string
 ): { url: string; keyword: string } {
   const code = normalizeTypeCode(typeCode)
-  const cleaned = partName.replace(/[／\/](中|良|並|難|大|特)$/, "").trim()
+  const stripped = partName.replace(/[／\/](中|良|並|難|大|特)$/, "").trim()
+  const cleaned = insertSearchSpaces(stripped)
   const keyword = [code, cleaned].filter(Boolean).join(" ")
 
   const params = new URLSearchParams({
