@@ -81,57 +81,129 @@ function classifyRow(
   return "single"
 }
 
-function splitNameMaker(combined: string): { name: string; maker: string } {
-  const m = combined.match(
-    /^(.+?[／\/](?:超特大|特大|中|良|並|難|大|小))\s+(.+)$/
-  )
-  if (m) return { name: m[1].trim(), maker: m[2].trim() }
-  return { name: combined.trim(), maker: "" }
+const KNOWN_CATEGORIES = new Set([
+  "タンク",
+  "シート",
+  "マフラー",
+  "ライト",
+  "ヘッドライト",
+  "ホイール",
+  "フォーク",
+  "サイレンサー",
+  "エキパイ",
+  "ステップ",
+  "ハンドル",
+  "ミラー",
+  "ウィンカー",
+  "ウインカー",
+  "アッパー",
+  "カウル",
+  "テール",
+  "エンジン",
+  "キャブ",
+  "キャリア",
+  "スプロケ",
+  "フェンダー",
+  "バンパー",
+  "ガード",
+  "スイッチ",
+  "レバー",
+  "ボックス",
+  "BOX",
+  "ＢＯＸ",
+  "ショック",
+  "キャリパー",
+  "ブレーキ",
+  "チェーン",
+  "ディスク",
+  "Bランプ",
+  "Ｂランプ",
+  "クラッチ",
+  "メーター",
+  "パーツセット",
+  "外装セット",
+  "足回りセット",
+  "ライト",
+  "その他",
+  "ＳＰ忠男",
+])
+
+const CONDITION_RE = /[／\/](超特大|特大|中|良|並|難|大|小)$/
+
+function splitMiddle(combined: string): {
+  category: string
+  productName: string
+  maker: string
+} {
+  const tokens = combined.split(/\s+/).filter(Boolean)
+  let category = ""
+  let rest = tokens
+  if (tokens.length > 1 && KNOWN_CATEGORIES.has(tokens[0])) {
+    category = tokens[0]
+    rest = tokens.slice(1)
+  }
+  // 商品名末尾の ／(中|大|...) を持つトークンを探す（最後のもの）
+  let conditionIdx = -1
+  for (let i = 0; i < rest.length; i++) {
+    if (CONDITION_RE.test(rest[i])) conditionIdx = i
+  }
+  let productName: string
+  let maker: string
+  if (conditionIdx >= 0) {
+    productName = rest.slice(0, conditionIdx + 1).join(" ")
+    maker = rest.slice(conditionIdx + 1).join(" ")
+  } else {
+    // 末尾を maker、残りを product
+    if (rest.length >= 2) {
+      productName = rest.slice(0, -1).join(" ")
+      maker = rest[rest.length - 1]
+    } else {
+      productName = rest.join(" ")
+      maker = ""
+    }
+  }
+  return { category, productName: productName.trim(), maker: maker.trim() }
 }
 
 /**
  * BDSマイリストPDFのテキストを行単位でパース
- * 末尾アンカー: 評価(数字1桁) + 開始価格 + 落|流 + 落札価格
+ *
+ * 実際のpdfjs抽出順:
+ *   YYYY 年 MM 月 DD 日 場所 ロット カテゴリ 商品名 メーカー 評価 開始価格 落|流 価格 商品数
+ *
+ * 商品数は末尾。次の日付または特殊マーカーで終端を判別。
  */
 export function parseBdsMylistText(rawText: string): BdsMylistRow[] {
   const halfText = toHalfWidth(rawText)
   const flat = halfText.replace(/\s+/g, " ")
 
   const rowRe =
-    /(\d{4}年\d{2}月\d{2}日)\s+(関東|関西|九州|大阪|堺|東京|北海道|東北|中部|中国|四国|沖縄)\s+(\d{4,6})\s+(\d+)\s+(\S*?)\s+(.+?)\s+([1-9])\s+([\d,]+)\s+(落|流)\s+([\d,]+)/g
+    /(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s+(関西|関東|九州|大阪|堺|東京|北海道|東北|中部|中国|四国|沖縄)\s+(\d{4,6})\s+([\s\S]+?)\s+([1-9])\s+([\d,]+)\s+(落|流)\s+([\d,]+)\s+(\d+)(?=\s+\d{4}\s*年|\s+★|\s+●|\s+自社|\s*$)/g
 
   const rows: BdsMylistRow[] = []
   let m: RegExpExecArray | null
   while ((m = rowRe.exec(flat))) {
     const [
       ,
-      date,
+      yyyy,
+      mm,
+      dd,
       venue,
       lotNo,
-      qtyStr,
-      categoryRaw,
-      combined,
+      middle,
       evalStr,
       startPriceStr,
       resultMark,
       finalPriceStr,
+      qtyStr,
     ] = m
 
-    let category = categoryRaw
-    let nameMakerStr = combined
-    // カテゴリ欠落（categoryに／が含まれている場合は商品名扱い）
-    if (categoryRaw.includes("／") || categoryRaw.includes("/")) {
-      category = ""
-      nameMakerStr = `${categoryRaw} ${combined}`
-    }
-
-    const { name: productName, maker } = splitNameMaker(nameMakerStr)
+    const date = `${yyyy}年${mm.padStart(2, "0")}月${dd.padStart(2, "0")}日`
+    const { category, productName, maker } = splitMiddle(middle)
     const cls = classifyRow(category, productName, maker)
     const vehicleModel =
       cls === "single" ? extractVehicleModel(productName) : null
-    const cleanName = productName
-      .replace(/[／\/](中|良|並|難|超特大|特大|大|小)$/, "")
-      .trim()
+    const cleanName = productName.replace(CONDITION_RE, "").trim()
 
     rows.push({
       date,
