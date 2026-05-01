@@ -15,6 +15,7 @@ import {
   PARTS_TARGET_PROFIT,
 } from "@/lib/bds-parts-fees"
 import { lookupBikeTypeFromDb } from "@/lib/bike-type-codes-supabase"
+import { BdsMylistBatch } from "@/components/bds-mylist-batch"
 import {
   C,
   font,
@@ -75,6 +76,7 @@ export function PartsResearchContent() {
   const [recent, setRecent] = useState<LogRow[]>([])
   const [lookupLoading, setLookupLoading] = useState(false)
   const [pasteName, setPasteName] = useState("")
+  const [mode, setMode] = useState<"single" | "batch">("single")
 
   const maker = makerSelect === "その他" ? makerCustom : makerSelect
   const lotNo = useMemo(() => extractBdsLotNo(bdsUrl), [bdsUrl])
@@ -305,6 +307,45 @@ export function PartsResearchContent() {
         型式コード主軸でヤフオク終了済み相場を検索 → 入札上限を即時表示
       </div>
 
+      {/* ── モード切替 ── */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
+        <button
+          onClick={() => setMode("single")}
+          style={{
+            padding: "10px 18px",
+            borderRadius: 8,
+            border: `1px solid ${mode === "single" ? C.orange : C.border}`,
+            background: mode === "single" ? `${C.orange}18` : "transparent",
+            color: mode === "single" ? C.orange : C.textSub,
+            cursor: "pointer",
+            fontFamily: font,
+            fontSize: 12,
+            fontWeight: 700,
+          }}
+        >
+          🔍 個別検索
+        </button>
+        <button
+          onClick={() => setMode("batch")}
+          style={{
+            padding: "10px 18px",
+            borderRadius: 8,
+            border: `1px solid ${mode === "batch" ? C.blue : C.border}`,
+            background: mode === "batch" ? `${C.blue}18` : "transparent",
+            color: mode === "batch" ? C.blue : C.textSub,
+            cursor: "pointer",
+            fontFamily: font,
+            fontSize: 12,
+            fontWeight: 700,
+          }}
+        >
+          📄 PDF一括スコアリング
+        </button>
+      </div>
+
+      {mode === "batch" && <BdsMylistBatch />}
+      {mode === "single" && (
+        <>
       {/* ── 商品名そのまま貼り付け検索 ── */}
       <div style={{ ...card(), borderTop: `3px solid ${C.green}` }}>
         <div style={{ ...lbl, marginBottom: 10, color: C.green }}>
@@ -794,6 +835,8 @@ export function PartsResearchContent() {
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   )
 }
