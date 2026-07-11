@@ -76,3 +76,29 @@ export function isReadyForValuation(f: ValuationGateInput): boolean {
   const answeredEngine = !!(f.engineStatus && f.engineStatus.trim())
   return hasModel && hasPhoto && answeredEngine
 }
+
+export interface HearingState {
+  model?: string | null
+  engine_status?: string | null
+  photo_count?: number
+}
+
+export interface HearingPrompt {
+  kind: "model" | "engine" | "photo"
+  text: string
+  quick?: "engine"
+}
+
+/** 次に聞くべき不足項目のメッセージ。ゲート充足なら null（＝つなぎ返信へ）。 */
+export function nextHearingPrompt(s: HearingState): HearingPrompt | null {
+  if (!(s.model && s.model.trim())) {
+    return { kind: "model", text: "ありがとうございます。まず「車種・年式」を教えてください（分かる範囲でOKです）。" }
+  }
+  if (!(s.engine_status && s.engine_status.trim())) {
+    return { kind: "engine", text: "ありがとうございます。エンジンはかかりますか？", quick: "engine" }
+  }
+  if ((s.photo_count ?? 0) < 1) {
+    return { kind: "photo", text: "ありがとうございます。お写真もお願いします（全体・メーター・エンジン周り・キズ の4〜6枚）。" }
+  }
+  return null
+}

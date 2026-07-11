@@ -50,3 +50,22 @@ describe("isReadyForValuation", () => {
     expect(isReadyForValuation({ model: "モンキー", photoCount: 2, engineStatus: null })).toBe(false)
   })
 })
+
+import { nextHearingPrompt } from "./hearing"
+
+describe("nextHearingPrompt", () => {
+  it("車種なし → 車種を聞く", () => {
+    expect(nextHearingPrompt({})?.kind).toBe("model")
+  })
+  it("車種あり・始動なし → 始動を聞く(quick)", () => {
+    const p = nextHearingPrompt({ model: "カブ" })
+    expect(p?.kind).toBe("engine")
+    expect(p?.quick).toBe("engine")
+  })
+  it("車種・始動あり・写真0 → 写真を聞く", () => {
+    expect(nextHearingPrompt({ model: "カブ", engine_status: "かかる", photo_count: 0 })?.kind).toBe("photo")
+  })
+  it("全部揃えば null（つなぎへ）", () => {
+    expect(nextHearingPrompt({ model: "カブ", engine_status: "不明", photo_count: 2 })).toBeNull()
+  })
+})
