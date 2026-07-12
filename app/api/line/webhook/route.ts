@@ -5,7 +5,7 @@ import { textMessage, replyMessage, getAccessToken, QR_ENGINE, type LineTextMess
 import { extractFields } from "@/lib/buyback/extract"
 import { mergeFields } from "@/lib/buyback/merge"
 import { nextHearingPrompt } from "@/lib/buyback/hearing"
-import { GREETING, TSUNAGI, HOLDING } from "@/lib/buyback/templates"
+import { TSUNAGI, HOLDING } from "@/lib/buyback/templates"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -180,9 +180,8 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      if (ev.type === "follow" && ev.replyToken) {
-        await tryReply(ev.replyToken, [textMessage(GREETING)])
-      } else if (ev.type === "message" && userId) {
+      // 友だち追加(follow)のあいさつは LINE公式アカウントの「あいさつメッセージ」で送るため Bot では送らない（二重防止）
+      if (ev.type === "message" && userId) {
         if (ev.message?.type === "text") await handleText(supabase, ev, userId)
         else if (ev.message?.type === "image") await handleImage(supabase, ev, userId)
       }
